@@ -4,7 +4,7 @@ import { useDispatch } from 'react-redux';
 import './main.scss';
 import { selectNeuron } from '../../store/slices/simulationSlice';
 import { useAnnAnimation } from './useAnnAnimation';
-import { viz } from '../../viz-kit';
+import { viz } from 'vizcraft';
 import { useMemo } from 'react';
 
 interface NetworkVisualizationProps {

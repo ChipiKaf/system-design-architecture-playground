@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import './App.scss'
-import Shell from './viz-kit/Shell';
+import Shell from './components/Shell';
 import AnnPlugin from './plugins/ann';
 import DecisionTreePlugin from './plugins/decision-tree';
 

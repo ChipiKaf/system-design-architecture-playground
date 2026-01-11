@@ -2,7 +2,7 @@ import React, { useMemo, useLayoutEffect, useRef } from 'react';
 import './main.scss';
 import { useDecisionTreeAnimation } from './useDecisionTreeAnimation';
 import { type TreeNode } from './decisionTreeSlice';
-import { viz } from '../../viz-kit/core/builder';
+import { viz } from 'vizcraft';
 
 interface DecisionTreeVisualizationProps {
   onAnimationComplete?: () => void;

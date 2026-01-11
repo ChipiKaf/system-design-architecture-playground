@@ -4,8 +4,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { type RootState } from '../store/store';
 import { nextStep, incrementPass, resetSimulation, selectNeuron } from '../store/slices/simulationSlice';
 import type { ModelPlugin, ModelStep } from '../types/ModelPlugin';
-import StepIndicator from './components/StepIndicator';
-import NeuronDetail from '../components/NeuronDetail';
+import StepIndicator from './StepIndicator/StepIndicator';
+import NeuronDetail from './NeuronDetail';
 
 interface ShellProps {
   plugin: ModelPlugin;
