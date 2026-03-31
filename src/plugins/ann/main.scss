@@ -21,7 +21,9 @@
     .viz-edge {
       stroke: #cbd5e1;
       stroke-width: 1;
-      transition: stroke-width 0.1s ease, stroke 0.1s ease;
+      transition:
+        stroke-width 0.1s ease,
+        stroke 0.1s ease;
     }
 
     .viz-edge-hit {
@@ -54,20 +56,20 @@
 
   // Flow animation class is applied via .animate('flow')
   .viz-edge-group.viz-anim-flow {
-     .viz-edge {
-         stroke: #60a5fa;
-         stroke-width: 2;
-         opacity: 0.5;
-     }
+    .viz-edge {
+      stroke: #60a5fa;
+      stroke-width: 2;
+      opacity: 0.5;
+    }
 
-     &:hover {
-         .viz-edge {
-             stroke: #3b82f6;
-             stroke-width: 3;
-             opacity: 1;
-             filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
-         }
-     }
+    &:hover {
+      .viz-edge {
+        stroke: #3b82f6;
+        stroke-width: 3;
+        opacity: 1;
+        filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
+      }
+    }
   }
 
   .signal {
