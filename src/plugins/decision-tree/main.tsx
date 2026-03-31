@@ -1,125 +1,166 @@
-import React, { useMemo, useLayoutEffect, useRef } from 'react';
-import './main.scss';
-import { useDecisionTreeAnimation } from './useDecisionTreeAnimation';
-import { type TreeNode } from './decisionTreeSlice';
-import { viz } from 'vizcraft';
+import React, { useMemo, useLayoutEffect, useEffect, useRef } from "react";
+import "./main.scss";
+import { useDecisionTreeAnimation } from "./useDecisionTreeAnimation";
+import { type TreeNode } from "./decisionTreeSlice";
+import { viz } from "vizcraft";
 
 interface DecisionTreeVisualizationProps {
   onAnimationComplete?: () => void;
 }
 
 // Logic to dynamically position nodes on a grid based on tree structure
-const calculateTreeLayout = (tree: Record<string, TreeNode>, rootId: string) => {
-    const layout: Record<string, { col: number; row: number }> = {};
-    let maxDepth = 0;
-    let leafCount = 0;
+const calculateTreeLayout = (
+  tree: Record<string, TreeNode>,
+  rootId: string,
+) => {
+  const layout: Record<string, { col: number; row: number }> = {};
+  let maxDepth = 0;
+  let leafCount = 0;
 
-    const traverse = (id: string, depth: number): number => {
-        const node = tree[id];
-        if (!node) return 0;
-        
-        if (depth > maxDepth) maxDepth = depth;
+  const traverse = (id: string, depth: number): number => {
+    const node = tree[id];
+    if (!node) return 0;
 
-        // If leaf or no children, assign a new COLUMN slot (horizontal)
-        if (!node.children || node.type === 'leaf') {
-            const col = leafCount++;
-            layout[id] = { row: depth, col };
-            return col;
-        }
+    if (depth > maxDepth) maxDepth = depth;
 
-        // Parent is centered horizontally between children
-        const leftCol = traverse(node.children.left, depth + 1);
-        const rightCol = traverse(node.children.right, depth + 1);
-        const col = (leftCol + rightCol) / 2;
+    // If leaf or no children, assign a new COLUMN slot (horizontal)
+    if (!node.children || node.type === "leaf") {
+      const col = leafCount++;
+      layout[id] = { row: depth, col };
+      return col;
+    }
 
-        layout[id] = { row: depth, col };
-        return col;
-    };
+    // Parent is centered horizontally between children
+    const leftCol = traverse(node.children.left, depth + 1);
+    const rightCol = traverse(node.children.right, depth + 1);
+    const col = (leftCol + rightCol) / 2;
 
-    traverse(rootId, 0);
-    // Grid: Cols = Width (leaf count), Rows = Height (max depth + 1)
-    return { layout, cols: leafCount, rows: maxDepth + 1 };
+    layout[id] = { row: depth, col };
+    return col;
+  };
+
+  traverse(rootId, 0);
+  // Grid: Cols = Width (leaf count), Rows = Height (max depth + 1)
+  return { layout, cols: leafCount, rows: maxDepth + 1 };
 };
 
 const DecisionTreeVisualization: React.FC<DecisionTreeVisualizationProps> = ({
   onAnimationComplete,
 }) => {
-  const { tree, dataPoints, rootId } = useDecisionTreeAnimation(onAnimationComplete);
+  const { tree, dataPoints, rootId } =
+    useDecisionTreeAnimation(onAnimationComplete);
 
   // Re-calculate layout if tree changes
-  const { layout, cols, rows } = useMemo(() => calculateTreeLayout(tree, rootId), [tree, rootId]);
+  const { layout, cols, rows } = useMemo(
+    () => calculateTreeLayout(tree, rootId),
+    [tree, rootId],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
+  const builderRef = useRef<ReturnType<typeof viz> | null>(null);
 
   const scene = useMemo(() => {
     // Configure Grid:
     const b = viz().view(800, 600).grid(cols, rows, { x: 50, y: 50 });
 
     // Determine active nodes (nodes containing unfinished data points)
-    const activeNodeIds = new Set(dataPoints.filter(p => !p.isFinished).map(p => p.currentNodeId));
+    const activeNodeIds = new Set(
+      dataPoints.filter((p) => !p.isFinished).map((p) => p.currentNodeId),
+    );
 
     // 1. Build Nodes
     Object.values(tree).forEach((node: TreeNode) => {
-        // Get calculated grid position
-        const pos = layout[node.id] || { col: 0, row: 0 };
-        const isActive = activeNodeIds.has(node.id);
-        
-        const n = b.node(node.id).cell(pos.col, pos.row);
+      // Get calculated grid position
+      const pos = layout[node.id] || { col: 0, row: 0 };
+      const isActive = activeNodeIds.has(node.id);
 
-        if (node.type === 'leaf') {
-             n.circle(30).class('leaf');
-        } else {
-             n.rect(80, 40, 5).class('internal');
-        }
+      const n = b.node(node.id).cell(pos.col, pos.row);
 
-        if (isActive) {
-            n.class('active');
-        }
+      if (node.type === "leaf") {
+        n.circle(30).class("leaf");
+      } else {
+        n.rect(80, 40, 5).class("internal");
+      }
 
-        n.label(node.label, { className: 'node-label' });
+      if (isActive) {
+        n.class("active");
+      }
+
+      n.label(node.label, { className: "node-label" });
     });
 
     // 2. Build Edges
     Object.values(tree).forEach((node: TreeNode) => {
-        if (node.type === 'leaf') return;
+      if (node.type === "leaf") return;
 
-        const isActive = activeNodeIds.has(node.id);
-        
-        if (node.children?.left) {
-            const e = b.edge(node.id, node.children.left)
-             .label('Yes', { position: 'mid', className: 'link-label' });
-            
-            if (isActive) {
-                e.animate('flow', { duration: '1s' });
-            }
-        }
-        if (node.children?.right) {
-            const e = b.edge(node.id, node.children.right)
-             .label('No', { position: 'mid', className: 'link-label' });
+      const isActive = activeNodeIds.has(node.id);
 
-            if (isActive) {
-                e.animate('flow', { duration: '1s' });
-            }
+      if (node.children?.left) {
+        const e = b
+          .edge(node.id, node.children.left)
+          .label("Yes", { position: "mid", className: "link-label" });
+
+        if (isActive) {
+          e.animate("flow", { duration: "1s" });
         }
+      }
+      if (node.children?.right) {
+        const e = b
+          .edge(node.id, node.children.right)
+          .label("No", { position: "mid", className: "link-label" });
+
+        if (isActive) {
+          e.animate("flow", { duration: "1s" });
+        }
+      }
     });
 
-    // 3. Add Data Points Overlay
-    b.overlay('data-points', { points: dataPoints });
+    // 3. Add Data Points via OverlayBuilder
+    b.overlay((o) => {
+      o.add("data-points", { points: dataPoints }, { key: "data-points" });
+    });
+
+    // AnimationBuilder: pulse active nodes when data points traverse
+    if (activeNodeIds.size > 0) {
+      b.animate((anim) => {
+        activeNodeIds.forEach((id) => {
+          anim
+            .at(0)
+            .node(id)
+            .to({ scale: 1.15 }, { duration: 250, easing: "easeOut" })
+            .to({ scale: 1.0 }, { duration: 250, easing: "easeIn" });
+        });
+      });
+    }
 
     return b;
   }, [tree, dataPoints, layout, cols, rows]);
 
   useLayoutEffect(() => {
-    if (containerRef.current) {
-        scene.mount(containerRef.current);
-    }
+    if (!containerRef.current) return;
+
+    // Destroy previous scene before mounting new one
+    builderRef.current?.destroy();
+    builderRef.current = scene;
+
+    scene.mount(containerRef.current, { autoplay: true });
   }, [scene]);
+
+  // Destroy on unmount
+  useEffect(() => {
+    return () => {
+      builderRef.current?.destroy();
+      builderRef.current = null;
+    };
+  }, []);
 
   return (
     <div className="decision-tree-visualization-container">
-       <div ref={containerRef} className="decision-tree-visualization" style={{ width: 800, height: 600 }}></div>
-       <div className="controls-overlay">
-         {/* Controls placeholder */}
-       </div>
+      <div
+        ref={containerRef}
+        className="decision-tree-visualization"
+        style={{ width: 800, height: 600 }}
+      ></div>
+      <div className="controls-overlay">{/* Controls placeholder */}</div>
     </div>
   );
 };
