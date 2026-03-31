@@ -76,44 +76,109 @@ const NetworkVisualization: React.FC<NetworkVisualizationProps> = ({
       // Fractional positioning allowed in viz-kit
       const row = neuron.neuronIndex + rowOffset;
 
-      b.node(`${neuron.layerIndex}-${neuron.neuronIndex}`)
+      const nodeBuilder = b
+        .node(`${neuron.layerIndex}-${neuron.neuronIndex}`)
         .cell(neuron.layerIndex, row) // Use calculated grid coordinates
         //.at(neuron.x, neuron.y) // old implementation
         .circle(neuronRadius)
         .class(neuronClass)
         .label(isVisible ? displayValue : "", {
           className: `neuron-value ${isVisible ? "visible" : ""}`,
-        })
-        .onClick(() => {
-          // Gather data for this neuron
-          const incomingConnections = connections.filter(
-            (c) =>
-              c.targetIndex === neuron.neuronIndex &&
-              c.sourceLayer === neuron.layerIndex - 1,
-          );
-
-          const inputs = incomingConnections.map((c) => {
-            const sourceKey = `${c.sourceLayer}-${c.sourceIndex}`;
-            return neuronValues[sourceKey]?.output || 0;
-          });
-
-          const weights = incomingConnections.map((c) => c.weight);
-
-          dispatch(
-            selectNeuron({
-              layerIndex: neuron.layerIndex,
-              neuronIndex: neuron.neuronIndex,
-              bias: neuron.bias,
-              output: val?.output || 0,
-              inputs,
-              weights,
-            }),
-          );
         });
+
+      // Tooltips: explain what this neuron is and why it fired/didn't
+      if (isVisible) {
+        const isInputLayer = neuron.layerIndex === 0;
+        if (isInputLayer) {
+          nodeBuilder.tooltip({
+            title: `Input Neuron [${neuron.neuronIndex}]`,
+            sections: [
+              { label: "Value", value: val.output.toFixed(4) },
+              { label: "Role", value: "Passes raw data into the network" },
+            ],
+          });
+        } else if (val.state === "sum") {
+          nodeBuilder.tooltip({
+            title: `Neuron [L${neuron.layerIndex}, N${neuron.neuronIndex}]`,
+            sections: [
+              { label: "Weighted Sum", value: val.sum.toFixed(4) },
+              { label: "Bias", value: neuron.bias.toFixed(4) },
+              {
+                label: "Status",
+                value: "Computing… activation not yet applied",
+              },
+            ],
+          });
+        } else {
+          const fired = val.output > 0;
+          nodeBuilder.tooltip({
+            title: `Neuron [L${neuron.layerIndex}, N${neuron.neuronIndex}]`,
+            sections: [
+              { label: "Weighted Sum", value: val.sum.toFixed(4) },
+              { label: "After ReLU", value: val.output.toFixed(4) },
+              {
+                label: "Fired?",
+                value: fired
+                  ? "✓ Yes — sum was positive"
+                  : "✗ No — sum was ≤ 0, ReLU outputs 0",
+              },
+              {
+                label: "Why?",
+                value: fired
+                  ? "Positive inputs outweighed negative ones"
+                  : "Negative/zero inputs dominated — this neuron stays silent",
+              },
+            ],
+          });
+          // Badge: quick visual indicator of fired/not-fired
+          nodeBuilder.badge(fired ? "✓" : "✗", {
+            position: "top-right",
+            fill: "#fff",
+            background: fired ? "#22c55e" : "#ef4444",
+            fontSize: 8,
+          });
+        }
+      }
+
+      nodeBuilder.onClick(() => {
+        // Gather data for this neuron
+        const incomingConnections = connections.filter(
+          (c) =>
+            c.targetIndex === neuron.neuronIndex &&
+            c.sourceLayer === neuron.layerIndex - 1,
+        );
+
+        const inputs = incomingConnections.map((c) => {
+          const sourceKey = `${c.sourceLayer}-${c.sourceIndex}`;
+          return neuronValues[sourceKey]?.output || 0;
+        });
+
+        const weights = incomingConnections.map((c) => c.weight);
+
+        dispatch(
+          selectNeuron({
+            layerIndex: neuron.layerIndex,
+            neuronIndex: neuron.neuronIndex,
+            bias: neuron.bias,
+            output: val?.output || 0,
+            inputs,
+            weights,
+          }),
+        );
+      });
     });
 
     // Connections
     connections.forEach((conn) => {
+      const sourceKey = `${conn.sourceLayer}-${conn.sourceIndex}`;
+      const sourceVal = neuronValues[sourceKey];
+      const sourceOutput = sourceVal?.output ?? 0;
+
+      const hasFlow =
+        activeLayer === conn.sourceLayer &&
+        sourceVal?.sum > 0 &&
+        conn.weight > 0;
+
       const bEdge = b
         .edge(
           `${conn.sourceLayer}-${conn.sourceIndex}`,
@@ -122,19 +187,55 @@ const NetworkVisualization: React.FC<NetworkVisualizationProps> = ({
         )
         .label(conn.weight.toFixed(2), { className: "weight-label" })
         .class("connection")
-        .hitArea(10); // Standard hit area width
+        .hitArea(10);
 
-      // Check "flow" condition: active layer matches source, source output > 0, weight > 0
-      if (
-        activeLayer === conn.sourceLayer &&
-        neuronValues[`${conn.sourceLayer}-${conn.sourceIndex}`]?.sum > 0 &&
-        conn.weight > 0
-      ) {
+      // Tooltip: explain this connection's role
+      const product = sourceOutput * conn.weight;
+      const isExcitatory = conn.weight >= 0;
+      const tooltipSections = [
+        {
+          label: "Weight",
+          value: `${conn.weight.toFixed(4)} (${isExcitatory ? "excitatory ↑" : "inhibitory ↓"})`,
+        },
+      ];
+      if (sourceVal) {
+        tooltipSections.push(
+          { label: "Source Output", value: sourceOutput.toFixed(4) },
+          {
+            label: "Signal Sent",
+            value: `${sourceOutput.toFixed(2)} × ${conn.weight.toFixed(2)} = ${product.toFixed(4)}`,
+          },
+        );
+      }
+      if (hasFlow) {
+        tooltipSections.push({
+          label: "Flow",
+          value: "✓ Active — positive source & positive weight",
+        });
+      } else if (activeLayer === conn.sourceLayer) {
+        const reason =
+          sourceOutput <= 0
+            ? "Source neuron did not fire (output ≤ 0)"
+            : conn.weight <= 0
+              ? "Weight is negative or zero"
+              : "Not active at this step";
+        tooltipSections.push({
+          label: "Flow",
+          value: `✗ Inactive — ${reason}`,
+        });
+      }
+
+      bEdge.tooltip({
+        title: `Connection`,
+        sections: tooltipSections,
+      });
+
+      if (hasFlow) {
         bEdge.animate("flow", { duration: "2s" });
       }
     });
 
-    // Add Signals and Grid Labels via OverlayBuilder
+    // Add Signals, Grid Labels, and Legend via OverlayBuilder
     b.overlay((o) => {
       // Signals
       signals.forEach((sig) => {

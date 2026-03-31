@@ -30,17 +30,14 @@
     }
 
     .weight-label {
-      // Note: Labels are now separate in DOM (viz-edge-labels layer), 
-      // but VizKit puts the custom className on them.
-      // So .weight-label can be styled.
       font-size: 12px;
       fill: #333;
       font-weight: bold;
       pointer-events: none;
       text-shadow: 0 0 4px white;
-      opacity: 0; 
+      opacity: 0;
       transition: opacity 0.1s ease;
-      stroke: none; // Ensure text is crisp
+      stroke: none;
     }
 
     &:hover {
@@ -48,7 +45,7 @@
         stroke-width: 2;
         stroke: #94a3b8;
       }
-      
+
       .weight-label {
         opacity: 1;
       }
@@ -61,12 +58,11 @@
          stroke: #60a5fa;
          stroke-width: 2;
          opacity: 0.5;
-         // Animation (dasharray/keyframes) is handled by VizKit base styles
      }
 
      &:hover {
          .viz-edge {
-             stroke: #3b82f6; // Brighter Blue
+             stroke: #3b82f6;
              stroke-width: 3;
              opacity: 1;
              filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.5));
@@ -88,12 +84,12 @@
     stroke-width: 2;
     cursor: pointer;
     transition: all 0.3s ease;
-    
+
     // Explicitly target shape for clarity and safety
     .viz-node-shape {
-         fill: inherit; // or #fff
-         stroke: inherit; // or #94a3b8
-         transition: inherit;
+      fill: inherit; // or #fff
+      stroke: inherit; // or #94a3b8
+      transition: inherit;
     }
 
     &.active {
@@ -117,17 +113,17 @@
     }
 
     &:hover {
-         stroke: #2563eb;
-         stroke-width: 3;
-         filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
+      stroke: #2563eb;
+      stroke-width: 3;
+      filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
 
-        &.negative {
-            stroke: #dc2626;
-            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
-        }
-        
-        // Ensure child label is visible on hover (if opacity logic used there)
-        // But here we rely on .neuron-value.visible class mostly
+      &.negative {
+        stroke: #dc2626;
+        filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
+      }
+
+      // Ensure child label is visible on hover (if opacity logic used there)
+      // But here we rely on .neuron-value.visible class mostly
     }
   }
 
@@ -154,5 +150,3 @@
     font-weight: 500;
   }
 }
-
-
