@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import type { SignalOverlayParams } from "vizcraft";
 import { type RootState } from "../../store/store";
 import {
   publishEvent,
@@ -29,14 +30,7 @@ export type AnimPhase =
   | "burst"
   | "summary";
 
-export interface Signal {
-  id: string;
-  from: string;
-  to: string;
-  progress: number;
-  /** If set, render as a circle overlay resting inside a node */
-  resting?: { nodeId: string; offsetX: number; offsetY: number };
-}
+export type Signal = { id: string } & SignalOverlayParams;
 
 export const useEventStreamingAnimation = (
   onAnimationComplete?: () => void,
@@ -50,17 +44,20 @@ export const useEventStreamingAnimation = (
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined!);
   // Balls that should persist visually across step transitions
   const persistedDsRef = useRef<Signal[]>([]);
-  // Broadcast instance resting balls
-  const persistedBcastRef = useRef<Signal[]>([]);
   // Track previous offline IDs to detect online transitions
   const prevOfflineIdsRef = useRef<string[]>([]);
+  const streamingRef = useRef(streaming);
+  const onAnimationCompleteRef = useRef(onAnimationComplete);
+
+  streamingRef.current = streaming;
+  onAnimationCompleteRef.current = onAnimationComplete;
 
   const cleanup = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     clearTimeout(timerRef.current);
   }, []);
 
-  // Animate a chain of signal hops sequentially: ball goes from→to, then next pair, etc.
+  // Animate a chain of signal hops sequentially using the vizcraft chain overlay API.
   const animateSignalChain = useCallback(
     (
       hops: { from: string; to: string }[],
@@ -69,35 +66,40 @@ export const useEventStreamingAnimation = (
       options?: { keepFinal?: boolean; extra?: Signal[] },
     ) => {
       const extra = options?.extra ?? [];
-      let hopIndex = 0;
+      const totalDuration = hops.length * durationPerHop;
+      const sigId = `chain-${hops[0]?.from}-${hops[hops.length - 1]?.to}`;
+      const startTime = performance.now();
 
-      const runHop = () => {
-        if (hopIndex >= hops.length) {
-          if (!options?.keepFinal) setSignals([...extra]);
-          onDone();
-          return;
-        }
-        const hop = hops[hopIndex];
-        const sigId = `sig-${hop.from}-${hop.to}`;
-        const start = performance.now();
-
-        const step = (now: number) => {
-          const p = Math.min((now - start) / durationPerHop, 1);
-          setSignals([
-            ...extra,
-            { id: sigId, from: hop.from, to: hop.to, progress: p },
-          ]);
-          if (p < 1) {
-            rafRef.current = requestAnimationFrame(step);
+      const step = (now: number) => {
+        const rawP = Math.min((now - startTime) / totalDuration, 1);
+        const progress = rawP * hops.length;
+        setSignals([
+          ...extra,
+          { id: sigId, chain: hops, progress, magnitude: 1 },
+        ]);
+        if (rawP < 1) {
+          rafRef.current = requestAnimationFrame(step);
+        } else {
+          if (options?.keepFinal) {
+            const last = hops[hops.length - 1];
+            setSignals([
+              ...extra,
+              {
+                id: sigId,
+                chain: hops,
+                progress: hops.length,
+                magnitude: 1,
+                resting: true,
+                parkAt: last.to,
+              },
+            ]);
           } else {
-            hopIndex++;
-            runHop();
+            setSignals([...extra]);
           }
-        };
-        rafRef.current = requestAnimationFrame(step);
+          onDone();
+        }
       };
-
-      runHop();
+      rafRef.current = requestAnimationFrame(step);
     },
     [],
   );
@@ -154,49 +156,43 @@ export const useEventStreamingAnimation = (
       const count = Math.min(inst.missedCount, 3);
       let ball = 0;
       const sigId = `catchup-${instId}`;
+      const clientPairs = [0, 1].map((clientIndex) => ({
+        from: instId,
+        to: `${instId}-client-${clientIndex}`,
+      }));
 
       const animNext = () => {
         if (ball >= count) {
-          // Done — add resting ball and update state
           dispatch(catchUpBroadcast(instId));
-          const restSig: Signal = {
-            id: `bcast-catchup-rest-${instId}`,
-            from: instId,
-            to: instId,
-            progress: 0,
-            resting: {
-              nodeId: instId,
-              offsetX: (Math.random() - 0.5) * 20,
-              offsetY: (Math.random() - 0.5) * 12,
-            },
-          };
-          persistedBcastRef.current = [
-            ...persistedBcastRef.current.filter(
-              (s) => s.resting?.nodeId !== instId,
-            ),
-            restSig,
-          ];
-          setSignals((prev) => [
-            ...prev.filter(
-              (s) => s.id !== sigId && s.resting?.nodeId !== instId,
-            ),
-            restSig,
-          ]);
+          setSignals((prev) => prev.filter((s) => s.id !== sigId));
           return;
         }
 
         const start = performance.now();
         const step = (now: number) => {
-          const p = Math.min((now - start) / 300, 1);
+          const p = Math.min((now - start) / 500, 1);
           setSignals((prev) => [
             ...prev.filter((s) => s.id !== sigId),
-            { id: sigId, from: "broker", to: instId, progress: p },
+            {
+              id: sigId,
+              from: "broker",
+              to: instId,
+              progress: p,
+              magnitude: 1,
+            },
           ]);
           if (p < 1) {
             rafRef.current = requestAnimationFrame(step);
           } else {
-            ball++;
-            timerRef.current = setTimeout(animNext, 100);
+            animateSignalsParallel(
+              clientPairs,
+              250,
+              () => {
+                ball++;
+                timerRef.current = setTimeout(animNext, 100);
+              },
+              { extra: [] },
+            );
           }
         };
         rafRef.current = requestAnimationFrame(step);
@@ -204,26 +200,29 @@ export const useEventStreamingAnimation = (
 
       animNext();
     }
-  }, [streaming.offlineBroadcastIds]);
+  }, [
+    animateSignalsParallel,
+    dispatch,
+    streaming.consumerGroups,
+    streaming.offlineBroadcastIds,
+  ]);
 
   useEffect(() => {
     cleanup();
+    const currentStreaming = streamingRef.current;
 
     // Step 0: Overview
     if (currentStep === 0) {
       setAnimPhase("idle");
-      const allPersisted = [
-        ...persistedDsRef.current,
-        ...persistedBcastRef.current,
-      ];
+      const allPersisted = [...persistedDsRef.current];
       setSignals(allPersisted);
-      setTimeout(() => onAnimationComplete?.(), 0);
+      setTimeout(() => onAnimationCompleteRef.current?.(), 0);
       return cleanup;
     }
 
     // Step 1: Produce — ball travels Producer → Dispatcher → Adapter → Broker
     if (currentStep === 1) {
-      const carried = [...persistedDsRef.current, ...persistedBcastRef.current];
+      const carried = [...persistedDsRef.current];
       setSignals(carried);
       dispatch(publishEvent({ key: randomKey() }));
       setAnimPhase("producing");
@@ -236,7 +235,7 @@ export const useEventStreamingAnimation = (
         500,
         () => {
           setAnimPhase("idle");
-          onAnimationComplete?.();
+          onAnimationCompleteRef.current?.();
         },
         { extra: carried },
       );
@@ -245,15 +244,15 @@ export const useEventStreamingAnimation = (
 
     // Step 2: Partition assignment — ball from broker → target partition, stays there
     if (currentStep === 2) {
-      const carried = [...persistedDsRef.current, ...persistedBcastRef.current];
+      const carried = [...persistedDsRef.current];
       setAnimPhase("partitioning");
-      const pId = streaming.lastPublishedEvent?.assignedPartition ?? 0;
+      const pId = currentStreaming.lastPublishedEvent?.assignedPartition ?? 0;
       animateSignalChain(
         [{ from: "broker", to: `p-${pId}` }],
         800,
         () => {
           setAnimPhase("idle");
-          onAnimationComplete?.();
+          onAnimationCompleteRef.current?.();
         },
         { keepFinal: true, extra: carried },
       );
@@ -263,12 +262,12 @@ export const useEventStreamingAnimation = (
     // Step 3: Workers consume — partition→worker, hold at worker, then worker→data-store
     if (currentStep === 3) {
       // Don't clear signals — ball is still sitting at partition from step 2
-      const carried = [...persistedDsRef.current, ...persistedBcastRef.current];
+      const carried = [...persistedDsRef.current];
       setAnimPhase("consuming-workers");
-      const pairs = streaming.consumerGroups[0].instances
+      const pairs = currentStreaming.consumerGroups[0].instances
         .filter((inst) => {
           const pId = inst.assignedPartitions[0];
-          return streaming.partitions[pId].events.some(
+          return currentStreaming.partitions[pId].events.some(
             (e) => e.consumedBy === null,
           );
         })
@@ -294,27 +293,23 @@ export const useEventStreamingAnimation = (
                 storePairs,
                 800,
                 () => {
-                  // Keep balls resting at data-store as circle overlays
-                  const dsSignals: Signal[] = storePairs.map((_p, i) => ({
+                  const dsSignals: Signal[] = storePairs.map((p, i) => ({
                     id: `ds-rest-s3-${i}-${Date.now()}`,
-                    from: "data-store",
+                    from: p.from,
                     to: "data-store",
-                    progress: 0,
-                    resting: {
-                      nodeId: "data-store",
-                      offsetX: (i - (storePairs.length - 1) / 2) * 14,
-                      offsetY: (Math.random() - 0.5) * 16,
-                    },
+                    progress: 1,
+                    resting: true,
+                    parkAt: "data-store",
+                    parkOffsetX: (i - (storePairs.length - 1) / 2) * 14,
+                    parkOffsetY: (Math.random() - 0.5) * 16,
                   }));
                   persistedDsRef.current = [
-                    ...carried.filter(
-                      (s) => s.resting?.nodeId === "data-store",
-                    ),
+                    ...carried.filter((s) => s.parkAt === "data-store"),
                     ...dsSignals,
                   ];
                   setSignals([...carried, ...dsSignals]);
                   setAnimPhase("idle");
-                  onAnimationComplete?.();
+                  onAnimationCompleteRef.current?.();
                 },
                 { extra: carried },
               );
@@ -325,53 +320,71 @@ export const useEventStreamingAnimation = (
       } else {
         setSignals([]);
         setAnimPhase("idle");
-        onAnimationComplete?.();
+        onAnimationCompleteRef.current?.();
       }
       return cleanup;
     }
 
     // Step 4: Broadcast — balls from broker → each broadcast instance (parallel)
     if (currentStep === 4) {
-      const dsExtra = persistedDsRef.current;
-      const bcastExtra = persistedBcastRef.current;
-      setSignals([...dsExtra, ...bcastExtra]);
+      const carried = [...persistedDsRef.current];
       dispatch(consumeBroadcast());
-      setAnimPhase("consuming-broadcast");
-      // Only animate to online instances
-      const onlineInstances = streaming.consumerGroups[1].instances.filter(
-        (inst) => !streaming.offlineBroadcastIds.includes(inst.id),
-      );
+
+      const onlineInstances =
+        currentStreaming.consumerGroups[1].instances.filter(
+          (inst) => !currentStreaming.offlineBroadcastIds.includes(inst.id),
+        );
       const pairs = onlineInstances.map((inst) => ({
         from: "broker",
         to: inst.id,
       }));
+
+      // All instances offline — complete immediately, nothing to animate
       if (pairs.length === 0) {
+        setSignals(carried);
         setAnimPhase("idle");
-        onAnimationComplete?.();
+        onAnimationCompleteRef.current?.();
         return cleanup;
       }
+
+      setSignals(carried);
+      setAnimPhase("consuming-broadcast");
+
       animateSignalsParallel(
         pairs,
-        1200,
+        900,
         () => {
-          // Keep balls resting inside each online broadcast instance box
-          const bcastSignals: Signal[] = onlineInstances.map((inst, i) => ({
-            id: `bcast-rest-${i}`,
-            from: inst.id,
+          const ts = Date.now();
+          const instanceHolding: Signal[] = onlineInstances.map((inst, i) => ({
+            id: `bcast-pass-${inst.id}-${ts}-${i}`,
+            from: "broker",
             to: inst.id,
-            progress: 0,
-            resting: {
-              nodeId: inst.id,
-              offsetX: (Math.random() - 0.5) * 20,
-              offsetY: (Math.random() - 0.5) * 12,
-            },
+            progress: 1,
+            resting: true,
+            parkAt: inst.id,
+            parkOffsetX: (Math.random() - 0.5) * 20,
+            parkOffsetY: (Math.random() - 0.5) * 12,
           }));
-          persistedBcastRef.current = bcastSignals;
-          setSignals([...dsExtra, ...bcastExtra, ...bcastSignals]);
-          setAnimPhase("idle");
-          onAnimationComplete?.();
+          const atInstances = [...carried, ...instanceHolding];
+          setSignals(atInstances);
+
+          animateSignalsParallel(
+            onlineInstances.flatMap((inst) =>
+              [0, 1].map((clientIndex) => ({
+                from: inst.id,
+                to: `${inst.id}-client-${clientIndex}`,
+              })),
+            ),
+            450,
+            () => {
+              setSignals(carried);
+              setAnimPhase("idle");
+              onAnimationCompleteRef.current?.();
+            },
+            { extra: atInstances },
+          );
         },
-        { extra: [...dsExtra, ...bcastExtra] },
+        { extra: carried },
       );
       return cleanup;
     }
@@ -380,13 +393,12 @@ export const useEventStreamingAnimation = (
     if (currentStep === 5) {
       // Carry forward previously persisted balls
       const carryDs = persistedDsRef.current;
-      const carryBcast = persistedBcastRef.current;
-      const carried = [...carryDs, ...carryBcast];
+      const carried = [...carryDs];
       setSignals(carried);
       setAnimPhase("burst");
 
       const BURST_COUNT = 5;
-      const partitionCount = streaming.partitionCount;
+      const partitionCount = currentStreaming.partitionCount;
 
       // Pre-generate all events so we know their partition assignments
       const planned = Array.from({ length: BURST_COUNT }, () => {
@@ -420,53 +432,42 @@ export const useEventStreamingAnimation = (
           { from: "broker", to: `p-${evt.pId}` },
         ];
 
-        let hopIdx = 0;
-        const runHop = () => {
-          if (hopIdx >= hops.length) {
+        const sigId = `burst-move-${eventIdx}`;
+        const totalDuration = hops.length * 250;
+        const burstStart = performance.now();
+
+        const step = (now: number) => {
+          const rawP = Math.min((now - burstStart) / totalDuration, 1);
+          setSignals([
+            ...carried,
+            ...resting,
+            { id: sigId, chain: hops, progress: rawP * hops.length },
+          ]);
+          if (rawP < 1) {
+            rafRef.current = requestAnimationFrame(step);
+          } else {
             // Ball arrived at partition — NOW dispatch so count updates
             dispatch(publishEvent({ key: evt.key }));
-
-            // Add resting ball inside the partition box with random offset
             const count = restCountByPartition[evt.pId] ?? 0;
             restCountByPartition[evt.pId] = count + 1;
-            const offsetX = (Math.random() - 0.5) * 30; // spread within 60px width
-            const offsetY = (Math.random() - 0.5) * 20; // spread within 44px height
+            const offsetX = (Math.random() - 0.5) * 30;
+            const offsetY = (Math.random() - 0.5) * 20;
             resting.push({
               id: `burst-rest-${eventIdx}`,
-              from: `p-${evt.pId}`,
+              from: "broker",
               to: `p-${evt.pId}`,
-              progress: 0,
-              resting: { nodeId: `p-${evt.pId}`, offsetX, offsetY },
+              progress: 1,
+              resting: true,
+              parkAt: `p-${evt.pId}`,
+              parkOffsetX: offsetX,
+              parkOffsetY: offsetY,
             });
             setSignals([...carried, ...resting]);
             eventIdx++;
-            // Small pause before next event
             timerRef.current = setTimeout(produceNext, 150);
-            return;
           }
-
-          const hop = hops[hopIdx];
-          const sigId = `burst-move-${eventIdx}`;
-          const start = performance.now();
-
-          const step = (now: number) => {
-            const p = Math.min((now - start) / 250, 1);
-            // Show resting signals + the moving one
-            setSignals([
-              ...carried,
-              ...resting,
-              { id: sigId, from: hop.from, to: hop.to, progress: p },
-            ]);
-            if (p < 1) {
-              rafRef.current = requestAnimationFrame(step);
-            } else {
-              hopIdx++;
-              runHop();
-            }
-          };
-          rafRef.current = requestAnimationFrame(step);
         };
-        runHop();
+        rafRef.current = requestAnimationFrame(step);
       };
 
       // Phase 2: consume — release one event per partition per round (parallel across partitions)
@@ -475,14 +476,14 @@ export const useEventStreamingAnimation = (
         // Build queues: group resting signals by partition
         const queues: Record<string, Signal[]> = {};
         for (const sig of resting) {
-          const nodeId = sig.resting!.nodeId;
+          const nodeId = sig.parkAt!;
           if (!queues[nodeId]) queues[nodeId] = [];
           queues[nodeId].push(sig);
         }
 
         // Map partition node id → worker id
         const partitionToWorker: Record<string, string> = {};
-        for (const inst of streaming.consumerGroups[0].instances) {
+        for (const inst of currentStreaming.consumerGroups[0].instances) {
           partitionToWorker[`p-${inst.assignedPartitions[0]}`] = inst.id;
         }
 
@@ -513,9 +514,9 @@ export const useEventStreamingAnimation = (
             dispatch(consumeAllStoreWorkers());
             dispatch(consumeBroadcast());
             persistedDsRef.current = dsResting;
-            setSignals([...dsResting, ...carryBcast]);
+            setSignals([...dsResting]);
             setAnimPhase("idle");
-            onAnimationComplete?.();
+            onAnimationCompleteRef.current?.();
             return;
           }
 
@@ -557,7 +558,7 @@ export const useEventStreamingAnimation = (
                 const stepToStore = (now2: number) => {
                   const p2 = Math.min((now2 - storeStart) / 500, 1);
                   setSignals([
-                    ...carryBcast,
+                    ...carryDs,
                     ...remainingResting,
                     ...dsResting,
                     ...storeSigs.map((s) => ({ ...s, progress: p2 })),
@@ -569,14 +570,13 @@ export const useEventStreamingAnimation = (
                     roundPairs.forEach((rp, i) => {
                       dsResting.push({
                         id: `ds-rest-${rp.workerId}-${Date.now()}-${i}`,
-                        from: "data-store",
+                        from: rp.workerId,
                         to: "data-store",
-                        progress: 0,
-                        resting: {
-                          nodeId: "data-store",
-                          offsetX: (Math.random() - 0.5) * 40,
-                          offsetY: (Math.random() - 0.5) * 20,
-                        },
+                        progress: 1,
+                        resting: true,
+                        parkAt: "data-store",
+                        parkOffsetX: (Math.random() - 0.5) * 40,
+                        parkOffsetY: (Math.random() - 0.5) * 20,
                       });
                     });
                     // Update resting array to match remaining
@@ -603,19 +603,22 @@ export const useEventStreamingAnimation = (
     // Step 6: Summary
     if (currentStep === 6) {
       // Keep persisted balls visible
-      const allPersisted = [
-        ...persistedDsRef.current,
-        ...persistedBcastRef.current,
-      ];
+      const allPersisted = [...persistedDsRef.current];
       setSignals(allPersisted);
       setAnimPhase("summary");
-      setTimeout(() => onAnimationComplete?.(), 0);
+      setTimeout(() => onAnimationCompleteRef.current?.(), 0);
       return cleanup;
     }
 
-    setTimeout(() => onAnimationComplete?.(), 0);
+    setTimeout(() => onAnimationCompleteRef.current?.(), 0);
     return cleanup;
-  }, [currentStep]);
+  }, [
+    animateSignalChain,
+    animateSignalsParallel,
+    cleanup,
+    currentStep,
+    dispatch,
+  ]);
 
   return { streaming, currentStep, animPhase, signals };
 };

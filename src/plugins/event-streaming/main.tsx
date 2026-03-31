@@ -1,20 +1,16 @@
-import React, { useMemo, useRef, useLayoutEffect, useEffect } from "react";
+import React, { useRef, useLayoutEffect, useEffect } from "react";
 import "./main.scss";
 import { useEventStreamingAnimation } from "./useEventStreamingAnimation";
 import { useDispatch } from "react-redux";
-import {
-  setAdapterType,
-  toggleStreaming,
-  toggleBroadcastOffline,
-} from "./eventStreamingSlice";
-import { viz } from "vizcraft";
+import { setAdapterType, toggleBroadcastOffline } from "./eventStreamingSlice";
+import { viz, type SignalOverlayParams } from "vizcraft";
 
 interface Props {
   onAnimationComplete?: () => void;
 }
 
 const W = 900;
-const H = 680;
+const H = 760;
 
 const EventStreamingVisualization: React.FC<Props> = ({
   onAnimationComplete,
@@ -31,15 +27,13 @@ const EventStreamingVisualization: React.FC<Props> = ({
     publishedEvents,
     lastPublishedEvent,
     adapterType,
-    streamingEnabled,
     offlineBroadcastIds,
   } = streaming;
 
   const workers = consumerGroups[0];
   const broadcast = consumerGroups[1];
 
-  // ── Build vizcraft scene ───────────────────────────────
-  const scene = useMemo(() => {
+  const scene = (() => {
     const isProducing = animPhase === "producing";
     const isPartitioning = animPhase === "partitioning";
     const isConsumingWorkers = animPhase === "consuming-workers";
@@ -47,7 +41,37 @@ const EventStreamingVisualization: React.FC<Props> = ({
 
     const b = viz().view(W, H);
 
-    // ═══ ROW 1 — Producer chain (top, horizontal) ════════
+    b.overlay((o) => {
+      o.add(
+        "rect",
+        {
+          x: 40,
+          y: 22,
+          w: 560,
+          h: 88,
+          rx: 16,
+          ry: 16,
+          fill: "rgba(15, 23, 42, 0)",
+          stroke: "#60a5fa",
+          strokeWidth: 1.5,
+          opacity: 0.65,
+        },
+        { key: "client-boundary", className: "es-client-boundary" },
+      );
+
+      o.add(
+        "text",
+        {
+          x: 54,
+          y: 18,
+          text: "Client / Producer Process",
+          fill: "#93c5fd",
+          fontSize: 10,
+          fontWeight: 700,
+        },
+        { key: "client-boundary-label", className: "es-client-boundary-label" },
+      );
+    });
 
     b.node("producer")
       .at(120, 60)
@@ -70,17 +94,23 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .rect(130, 50, 10)
       .fill("#6366f1")
       .stroke("#4f46e5", 2)
-      .label("Dispatcher", { fill: "#fff", fontSize: 13, fontWeight: "bold" })
+      .label("Producer Service", {
+        fill: "#fff",
+        fontSize: 13,
+        fontWeight: "bold",
+      })
       .tooltip({
-        title: "Event Dispatcher",
+        title: "Producer Service",
         sections: [
           {
-            label: "Role",
-            value: "Routes events to streaming pipeline or direct storage",
+            label: "Layer",
+            value:
+              "Application code inside your producer, not Kafka infrastructure",
           },
           {
-            label: "Flag",
-            value: `Streaming ${streamingEnabled ? "enabled" : "disabled"}`,
+            label: "Role",
+            value:
+              "Chooses when to publish a domain event and hands it to the Kafka client",
           },
         ],
       });
@@ -91,22 +121,28 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .fill(adapterType === "production" ? "#f59e0b" : "#64748b")
       .stroke(adapterType === "production" ? "#d97706" : "#475569", 2)
       .label(
-        adapterType === "production" ? "Prod Adapter" : "Default Adapter",
-        { fill: "#fff", fontSize: 12, fontWeight: "bold" },
+        adapterType === "production" ? "librdkafka Client" : "KafkaJS Client",
+        { fill: "#fff", fontSize: 11, fontWeight: "bold" },
       )
       .tooltip({
-        title: "Streaming Adapter",
+        title: "Kafka Client Adapter",
         sections: [
           {
             label: "Type",
             value:
               adapterType === "production"
-                ? "Production (librdkafka)"
-                : "Default (KafkaJS)",
+                ? "librdkafka-backed client"
+                : "KafkaJS client",
           },
           {
-            label: "Purpose",
-            value: "Pluggable transport layer for producing messages",
+            label: "Role",
+            value:
+              "In-process library that serializes records and speaks Kafka protocol",
+          },
+          {
+            label: "Layer",
+            value:
+              "Still part of your application process, not the Kafka cluster",
           },
         ],
       });
@@ -119,70 +155,61 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .label("event", { fill: "#94a3b8", fontSize: 9 });
     if (isProducing) e1.animate("flow", { duration: "1s" });
 
-    // Dispatcher → Adapter (only when streaming)
-    if (streamingEnabled) {
-      const e2 = b
-        .edge("dispatcher", "adapter", "e-disp-adapter")
-        .arrow(true)
-        .stroke("#94a3b8", 1.5);
-      if (isProducing) e2.animate("flow", { duration: "1s" });
-    }
+    // Dispatcher → Adapter
+    const e2 = b
+      .edge("dispatcher", "adapter", "e-disp-adapter")
+      .arrow(true)
+      .stroke("#94a3b8", 1.5);
+    if (isProducing) e2.animate("flow", { duration: "1s" });
 
-    // ═══ ROW 2 — Event Broker ════════════════════════════
+    // ═══ ROW 2 — Kafka Cluster ════════════════════════════
 
     b.node("broker")
       .at(450, 200)
       .rect(220, 60, 12)
       .fill("#0ea5e9")
       .stroke("#0284c7", 2)
-      .label("Event Broker", {
+      .label("Kafka Cluster", {
         fill: "#fff",
         fontSize: 15,
         fontWeight: "bold",
         dy: -8,
       })
-      .badge("Topic", {
+      .badge("Kafka", {
         position: "top-left",
         fill: "#fff",
         background: "#0369a1",
         fontSize: 9,
+      })
+      .tooltip({
+        title: "Kafka Cluster",
+        sections: [
+          {
+            label: "Role",
+            value:
+              "Durable event infrastructure that stores records and serves producers and consumers",
+          },
+          {
+            label: "Topics",
+            value:
+              "A cluster can host many topics. This diagram is showing one topic split into partitions",
+          },
+        ],
       });
 
-    b.node("broker").label(`3 partitions · gzip · 12h retention`, {
+    b.node("broker").label(`1 topic shown · 3 partitions · 12h retention`, {
       fill: "#bae6fd",
       fontSize: 9,
       dy: 10,
     });
 
     // Adapter → Broker
-    if (streamingEnabled) {
-      const e3 = b
-        .edge("adapter", "broker", "e-adapter-broker")
-        .arrow(true)
-        .stroke("#38bdf8", 2)
-        .label("produce", { fill: "#38bdf8", fontSize: 9 });
-      if (isProducing) e3.animate("flow", { duration: "1.2s" });
-    }
-
-    // Direct fallback path
-    if (!streamingEnabled) {
-      b.node("direct-store")
-        .at(700, 60)
-        .rect(120, 50, 10)
-        .fill("#dc2626")
-        .stroke("#b91c1c", 2)
-        .label("Direct Write", {
-          fill: "#fff",
-          fontSize: 12,
-          fontWeight: "bold",
-        });
-
-      b.edge("dispatcher", "direct-store", "e-direct")
-        .arrow(true)
-        .stroke("#ef4444", 2)
-        .dashed()
-        .label("fallback", { fill: "#fca5a5", fontSize: 9 });
-    }
+    const e3 = b
+      .edge("adapter", "broker", "e-adapter-broker")
+      .arrow(true)
+      .stroke("#38bdf8", 2)
+      .label("produce", { fill: "#38bdf8", fontSize: 9 });
+    if (isProducing) e3.animate("flow", { duration: "1.2s" });
 
     // ═══ ROW 3 — Partitions ══════════════════════════════
 
@@ -205,10 +232,13 @@ const EventStreamingVisualization: React.FC<Props> = ({
           dy: -6,
         })
         .tooltip({
-          title: `Partition ${i}`,
+          title: `Topic Partition ${i}`,
           sections: [
             { label: "Events", value: String(count) },
-            { label: "Role", value: "Ordered, append-only event log segment" },
+            {
+              label: "Role",
+              value: "One ordered log segment of the topic shown above",
+            },
           ],
         });
 
@@ -325,7 +355,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .rect(240, 26, 6)
       .fill("#14532d")
       .stroke("#166534", 1)
-      .label("Broadcast — fan-out", {
+      .label("WebSocket Nodes — fan-out", {
         fill: "#86efac",
         fontSize: 10,
       })
@@ -341,7 +371,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .at(670, 430)
       .rect(0, 0, 0)
       .fill("transparent")
-      .label("every event → all instances", {
+      .label("every event → all nodes → each node's clients", {
         fill: workersActive && !broadcastActive ? "#1a3a2a" : "#4ade80",
         fontSize: 8,
       });
@@ -359,7 +389,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
           isOffline ? "#1e293b" : isConsumingBroadcast ? "#16a34a" : "#14532d",
         )
         .stroke(isOffline ? "#374151" : "#22c55e", isOffline ? 1 : 2)
-        .label(isOffline ? `Instance ${i}` : `Instance ${i}`, {
+        .label(`WS Node ${i}`, {
           fill: isOffline ? "#64748b" : "#fff",
           fontSize: 11,
           fontWeight: "bold",
@@ -367,7 +397,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
         })
         .onClick((id) => dispatch(toggleBroadcastOffline(id)))
         .tooltip({
-          title: `Broadcast Instance ${i}`,
+          title: `WebSocket Node ${i}`,
           sections: [
             {
               label: isOffline ? "Status" : "Received",
@@ -377,7 +407,8 @@ const EventStreamingVisualization: React.FC<Props> = ({
             },
             {
               label: "Pattern",
-              value: "Every instance gets every event (fan-out)",
+              value:
+                "Each online node consumes every event from Kafka and pushes it to its own connected WebSocket clients",
             },
             {
               label: "Click",
@@ -400,7 +431,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
           { fill: "#ef4444", fontSize: 8, dy: 9 },
         );
       } else {
-        nodeB.label(`${inst.processedCount} recv`, {
+        nodeB.label(`${inst.processedCount} recv · 2 clients`, {
           fill: "#bbf7d0",
           fontSize: 8,
           dy: 9,
@@ -423,6 +454,51 @@ const EventStreamingVisualization: React.FC<Props> = ({
       }
       if (isConsumingBroadcast && !isOffline)
         eb.animate("flow", { duration: "1.2s" });
+
+      [0, 1].forEach((clientIndex) => {
+        const clientX = bx + (clientIndex === 0 ? -32 : 32);
+        const clientY = 650;
+        const clientId = `${inst.id}-client-${clientIndex}`;
+        const clientStroke = isOffline ? "#243341" : "#0f766e";
+        const clientFill = isOffline
+          ? "#08141a"
+          : isConsumingBroadcast
+            ? "#134e4a"
+            : "#0a2e2b";
+
+        b.node(clientId)
+          .at(clientX, clientY)
+          .rect(56, 34, 6)
+          .fill(clientFill)
+          .stroke(clientStroke, 1)
+          .label(`Client ${i + 1}${clientIndex + 1}`, {
+            fill: isOffline ? "#5b7282" : "#99f6e4",
+            fontSize: 8,
+            fontWeight: "bold",
+          })
+          .tooltip({
+            title: `Client ${i + 1}${clientIndex + 1}`,
+            sections: [
+              {
+                label: "Connected To",
+                value: `WS Node ${i}`,
+              },
+              {
+                label: "Role",
+                value:
+                  "Browser or app client receiving realtime updates from this node",
+              },
+            ],
+          });
+
+        const clientEdge = b
+          .edge(inst.id, clientId, `e-${inst.id}-client-${clientIndex}`)
+          .arrow(true)
+          .stroke(isOffline ? "#1f2937" : "#0f766e", 1);
+        if (isOffline) clientEdge.dashed();
+        if (isConsumingBroadcast && !isOffline)
+          clientEdge.animate("flow", { duration: "0.8s" });
+      });
     });
 
     // Pulse on workers/broadcast during consumption
@@ -445,6 +521,15 @@ const EventStreamingVisualization: React.FC<Props> = ({
             .node(inst.id)
             .to({ scale: 1.12 }, { duration: 250, easing: "easeOut" })
             .to({ scale: 1.0 }, { duration: 250, easing: "easeIn" });
+        });
+        broadcast.instances.forEach((inst) => {
+          [0, 1].forEach((clientIndex) => {
+            anim
+              .at(0)
+              .node(`${inst.id}-client-${clientIndex}`)
+              .to({ scale: 1.08 }, { duration: 180, easing: "easeOut" })
+              .to({ scale: 1.0 }, { duration: 180, easing: "easeIn" });
+          });
         });
       });
     }
@@ -485,109 +570,18 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .stroke("#a78bfa", 1)
       .dashed();
 
-    b.node("ws-gateway")
-      .at(670, 580)
-      .rect(120, 46, 10)
-      .fill("#0f766e")
-      .stroke("#115e59", 2)
-      .label("Realtime Push", {
-        fill: "#fff",
-        fontSize: 11,
-        fontWeight: "bold",
-        dy: -2,
-      })
-      .badge("WS", {
-        position: "top-right",
-        fill: "#fff",
-        background: "#0d9488",
-        fontSize: 9,
-      })
-      .tooltip({
-        title: "WebSocket Gateway",
-        sections: [
-          {
-            label: "Role",
-            value: "Pushes events to connected clients in real time",
-          },
-        ],
-      });
-
-    b.node("ws-gateway").label("→ clients", {
-      fill: "#5eead4",
-      fontSize: 8,
-      dy: 12,
-    });
-
-    b.edge("broadcast-0", "ws-gateway", "e-b-ws")
-      .arrow(true)
-      .stroke("#5eead4", 1)
-      .dashed()
-      .label("push", { fill: "#5eead4", fontSize: 8 });
-
-    // ═══ SIGNAL OVERLAYS (moving balls) ══════════════════
+    // ═══ SIGNAL OVERLAYS ══════════════════
     if (signals.length > 0) {
-      // Node positions for circle overlay placement
-      const partitionPositions: Record<string, { x: number; y: number }> = {};
-      partitions.forEach((_, i) => {
-        partitionPositions[`p-${i}`] = { x: 370 + i * 80, y: 310 };
-      });
-      partitionPositions["data-store"] = { x: 230, y: 580 };
-      broadcast.instances.forEach((inst, i) => {
-        partitionPositions[inst.id] = { x: 620 + i * 100, y: 470 };
-      });
-
-      const movingSignals = signals.filter((s) => !s.resting);
-      const restingSignals = signals.filter((s) => s.resting);
-
       b.overlay((o) => {
-        // Moving signals as normal signal overlays
-        movingSignals.forEach((sig) => {
-          o.add(
-            "signal",
-            {
-              from: sig.from,
-              to: sig.to,
-              progress: sig.progress,
-              magnitude: 1,
-            },
-            { key: sig.id },
-          );
-        });
-
-        // Resting signals as circle overlays inside partition boxes
-        restingSignals.forEach((sig) => {
-          const pos = partitionPositions[sig.resting!.nodeId];
-          if (pos) {
-            o.add(
-              "circle",
-              {
-                x: pos.x + sig.resting!.offsetX,
-                y: pos.y + sig.resting!.offsetY,
-                r: 5,
-                fill: "#fbbf24",
-                stroke: "#f59e0b",
-                strokeWidth: 1,
-              },
-              { key: sig.id },
-            );
-          }
+        signals.forEach((sig) => {
+          const { id, ...params } = sig;
+          o.add("signal", params as SignalOverlayParams, { key: id });
         });
       });
     }
 
     return b;
-  }, [
-    partitions,
-    workers.instances,
-    broadcast.instances,
-    offlineBroadcastIds,
-    publishedEvents,
-    lastPublishedEvent,
-    adapterType,
-    streamingEnabled,
-    animPhase,
-    signals,
-  ]);
+  })();
 
   // ── Mount ──────────────────────────────────────────────
   useLayoutEffect(() => {
@@ -634,17 +628,6 @@ const EventStreamingVisualization: React.FC<Props> = ({
             <option value="production">Production (librdkafka)</option>
           </select>
         </div>
-        <div className="es-control-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={streamingEnabled}
-              onChange={() => dispatch(toggleStreaming())}
-              disabled={currentStep > 0}
-            />
-            Streaming Enabled
-          </label>
-        </div>
       </div>
 
       <div className="es-canvas" ref={containerRef} />
@@ -659,7 +642,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
           <span className="es-stat-value worker">{workerProcessed}</span>
         </div>
         <div className="es-stat">
-          <span className="es-stat-label">Broadcast received</span>
+          <span className="es-stat-label">Fan-out deliveries</span>
           <span className="es-stat-value bcast">{broadcastProcessed}</span>
         </div>
         {lastPublishedEvent && (
