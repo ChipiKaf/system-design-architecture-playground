@@ -1,33 +1,37 @@
-
-import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { type RootState } from '../store/store';
-import { nextStep, incrementPass, resetSimulation, selectNeuron } from '../store/slices/simulationSlice';
-import type { ModelPlugin, ModelStep } from '../types/ModelPlugin';
-import StepIndicator from './StepIndicator/StepIndicator';
-import NeuronDetail from './NeuronDetail';
+import React from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { type RootState } from "../store/store";
+import {
+  nextStep,
+  incrementPass,
+  resetSimulation,
+} from "../store/slices/simulationSlice";
+import type { DemoPlugin, DemoStep } from "../types/ModelPlugin";
+import StepIndicator from "./StepIndicator/StepIndicator";
 
 interface ShellProps {
-  plugin: ModelPlugin;
+  plugin: DemoPlugin;
 }
 
 // Helper to normalize steps to objects
-const normalizeSteps = (steps: (string | ModelStep)[]): ModelStep[] => {
-    return steps.map(s => typeof s === 'string' ? { label: s, autoAdvance: false } : s);
+const normalizeSteps = (steps: (string | DemoStep)[]): DemoStep[] => {
+  return steps.map((s) =>
+    typeof s === "string" ? { label: s, autoAdvance: false } : s,
+  );
 };
 
 const Shell: React.FC<ShellProps> = ({ plugin }) => {
   const dispatch = useDispatch();
   const simulationState = useSelector((state: RootState) => state.simulation);
-  
+
   // Use the plugin's selector to get its specific state
   const modelState = useSelector(plugin.selector);
 
   React.useEffect(() => {
-     // Reset shared simulation state (step 0, pass 0)
-     dispatch(resetSimulation());
-     // Initialize the plugin on mount
-     plugin.init(dispatch);
+    // Reset shared simulation state (step 0, pass 0)
+    dispatch(resetSimulation());
+    // Initialize the plugin on mount
+    plugin.init(dispatch);
   }, [dispatch, plugin]);
 
   const rawSteps = plugin.getSteps(modelState);
@@ -44,15 +48,15 @@ const Shell: React.FC<ShellProps> = ({ plugin }) => {
   }, [currentStep]);
 
   const handleAnimationComplete = () => {
-      const currentConfig = steps[currentStep];
-      
-      // If autoAdvance is true, proceed automatically.
-      // Otherwise, unlock the "Next" button (isProcessing = false).
-      if (currentConfig?.autoAdvance) {
-          dispatch(nextStep(steps.length));
-      } else {
-          setIsProcessing(false);
-      }
+    const currentConfig = steps[currentStep];
+
+    // If autoAdvance is true, proceed automatically.
+    // Otherwise, unlock the "Next" button (isProcessing = false).
+    if (currentConfig?.autoAdvance) {
+      dispatch(nextStep(steps.length));
+    } else {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -64,7 +68,7 @@ const Shell: React.FC<ShellProps> = ({ plugin }) => {
 
       <div className="main-content">
         <StepIndicator
-          steps={steps.map(s => s.label)}
+          steps={steps.map((s) => s.label)}
           currentStep={currentStep}
           onNextStep={() => dispatch(nextStep(steps.length))}
           onReset={() => {
@@ -75,26 +79,17 @@ const Shell: React.FC<ShellProps> = ({ plugin }) => {
           // Button is disabled if processing (waiting for anim)
           isProcessing={isProcessing}
           nextButtonConfig={{
-              text: steps[currentStep]?.nextButtonText,
-              processingText: steps[currentStep]?.processingText,
-              color: steps[currentStep]?.nextButtonColor
+            text: steps[currentStep]?.nextButtonText,
+            processingText: steps[currentStep]?.processingText,
+            color: steps[currentStep]?.nextButtonColor,
           }}
           restartButtonConfig={plugin.restartConfig}
         />
-        
+
         <div className="visualization-container">
-           <plugin.Component 
-             onAnimationComplete={handleAnimationComplete}
-           />
+          <plugin.Component onAnimationComplete={handleAnimationComplete} />
         </div>
       </div>
-
-      {simulationState.selectedNeuron && (
-        <NeuronDetail
-          data={simulationState.selectedNeuron}
-          onClose={() => dispatch(selectNeuron(null))}
-        />
-      )}
     </div>
   );
 };

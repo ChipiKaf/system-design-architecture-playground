@@ -1,53 +1,67 @@
-# AI Model Playground
+# System Design & Architecture Playground
 
-A universal, extensible playground for visualizing and interacting with various AI models.
+An interactive, extensible playground for visualizing and exploring system design and architecture concepts.
 
-This project is designed to be a comprehensive platform for exploring the inner workings of different Artificial Intelligence architectures. While it currently features visualizations for Neural Networks (ANN) and Computational Theory of Mind (CTM) concepts, its core architecture is built to be agnostic and extensible, allowing for the integration and visualization of *any* AI model.
+This project is designed to be a hands-on platform for understanding how distributed systems, infrastructure patterns, and architectural components work. Each demo is a step-by-step interactive visualization that you can walk through and experiment with.
 
 ## Vision
 
-The goal is to demystify AI by providing a tangible, interactive interface where users can observe models in action. Whether it's a simple perceptron, a complex transformer, a decision tree, or a theoretical cognitive model, this playground aims to provide the tools to visualize it.
+Demystify system design by providing tangible, animated demos where you can observe patterns in action — from load balancing to caching, message queues, and beyond.
 
 ## Features
 
-- **Extensible Plugin Architecture**: Easily add new model types through a modular plugin system.
-- **Interactive Visualizations**: Real-time rendering of model states, signal propagation, and decision processes.
-- **Universal Viz Kit**: A shared library of visualization components (`viz-kit`) to ensure consistent and high-quality rendering across different models.
-- **Current Plugins**:
-    - **Artificial Neural Networks (ANN)**: Visualize layers, neurons, weights, biases, and activation functions.
-    - **Computational Theory of Mind (CTM)**: Explore cognitive architectures and mental state transitions.
+- **Extensible Plugin Architecture**: Add new system design demos through a modular plugin system.
+- **Interactive Visualizations**: Step-by-step walkthroughs of system behavior.
+- **Current Demos**:
+    - **Load Balancer**: See how Round Robin, Least Connections, and Random strategies distribute requests across servers.
 
 ## Tech Stack
 
 - **Framework**: [React](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
 - **Build Tool**: [Vite](https://vitejs.dev/)
 - **State Management**: [Redux Toolkit](https://redux-toolkit.js.org/)
-- **Styling**: SCSS / CSS Modules
+- **Styling**: SCSS
 
 ## Getting Started
 
-Follow these steps to get the project running locally:
-
-1.  **Clone the repository**
+1. **Clone the repository**
 
     ```bash
-    git clone <repository-url>
-    cd ai-model-playground
+    git clone git@github.com:ChipiKaf/system-design-architecture-playground.git
+    cd system-design-architecture-playground
     ```
 
-2.  **Install dependencies**
+2. **Install dependencies**
 
     ```bash
     npm install
     ```
 
-3.  **Run the development server**
+3. **Run the development server**
 
     ```bash
     npm run dev
     ```
 
-4.  **Open in Browser**
+4. **Open in Browser**
+
+    Visit `http://localhost:5173`
+
+## Adding a New Demo
+
+Use the plugin generator to scaffold a new demo:
+
+```bash
+npm run generate <plugin-name>
+```
+
+For example:
+```bash
+npm run generate caching
+```
+
+This creates a new plugin under `src/plugins/<plugin-name>/` with all the boilerplate wired up.
+
 
     Navigate to `http://localhost:5173` (or the URL shown in your terminal) to view the application.
 

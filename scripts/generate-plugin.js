@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const pluginName = process.argv[2];
 
 if (!pluginName) {
-  console.error('Please provide a plugin name (kebab-case), e.g., npm run generate-plugin decision-tree');
+  console.error('Please provide a plugin name (kebab-case), e.g., npm run generate load-balancer');
   process.exit(1);
 }
 
@@ -258,17 +258,17 @@ const scssContent = `.${pluginName}-visualization {
 fs.writeFileSync(path.join(targetDir, 'main.scss'), scssContent);
 
 // 5. Index
-const indexContent = `import type { ModelPlugin, ModelStep } from '../../types/ModelPlugin';
+const indexContent = `import type { DemoPlugin } from '../../types/ModelPlugin';
 import ${camelName}Reducer, { type ${pascalName}State, initialState } from './${camelName}Slice';
 import ${pascalName}Visualization from './main';
 import type { Action, Dispatch } from '@reduxjs/toolkit';
 
 type LocalRootState = { ${camelName}: ${pascalName}State };
 
-const ${pascalName}Plugin: ModelPlugin<${pascalName}State, Action, LocalRootState, Dispatch<Action>> = {
+const ${pascalName}Plugin: DemoPlugin<${pascalName}State, Action, LocalRootState, Dispatch<Action>> = {
   id: '${pluginName}',
   name: '${pascalName}',
-  description: 'Description for ${pascalName} model.',
+  description: 'Description for ${pascalName} demo.',
   initialState,
   reducer: ${camelName}Reducer,
   Component: ${pascalName}Visualization,
