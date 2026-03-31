@@ -17,6 +17,11 @@
     }
   }
 
+  // Clickable nodes cursor
+  .viz-node[data-clickable="true"] {
+    cursor: pointer;
+  }
+
   .es-controls {
     display: flex;
     align-items: center;

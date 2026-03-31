@@ -2,7 +2,11 @@ import React, { useMemo, useRef, useLayoutEffect, useEffect } from "react";
 import "./main.scss";
 import { useEventStreamingAnimation } from "./useEventStreamingAnimation";
 import { useDispatch } from "react-redux";
-import { setAdapterType, toggleStreaming } from "./eventStreamingSlice";
+import {
+  setAdapterType,
+  toggleStreaming,
+  toggleBroadcastOffline,
+} from "./eventStreamingSlice";
 import { viz } from "vizcraft";
 
 interface Props {
@@ -28,18 +32,19 @@ const EventStreamingVisualization: React.FC<Props> = ({
     lastPublishedEvent,
     adapterType,
     streamingEnabled,
+    offlineBroadcastIds,
   } = streaming;
 
   const workers = consumerGroups[0];
   const broadcast = consumerGroups[1];
 
-  const isProducing = animPhase === "producing";
-  const isPartitioning = animPhase === "partitioning";
-  const isConsumingWorkers = animPhase === "consuming-workers";
-  const isConsumingBroadcast = animPhase === "consuming-broadcast";
-
   // ── Build vizcraft scene ───────────────────────────────
   const scene = useMemo(() => {
+    const isProducing = animPhase === "producing";
+    const isPartitioning = animPhase === "partitioning";
+    const isConsumingWorkers = animPhase === "consuming-workers";
+    const isConsumingBroadcast = animPhase === "consuming-broadcast";
+
     const b = viz().view(W, H);
 
     // ═══ ROW 1 — Producer chain (top, horizontal) ════════
@@ -232,15 +237,35 @@ const EventStreamingVisualization: React.FC<Props> = ({
 
     // ═══ ROW 4 — Consumer Groups (side by side) ══════════
 
+    // Track which side is currently active for visual hierarchy
+    const workersActive = isConsumingWorkers || animPhase === "burst";
+    const broadcastActive = isConsumingBroadcast;
+
     // ── Left: Store Workers (load-balanced) ──
     b.node("workers-label")
       .at(230, 410)
       .rect(240, 26, 6)
       .fill("#1e1b4b")
       .stroke("#312e81", 1)
-      .label("Store Workers — load-balanced (shared consumer group)", {
+      .label("Workers — load-balanced", {
         fill: "#a5b4fc",
-        fontSize: 9,
+        fontSize: 10,
+      })
+      .badge("1:1", {
+        position: "top-right",
+        fill: "#fff",
+        background: "#4f46e5",
+        fontSize: 8,
+      });
+
+    // Inline annotation
+    b.node("workers-hint")
+      .at(230, 430)
+      .rect(0, 0, 0)
+      .fill("transparent")
+      .label("each partition → exactly 1 worker", {
+        fill: broadcastActive ? "#475569" : "#818cf8",
+        fontSize: 8,
       });
 
     workers.instances.forEach((inst, i) => {
@@ -278,7 +303,11 @@ const EventStreamingVisualization: React.FC<Props> = ({
         { fill: "#c7d2fe", fontSize: 8, dy: 9 },
       );
 
-      // Broker → Worker edge (via partition)
+      // Partition → Worker edge
+      const edgeStroke =
+        broadcastActive && !workersActive
+          ? "#3730a3" // dim when broadcast is active
+          : "#6366f1";
       const ew = b
         .edge(
           `p-${inst.assignedPartitions[0]}`,
@@ -286,7 +315,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
           `e-p${inst.assignedPartitions[0]}-${inst.id}`,
         )
         .arrow(true)
-        .stroke("#6366f1", 1.5);
+        .stroke(edgeStroke, 1.5);
       if (isConsumingWorkers) ew.animate("flow", { duration: "1.2s" });
     });
 
@@ -296,49 +325,104 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .rect(240, 26, 6)
       .fill("#14532d")
       .stroke("#166534", 1)
-      .label("Broadcast — fan-out (unique consumer group per instance)", {
+      .label("Broadcast — fan-out", {
         fill: "#86efac",
-        fontSize: 9,
+        fontSize: 10,
+      })
+      .badge("1:N", {
+        position: "top-right",
+        fill: "#fff",
+        background: "#16a34a",
+        fontSize: 8,
+      });
+
+    // Inline annotation
+    b.node("broadcast-hint")
+      .at(670, 430)
+      .rect(0, 0, 0)
+      .fill("transparent")
+      .label("every event → all instances", {
+        fill: workersActive && !broadcastActive ? "#1a3a2a" : "#4ade80",
+        fontSize: 8,
       });
 
     broadcast.instances.forEach((inst, i) => {
       const bx = 620 + i * 100;
       const by = 470;
+      const isOffline = offlineBroadcastIds.includes(inst.id);
 
-      b.node(inst.id)
+      const nodeB = b
+        .node(inst.id)
         .at(bx, by)
         .rect(80, 50, 8)
-        .fill(isConsumingBroadcast ? "#16a34a" : "#14532d")
-        .stroke("#22c55e", 2)
-        .label(`Instance ${i}`, {
-          fill: "#fff",
+        .fill(
+          isOffline ? "#1e293b" : isConsumingBroadcast ? "#16a34a" : "#14532d",
+        )
+        .stroke(isOffline ? "#374151" : "#22c55e", isOffline ? 1 : 2)
+        .label(isOffline ? `Instance ${i}` : `Instance ${i}`, {
+          fill: isOffline ? "#64748b" : "#fff",
           fontSize: 11,
           fontWeight: "bold",
           dy: -7,
         })
+        .onClick((id) => dispatch(toggleBroadcastOffline(id)))
         .tooltip({
           title: `Broadcast Instance ${i}`,
           sections: [
-            { label: "Received", value: String(inst.processedCount) },
+            {
+              label: isOffline ? "Status" : "Received",
+              value: isOffline
+                ? `OFFLINE — ${inst.missedCount} event${inst.missedCount !== 1 ? "s" : ""} missed`
+                : String(inst.processedCount),
+            },
             {
               label: "Pattern",
               value: "Every instance gets every event (fan-out)",
             },
+            {
+              label: "Click",
+              value: isOffline
+                ? "Click to bring back online"
+                : "Click to take offline",
+            },
           ],
         });
 
-      b.node(inst.id).label(`${inst.processedCount} recv`, {
-        fill: "#bbf7d0",
-        fontSize: 8,
-        dy: 9,
-      });
+      if (isOffline) {
+        nodeB.badge("OFFLINE", {
+          position: "top-left",
+          fill: "#fff",
+          background: "#dc2626",
+          fontSize: 7,
+        });
+        nodeB.label(
+          inst.missedCount > 0 ? `${inst.missedCount} missed` : "0 recv",
+          { fill: "#ef4444", fontSize: 8, dy: 9 },
+        );
+      } else {
+        nodeB.label(`${inst.processedCount} recv`, {
+          fill: "#bbf7d0",
+          fontSize: 8,
+          dy: 9,
+        });
+      }
 
-      // Broker → Broadcast edge
+      // Broker → Broadcast edge (from topic, not partitions)
+      const ebStroke = isOffline
+        ? "#1e293b" // nearly invisible when offline
+        : workersActive && !broadcastActive
+          ? "#14532d" // dim when workers are active
+          : "#22c55e";
       const eb = b
         .edge("broker", inst.id, `e-broker-${inst.id}`)
         .arrow(true)
-        .stroke("#22c55e", 1.5);
-      if (isConsumingBroadcast) eb.animate("flow", { duration: "1.2s" });
+        .stroke(ebStroke, isOffline ? 1 : 1.5);
+      if (isOffline) eb.dashed();
+      if (i === 0 && !isOffline) {
+        eb.label("all events", { fill: ebStroke, fontSize: 8 });
+      }
+      if (isConsumingBroadcast && !isOffline)
+        eb.animate("flow", { duration: "1.2s" });
     });
 
     // Pulse on workers/broadcast during consumption
@@ -442,10 +526,14 @@ const EventStreamingVisualization: React.FC<Props> = ({
 
     // ═══ SIGNAL OVERLAYS (moving balls) ══════════════════
     if (signals.length > 0) {
-      // Partition node positions for circle overlay placement
+      // Node positions for circle overlay placement
       const partitionPositions: Record<string, { x: number; y: number }> = {};
       partitions.forEach((_, i) => {
         partitionPositions[`p-${i}`] = { x: 370 + i * 80, y: 310 };
+      });
+      partitionPositions["data-store"] = { x: 230, y: 580 };
+      broadcast.instances.forEach((inst, i) => {
+        partitionPositions[inst.id] = { x: 620 + i * 100, y: 470 };
       });
 
       const movingSignals = signals.filter((s) => !s.resting);
@@ -490,12 +578,13 @@ const EventStreamingVisualization: React.FC<Props> = ({
     return b;
   }, [
     partitions,
-    consumerGroups,
+    workers.instances,
+    broadcast.instances,
+    offlineBroadcastIds,
     publishedEvents,
     lastPublishedEvent,
     adapterType,
     streamingEnabled,
-    currentStep,
     animPhase,
     signals,
   ]);

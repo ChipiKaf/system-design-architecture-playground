@@ -17,6 +17,7 @@ export interface ConsumerInstance {
   groupId: string;
   assignedPartitions: number[];
   processedCount: number;
+  missedCount: number;
 }
 
 export interface ConsumerGroup {
@@ -34,6 +35,7 @@ export interface EventStreamingState {
   adapterType: "default" | "production";
   streamingEnabled: boolean;
   lastPublishedEvent: EventMessage | null;
+  offlineBroadcastIds: string[];
 }
 
 const PARTITION_COUNT = 3;
@@ -63,18 +65,21 @@ export const initialState: EventStreamingState = {
           groupId: "store-workers",
           assignedPartitions: [0],
           processedCount: 0,
+          missedCount: 0,
         },
         {
           id: "worker-1",
           groupId: "store-workers",
           assignedPartitions: [1],
           processedCount: 0,
+          missedCount: 0,
         },
         {
           id: "worker-2",
           groupId: "store-workers",
           assignedPartitions: [2],
           processedCount: 0,
+          missedCount: 0,
         },
       ],
     },
@@ -88,12 +93,14 @@ export const initialState: EventStreamingState = {
           groupId: "broadcast",
           assignedPartitions: [0, 1, 2],
           processedCount: 0,
+          missedCount: 0,
         },
         {
           id: "broadcast-1",
           groupId: "broadcast",
           assignedPartitions: [0, 1, 2],
           processedCount: 0,
+          missedCount: 0,
         },
       ],
     },
@@ -101,6 +108,7 @@ export const initialState: EventStreamingState = {
   adapterType: "default",
   streamingEnabled: true,
   lastPublishedEvent: null,
+  offlineBroadcastIds: [],
 };
 
 const eventStreamingSlice = createSlice({
@@ -162,8 +170,29 @@ const eventStreamingSlice = createSlice({
       const group = state.consumerGroups.find((g) => g.id === "broadcast");
       if (!group || !state.lastPublishedEvent) return;
       for (const inst of group.instances) {
-        inst.processedCount += 1;
+        if (state.offlineBroadcastIds.includes(inst.id)) {
+          inst.missedCount += 1;
+        } else {
+          inst.processedCount += 1;
+        }
       }
+    },
+    toggleBroadcastOffline(state, action: PayloadAction<string>) {
+      const id = action.payload;
+      const idx = state.offlineBroadcastIds.indexOf(id);
+      if (idx >= 0) {
+        state.offlineBroadcastIds.splice(idx, 1);
+      } else {
+        state.offlineBroadcastIds.push(id);
+      }
+    },
+    catchUpBroadcast(state, action: PayloadAction<string>) {
+      const group = state.consumerGroups.find((g) => g.id === "broadcast");
+      if (!group) return;
+      const inst = group.instances.find((i) => i.id === action.payload);
+      if (!inst) return;
+      inst.processedCount += inst.missedCount;
+      inst.missedCount = 0;
     },
     setAdapterType(state, action: PayloadAction<"default" | "production">) {
       state.adapterType = action.payload;
@@ -182,6 +211,8 @@ export const {
   consumeStoreWorker,
   consumeAllStoreWorkers,
   consumeBroadcast,
+  toggleBroadcastOffline,
+  catchUpBroadcast,
   setAdapterType,
   toggleStreaming,
   reset,

@@ -6,6 +6,7 @@ import {
   consumeStoreWorker,
   consumeAllStoreWorkers,
   consumeBroadcast,
+  catchUpBroadcast,
 } from "./eventStreamingSlice";
 
 const KEYS = ["user-1", "user-2", "user-3", "order-A", "order-B", "session-X"];
@@ -47,6 +48,12 @@ export const useEventStreamingAnimation = (
   const [signals, setSignals] = useState<Signal[]>([]);
   const rafRef = useRef<number>(undefined!);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined!);
+  // Balls that should persist visually across step transitions
+  const persistedDsRef = useRef<Signal[]>([]);
+  // Broadcast instance resting balls
+  const persistedBcastRef = useRef<Signal[]>([]);
+  // Track previous offline IDs to detect online transitions
+  const prevOfflineIdsRef = useRef<string[]>([]);
 
   const cleanup = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -59,13 +66,14 @@ export const useEventStreamingAnimation = (
       hops: { from: string; to: string }[],
       durationPerHop: number,
       onDone: () => void,
-      options?: { keepFinal?: boolean },
+      options?: { keepFinal?: boolean; extra?: Signal[] },
     ) => {
+      const extra = options?.extra ?? [];
       let hopIndex = 0;
 
       const runHop = () => {
         if (hopIndex >= hops.length) {
-          if (!options?.keepFinal) setSignals([]);
+          if (!options?.keepFinal) setSignals([...extra]);
           onDone();
           return;
         }
@@ -75,7 +83,10 @@ export const useEventStreamingAnimation = (
 
         const step = (now: number) => {
           const p = Math.min((now - start) / durationPerHop, 1);
-          setSignals([{ id: sigId, from: hop.from, to: hop.to, progress: p }]);
+          setSignals([
+            ...extra,
+            { id: sigId, from: hop.from, to: hop.to, progress: p },
+          ]);
           if (p < 1) {
             rafRef.current = requestAnimationFrame(step);
           } else {
@@ -97,8 +108,9 @@ export const useEventStreamingAnimation = (
       pairs: { from: string; to: string }[],
       duration: number,
       onDone: () => void,
-      options?: { keepFinal?: boolean },
+      options?: { keepFinal?: boolean; extra?: Signal[] },
     ) => {
+      const extra = options?.extra ?? [];
       const start = performance.now();
       const sigs = pairs.map((pair, i) => ({
         id: `sig-par-${i}`,
@@ -109,11 +121,11 @@ export const useEventStreamingAnimation = (
 
       const step = (now: number) => {
         const p = Math.min((now - start) / duration, 1);
-        setSignals(sigs.map((s) => ({ ...s, progress: p })));
+        setSignals([...extra, ...sigs.map((s) => ({ ...s, progress: p }))]);
         if (p < 1) {
           rafRef.current = requestAnimationFrame(step);
         } else {
-          if (!options?.keepFinal) setSignals([]);
+          if (!options?.keepFinal) setSignals([...extra]);
           onDone();
         }
       };
@@ -122,20 +134,97 @@ export const useEventStreamingAnimation = (
     [],
   );
 
+  // Catch-up animation: fires when a broadcast instance transitions offline → online
+  useEffect(() => {
+    const prev = prevOfflineIdsRef.current;
+    const curr = streaming.offlineBroadcastIds;
+    const comingOnline = prev.filter((id) => !curr.includes(id));
+    prevOfflineIdsRef.current = [...curr];
+    if (comingOnline.length === 0) return;
+
+    for (const instId of comingOnline) {
+      const inst = streaming.consumerGroups[1].instances.find(
+        (i) => i.id === instId,
+      );
+      if (!inst || inst.missedCount === 0) {
+        dispatch(catchUpBroadcast(instId));
+        continue;
+      }
+
+      const count = Math.min(inst.missedCount, 3);
+      let ball = 0;
+      const sigId = `catchup-${instId}`;
+
+      const animNext = () => {
+        if (ball >= count) {
+          // Done — add resting ball and update state
+          dispatch(catchUpBroadcast(instId));
+          const restSig: Signal = {
+            id: `bcast-catchup-rest-${instId}`,
+            from: instId,
+            to: instId,
+            progress: 0,
+            resting: {
+              nodeId: instId,
+              offsetX: (Math.random() - 0.5) * 20,
+              offsetY: (Math.random() - 0.5) * 12,
+            },
+          };
+          persistedBcastRef.current = [
+            ...persistedBcastRef.current.filter(
+              (s) => s.resting?.nodeId !== instId,
+            ),
+            restSig,
+          ];
+          setSignals((prev) => [
+            ...prev.filter(
+              (s) => s.id !== sigId && s.resting?.nodeId !== instId,
+            ),
+            restSig,
+          ]);
+          return;
+        }
+
+        const start = performance.now();
+        const step = (now: number) => {
+          const p = Math.min((now - start) / 300, 1);
+          setSignals((prev) => [
+            ...prev.filter((s) => s.id !== sigId),
+            { id: sigId, from: "broker", to: instId, progress: p },
+          ]);
+          if (p < 1) {
+            rafRef.current = requestAnimationFrame(step);
+          } else {
+            ball++;
+            timerRef.current = setTimeout(animNext, 100);
+          }
+        };
+        rafRef.current = requestAnimationFrame(step);
+      };
+
+      animNext();
+    }
+  }, [streaming.offlineBroadcastIds]);
+
   useEffect(() => {
     cleanup();
 
     // Step 0: Overview
     if (currentStep === 0) {
       setAnimPhase("idle");
-      setSignals([]);
+      const allPersisted = [
+        ...persistedDsRef.current,
+        ...persistedBcastRef.current,
+      ];
+      setSignals(allPersisted);
       setTimeout(() => onAnimationComplete?.(), 0);
       return cleanup;
     }
 
     // Step 1: Produce — ball travels Producer → Dispatcher → Adapter → Broker
     if (currentStep === 1) {
-      setSignals([]);
+      const carried = [...persistedDsRef.current, ...persistedBcastRef.current];
+      setSignals(carried);
       dispatch(publishEvent({ key: randomKey() }));
       setAnimPhase("producing");
       animateSignalChain(
@@ -149,23 +238,24 @@ export const useEventStreamingAnimation = (
           setAnimPhase("idle");
           onAnimationComplete?.();
         },
+        { extra: carried },
       );
       return cleanup;
     }
 
     // Step 2: Partition assignment — ball from broker → target partition, stays there
     if (currentStep === 2) {
+      const carried = [...persistedDsRef.current, ...persistedBcastRef.current];
       setAnimPhase("partitioning");
       const pId = streaming.lastPublishedEvent?.assignedPartition ?? 0;
       animateSignalChain(
         [{ from: "broker", to: `p-${pId}` }],
         800,
         () => {
-          // Keep ball resting at partition (signals stay, keepFinal=true)
           setAnimPhase("idle");
           onAnimationComplete?.();
         },
-        { keepFinal: true },
+        { keepFinal: true, extra: carried },
       );
       return cleanup;
     }
@@ -173,6 +263,7 @@ export const useEventStreamingAnimation = (
     // Step 3: Workers consume — partition→worker, hold at worker, then worker→data-store
     if (currentStep === 3) {
       // Don't clear signals — ball is still sitting at partition from step 2
+      const carried = [...persistedDsRef.current, ...persistedBcastRef.current];
       setAnimPhase("consuming-workers");
       const pairs = streaming.consumerGroups[0].instances
         .filter((inst) => {
@@ -199,13 +290,37 @@ export const useEventStreamingAnimation = (
                 from: p.to,
                 to: "data-store",
               }));
-              animateSignalsParallel(storePairs, 800, () => {
-                setAnimPhase("idle");
-                onAnimationComplete?.();
-              });
+              animateSignalsParallel(
+                storePairs,
+                800,
+                () => {
+                  // Keep balls resting at data-store as circle overlays
+                  const dsSignals: Signal[] = storePairs.map((_p, i) => ({
+                    id: `ds-rest-s3-${i}-${Date.now()}`,
+                    from: "data-store",
+                    to: "data-store",
+                    progress: 0,
+                    resting: {
+                      nodeId: "data-store",
+                      offsetX: (i - (storePairs.length - 1) / 2) * 14,
+                      offsetY: (Math.random() - 0.5) * 16,
+                    },
+                  }));
+                  persistedDsRef.current = [
+                    ...carried.filter(
+                      (s) => s.resting?.nodeId === "data-store",
+                    ),
+                    ...dsSignals,
+                  ];
+                  setSignals([...carried, ...dsSignals]);
+                  setAnimPhase("idle");
+                  onAnimationComplete?.();
+                },
+                { extra: carried },
+              );
             }, 600);
           },
-          { keepFinal: true },
+          { keepFinal: true, extra: carried },
         );
       } else {
         setSignals([]);
@@ -217,23 +332,57 @@ export const useEventStreamingAnimation = (
 
     // Step 4: Broadcast — balls from broker → each broadcast instance (parallel)
     if (currentStep === 4) {
-      setSignals([]);
+      const dsExtra = persistedDsRef.current;
+      const bcastExtra = persistedBcastRef.current;
+      setSignals([...dsExtra, ...bcastExtra]);
       dispatch(consumeBroadcast());
       setAnimPhase("consuming-broadcast");
-      const pairs = streaming.consumerGroups[1].instances.map((inst) => ({
+      // Only animate to online instances
+      const onlineInstances = streaming.consumerGroups[1].instances.filter(
+        (inst) => !streaming.offlineBroadcastIds.includes(inst.id),
+      );
+      const pairs = onlineInstances.map((inst) => ({
         from: "broker",
         to: inst.id,
       }));
-      animateSignalsParallel(pairs, 1200, () => {
+      if (pairs.length === 0) {
         setAnimPhase("idle");
         onAnimationComplete?.();
-      });
+        return cleanup;
+      }
+      animateSignalsParallel(
+        pairs,
+        1200,
+        () => {
+          // Keep balls resting inside each online broadcast instance box
+          const bcastSignals: Signal[] = onlineInstances.map((inst, i) => ({
+            id: `bcast-rest-${i}`,
+            from: inst.id,
+            to: inst.id,
+            progress: 0,
+            resting: {
+              nodeId: inst.id,
+              offsetX: (Math.random() - 0.5) * 20,
+              offsetY: (Math.random() - 0.5) * 12,
+            },
+          }));
+          persistedBcastRef.current = bcastSignals;
+          setSignals([...dsExtra, ...bcastExtra, ...bcastSignals]);
+          setAnimPhase("idle");
+          onAnimationComplete?.();
+        },
+        { extra: [...dsExtra, ...bcastExtra] },
+      );
       return cleanup;
     }
 
     // Step 5: Burst — produce 5 events into partitions, then consume all at once
     if (currentStep === 5) {
-      setSignals([]);
+      // Carry forward previously persisted balls
+      const carryDs = persistedDsRef.current;
+      const carryBcast = persistedBcastRef.current;
+      const carried = [...carryDs, ...carryBcast];
+      setSignals(carried);
       setAnimPhase("burst");
 
       const BURST_COUNT = 5;
@@ -256,7 +405,7 @@ export const useEventStreamingAnimation = (
       const produceNext = () => {
         if (eventIdx >= BURST_COUNT) {
           // All events produced — hold resting signals at partitions briefly
-          setSignals([...resting]);
+          setSignals([...carried, ...resting]);
           timerRef.current = setTimeout(() => consumeAll(), 600);
           return;
         }
@@ -289,7 +438,7 @@ export const useEventStreamingAnimation = (
               progress: 0,
               resting: { nodeId: `p-${evt.pId}`, offsetX, offsetY },
             });
-            setSignals([...resting]);
+            setSignals([...carried, ...resting]);
             eventIdx++;
             // Small pause before next event
             timerRef.current = setTimeout(produceNext, 150);
@@ -304,6 +453,7 @@ export const useEventStreamingAnimation = (
             const p = Math.min((now - start) / 250, 1);
             // Show resting signals + the moving one
             setSignals([
+              ...carried,
               ...resting,
               { id: sigId, from: hop.from, to: hop.to, progress: p },
             ]);
@@ -340,6 +490,9 @@ export const useEventStreamingAnimation = (
           (k) => queues[k].length > 0,
         );
 
+        // Balls that have arrived at data-store — persist across rounds
+        const dsResting: Signal[] = [...carryDs];
+
         const runRound = () => {
           // Pick one from each partition that still has events
           const roundPairs: {
@@ -359,7 +512,8 @@ export const useEventStreamingAnimation = (
             // All drained — dispatch state update and finish
             dispatch(consumeAllStoreWorkers());
             dispatch(consumeBroadcast());
-            setSignals([]);
+            persistedDsRef.current = dsResting;
+            setSignals([...dsResting, ...carryBcast]);
             setAnimPhase("idle");
             onAnimationComplete?.();
             return;
@@ -381,7 +535,9 @@ export const useEventStreamingAnimation = (
           const stepToWorker = (now: number) => {
             const p = Math.min((now - start) / 600, 1);
             setSignals([
+              ...carried,
               ...remainingResting,
+              ...dsResting,
               ...movingSigs.map((s) => ({ ...s, progress: p })),
             ]);
             if (p < 1) {
@@ -401,12 +557,28 @@ export const useEventStreamingAnimation = (
                 const stepToStore = (now2: number) => {
                   const p2 = Math.min((now2 - storeStart) / 500, 1);
                   setSignals([
+                    ...carryBcast,
                     ...remainingResting,
+                    ...dsResting,
                     ...storeSigs.map((s) => ({ ...s, progress: p2 })),
                   ]);
                   if (p2 < 1) {
                     rafRef.current = requestAnimationFrame(stepToStore);
                   } else {
+                    // Add arrived balls to data-store resting (persist across rounds)
+                    roundPairs.forEach((rp, i) => {
+                      dsResting.push({
+                        id: `ds-rest-${rp.workerId}-${Date.now()}-${i}`,
+                        from: "data-store",
+                        to: "data-store",
+                        progress: 0,
+                        resting: {
+                          nodeId: "data-store",
+                          offsetX: (Math.random() - 0.5) * 40,
+                          offsetY: (Math.random() - 0.5) * 20,
+                        },
+                      });
+                    });
                     // Update resting array to match remaining
                     resting.length = 0;
                     resting.push(...remainingResting);
@@ -430,7 +602,12 @@ export const useEventStreamingAnimation = (
 
     // Step 6: Summary
     if (currentStep === 6) {
-      setSignals([]);
+      // Keep persisted balls visible
+      const allPersisted = [
+        ...persistedDsRef.current,
+        ...persistedBcastRef.current,
+      ];
+      setSignals(allPersisted);
       setAnimPhase("summary");
       setTimeout(() => onAnimationComplete?.(), 0);
       return cleanup;
