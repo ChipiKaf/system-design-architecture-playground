@@ -1,0 +1,505 @@
+/* ── LangGraph Plugin Styles ──────────────────────────────── */
+
+.lg-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* ── Concept pills ────────────────────────────────────────── */
+.lg-pills {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  background: rgba(15, 23, 42, 0.5);
+  border-bottom: 1px solid #1e293b;
+}
+
+.lg-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+  background: transparent;
+  line-height: 1.3;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+
+  &--graph {
+    color: #c4b5fd;
+    border-color: #7c3aed;
+    &:hover {
+      background: rgba(124, 58, 237, 0.2);
+    }
+  }
+  &--node {
+    color: #a5b4fc;
+    border-color: #6366f1;
+    &:hover {
+      background: rgba(99, 102, 241, 0.2);
+    }
+  }
+  &--edge {
+    color: #fde68a;
+    border-color: #f59e0b;
+    &:hover {
+      background: rgba(245, 158, 11, 0.2);
+    }
+  }
+  &--state {
+    color: #6ee7b7;
+    border-color: #10b981;
+    &:hover {
+      background: rgba(16, 185, 129, 0.2);
+    }
+  }
+  &--channel {
+    color: #5eead4;
+    border-color: #14b8a6;
+    &:hover {
+      background: rgba(20, 184, 166, 0.2);
+    }
+  }
+  &--send {
+    color: #67e8f9;
+    border-color: #06b6d4;
+    &:hover {
+      background: rgba(6, 182, 212, 0.2);
+    }
+  }
+  &--int {
+    color: #fca5a5;
+    border-color: #ef4444;
+    &:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+  }
+}
+
+/* ── Body: graph + sidebar ────────────────────────────────── */
+.lg-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.lg-graph {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lg-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Sidebar: state panel + extras ────────────────────────── */
+.lg-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: #0f172a;
+  border-left: 1px solid #1e293b;
+  overflow-y: auto;
+}
+
+/* ── State panel ──────────────────────────────────────────── */
+.lg-state-panel {
+  background: #1e293b;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  overflow: hidden;
+}
+
+.lg-state-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: #0f172a;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.lg-state-subtitle {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.lg-state-entries {
+  display: flex;
+  flex-direction: column;
+}
+
+.lg-state-entry {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 0.5fr;
+  gap: 0.25rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid #1e293b;
+  font-size: 0.68rem;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  transition: background 0.3s;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &--changed {
+    background: rgba(52, 211, 153, 0.12);
+    animation: lg-flash 1.2s ease-out;
+  }
+}
+
+@keyframes lg-flash {
+  0% {
+    background: rgba(52, 211, 153, 0.35);
+  }
+  100% {
+    background: rgba(52, 211, 153, 0.08);
+  }
+}
+
+.lg-state-key {
+  color: #93c5fd;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lg-state-val {
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lg-state-reducer {
+  color: #64748b;
+  font-size: 0.6rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ── Phase indicator ──────────────────────────────────────── */
+.lg-phase {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  background: #1e293b;
+  border-radius: 6px;
+  border: 1px solid #334155;
+}
+
+.lg-phase-label {
+  font-size: 0.7rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.lg-phase-value {
+  font-size: 0.7rem;
+  color: #a78bfa;
+  font-weight: 700;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+/* ── LLM call panel ───────────────────────────────────────── */
+.lg-llm-panel {
+  background: #1e1b4b;
+  border: 1px solid #4338ca;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.lg-llm-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #c7d2fe;
+  margin-bottom: 0.35rem;
+}
+
+.lg-llm-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #818cf8;
+  animation: lg-pulse 1s infinite alternate;
+}
+
+@keyframes lg-pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.lg-llm-detail {
+  font-size: 0.65rem;
+  color: #a5b4fc;
+  line-height: 1.4;
+}
+
+.lg-llm-label {
+  font-weight: 700;
+  color: #818cf8;
+}
+
+/* ── Channel Inspector ────────────────────────────────────── */
+.lg-channel-inspector {
+  background: #1e293b;
+  border-radius: 8px;
+  border: 1px solid #2dd4bf40;
+  overflow: hidden;
+}
+
+.lg-channel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #5eead4;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  background: #0f172a;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lg-channel-info {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #14b8a6;
+  background: transparent;
+  color: #5eead4;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+
+  &:hover {
+    background: rgba(20, 184, 166, 0.25);
+  }
+}
+
+.lg-channel-patches {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid #1e293b;
+}
+
+.lg-channel-label {
+  font-size: 0.62rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.lg-channel-patch {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0;
+  font-size: 0.68rem;
+  transition:
+    opacity 0.3s,
+    filter 0.3s;
+
+  &--lost {
+    opacity: 0.4;
+    text-decoration: line-through;
+    filter: saturate(0.3);
+  }
+}
+
+.lg-channel-node {
+  color: #c7d2fe;
+  font-weight: 600;
+  min-width: 60px;
+}
+
+.lg-channel-arrow {
+  color: #475569;
+}
+
+.lg-channel-code {
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.63rem;
+  color: #94a3b8;
+  background: #0f172a;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+
+.lg-channel-overwritten {
+  font-size: 0.58rem;
+  color: #f87171;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* ── Toggle ── */
+.lg-channel-toggle {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid #1e293b;
+}
+
+.lg-channel-toggle-label {
+  font-size: 0.62rem;
+  color: #64748b;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.3rem;
+
+  code {
+    color: #93c5fd;
+  }
+}
+
+.lg-channel-buttons {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.lg-channel-btn {
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+
+  &:hover {
+    border-color: #475569;
+    color: #e2e8f0;
+  }
+
+  &--active {
+    background: #14b8a6;
+    border-color: #14b8a6;
+    color: #042f2e;
+
+    &:hover {
+      background: #2dd4bf;
+      border-color: #2dd4bf;
+      color: #042f2e;
+    }
+  }
+
+  &--danger.lg-channel-btn--active {
+    background: #dc2626;
+    border-color: #dc2626;
+    color: #fff;
+
+    &:hover {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+  }
+}
+
+/* ── Result display ── */
+.lg-channel-result {
+  padding: 0.4rem 0.75rem 0.5rem;
+}
+
+.lg-channel-outcome {
+  margin-top: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 5px;
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.66rem;
+  transition: all 0.25s;
+
+  code {
+    display: block;
+    color: #cbd5e1;
+  }
+
+  &--ok {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+  }
+
+  &--bad {
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    animation: lg-danger-pulse 1.5s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes lg-danger-pulse {
+  0% {
+    border-color: rgba(220, 38, 38, 0.2);
+  }
+  100% {
+    border-color: rgba(220, 38, 38, 0.5);
+  }
+}
+
+.lg-channel-key-ok {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.lg-channel-verdict {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  &--ok {
+    color: #34d399;
+  }
+
+  &--bad {
+    color: #f87171;
+  }
+}

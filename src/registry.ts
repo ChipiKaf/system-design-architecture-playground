@@ -1,6 +1,7 @@
 import type { DemoPlugin } from "./types/ModelPlugin";
 import LoadBalancerPlugin from "./plugins/load-balancer";
 import EventStreamingPlugin from "./plugins/event-streaming";
+import LanggraphPlugin from "./plugins/langgraph";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -38,14 +39,14 @@ export const categories: PluginCategory[] = [
     accent: "#3b82f6",
     plugins: [LoadBalancerPlugin, EventStreamingPlugin],
   },
-  // {
-  //   id: "architecture",
-  //   name: "Architecture & Patterns",
-  //   description:
-  //     "Design patterns, graph-based orchestration (LangGraph), pub/sub topologies, and other architectural concepts.",
-  //   accent: "#8b5cf6",
-  //   plugins: [],
-  // },
+  {
+    id: "architecture",
+    name: "Architecture & Patterns",
+    description:
+      "Design patterns, graph-based orchestration (LangGraph), AI pipelines, and other architectural concepts.",
+    accent: "#8b5cf6",
+    plugins: [LanggraphPlugin],
+  },
 ];
 
 /* ── Helpers ─────────────────────────────────────────────── */
