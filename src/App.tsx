@@ -8,6 +8,7 @@ import {
 import "./App.scss";
 import Shell from "./components/Shell";
 import LoadBalancerPlugin from "./plugins/load-balancer";
+import EventStreamingPlugin from "./plugins/event-streaming";
 
 function PluginSwitcher() {
   const navigate = useNavigate();
@@ -38,6 +39,7 @@ function PluginSwitcher() {
         }}
       >
         <option value="load-balancer">Load Balancer</option>
+        <option value="event-streaming">Event Streaming</option>
       </select>
     </div>
   );
@@ -52,6 +54,10 @@ function App() {
         <Route
           path="/load-balancer"
           element={<Shell plugin={LoadBalancerPlugin} />}
+        />
+        <Route
+          path="/event-streaming"
+          element={<Shell plugin={EventStreamingPlugin} />}
         />
         <Route path="*" element={<Navigate to="/load-balancer" replace />} />
       </Routes>
