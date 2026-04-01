@@ -1,5 +1,6 @@
 import React from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { type RootState } from "../store/store";
 import {
   nextStep,
@@ -7,10 +8,12 @@ import {
   resetSimulation,
 } from "../store/slices/simulationSlice";
 import type { DemoPlugin, DemoStep } from "../types/ModelPlugin";
+import type { PluginCategory } from "../registry";
 import StepIndicator from "./StepIndicator/StepIndicator";
 
 interface ShellProps {
   plugin: DemoPlugin;
+  category: PluginCategory;
 }
 
 // Helper to normalize steps to objects
@@ -20,8 +23,9 @@ const normalizeSteps = (steps: (string | DemoStep)[]): DemoStep[] => {
   );
 };
 
-const Shell: React.FC<ShellProps> = ({ plugin }) => {
+const Shell: React.FC<ShellProps> = ({ plugin, category }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const simulationState = useSelector((state: RootState) => state.simulation);
 
   // Use the plugin's selector to get its specific state
@@ -62,8 +66,51 @@ const Shell: React.FC<ShellProps> = ({ plugin }) => {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>{plugin.name}</h1>
-        <p>{plugin.description}</p>
+        <div className="app-header__nav">
+          <button
+            className="app-header__back"
+            onClick={() => navigate("/")}
+            title="Back to topics"
+          >
+            ←
+          </button>
+
+          <div className="app-header__text">
+            <div className="app-header__breadcrumb">
+              <span
+                className="app-header__category"
+                style={{ color: category.accent }}
+              >
+                {category.name}
+              </span>
+              {category.plugins.length > 1 && (
+                <>
+                  <span className="app-header__sep">/</span>
+                  <select
+                    className="app-header__select"
+                    value={plugin.id}
+                    onChange={(e) =>
+                      navigate(`/${category.id}/${e.target.value}`)
+                    }
+                  >
+                    {category.plugins.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              {category.plugins.length <= 1 && (
+                <>
+                  <span className="app-header__sep">/</span>
+                  <span className="app-header__plugin-name">{plugin.name}</span>
+                </>
+              )}
+            </div>
+            <p>{plugin.description}</p>
+          </div>
+        </div>
       </header>
 
       <div className="main-content">

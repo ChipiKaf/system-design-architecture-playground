@@ -300,117 +300,38 @@ export default ${pascalName}Plugin;
 fs.writeFileSync(path.join(targetDir, 'index.ts'), indexContent);
 
 
-// 6. Update App.tsx
-const appPath = path.join(__dirname, '../src/App.tsx');
-let appContent = fs.readFileSync(appPath, 'utf-8');
+// 6. Update registry.ts — add the import and put the plugin into a category.
+//    The store and routes are built automatically from the registry,
+//    so no other files need to change.
 
-// 6a. Add Import
-const importStatement = `import ${pascalName}Plugin from './plugins/${pluginName}';`;
-// Insert usage of the new plugin after the last plugin import
-const lastImportRegex = /import .*Plugin from '.\/plugins\/.*';/g;
-let match;
-let lastImportIndex = -1;
-while ((match = lastImportRegex.exec(appContent)) !== null) {
-  lastImportIndex = match.index + match[0].length;
-}
+const registryPath = path.join(__dirname, '../src/registry.ts');
+if (fs.existsSync(registryPath)) {
+  let regContent = fs.readFileSync(registryPath, 'utf-8');
 
-if (lastImportIndex !== -1) {
-  appContent =
-    appContent.slice(0, lastImportIndex) +
-    '\n' + importStatement +
-    appContent.slice(lastImportIndex);
-} else {
-  // Fallback: try to add after the last import line
-  const lastAnyImportRegex = /import .* from .*/g;
-  while ((match = lastAnyImportRegex.exec(appContent)) !== null) {
-    lastImportIndex = match.index + match[0].length;
-  }
-  if (lastImportIndex !== -1) {
-    appContent =
-      appContent.slice(0, lastImportIndex) +
-      '\n' + importStatement +
-      appContent.slice(lastImportIndex);
-  }
-}
-
-// 6b. Add Option
-const humanName = pascalName.replace(/([A-Z])/g, ' $1').trim();
-const optionElement = `        <option value="${pluginName}">${humanName}</option>`;
-const selectEndTag = '</select>';
-const selectIndex = appContent.indexOf(selectEndTag);
-
-if (selectIndex !== -1) {
-  appContent =
-    appContent.slice(0, selectIndex) +
-    optionElement + '\n' +
-    '      ' +
-    appContent.slice(selectIndex);
-}
-
-// 6c. Add Route
-const routeElement = `        <Route path="/${pluginName}" element={<Shell plugin={${pascalName}Plugin} />} />`;
-const routesEndTag = '</Routes>';
-const routesIndex = appContent.indexOf(routesEndTag);
-
-if (routesIndex !== -1) {
-  appContent =
-    appContent.slice(0, routesIndex) +
-    routeElement + '\n' +
-    '      ' +
-    appContent.slice(routesIndex);
-}
-
-fs.writeFileSync(appPath, appContent);
-console.log('Updated src/App.tsx with new plugin routes');
-
-// 7. Update store.ts
-const storePath = path.join(__dirname, '../src/store/store.ts');
-if (fs.existsSync(storePath)) {
-  let storeContent = fs.readFileSync(storePath, 'utf-8');
-
-  // 7a. Add Import
-  const storeImportStatement = `import ${pascalName}Plugin from '../plugins/${pluginName}';`;
-  const lastStoreImportRegex = /import .*Plugin from '..\/plugins\/.*';/g;
+  // 6a. Add import after the last plugin import
+  const regImport = `import ${pascalName}Plugin from "./plugins/${pluginName}";`;
+  const lastPluginImportRegex = /import .*Plugin from ".\/plugins\/.*";/g;
   let match;
-  let lastStoreImportIndex = -1;
-  while ((match = lastStoreImportRegex.exec(storeContent)) !== null) {
-    lastStoreImportIndex = match.index + match[0].length;
+  let lastIdx = -1;
+  while ((match = lastPluginImportRegex.exec(regContent)) !== null) {
+    lastIdx = match.index + match[0].length;
   }
 
-  if (lastStoreImportIndex !== -1) {
-    storeContent =
-      storeContent.slice(0, lastStoreImportIndex) +
-      '\n' + storeImportStatement +
-      storeContent.slice(lastStoreImportIndex);
-  } else {
-    // Fallback
-    const lastAnyImport = /import .* from .*/g;
-    while ((match = lastAnyImport.exec(storeContent)) !== null) {
-      lastStoreImportIndex = match.index + match[0].length;
-    }
-    if (lastStoreImportIndex !== -1) {
-      storeContent =
-        storeContent.slice(0, lastStoreImportIndex) +
-        '\n' + storeImportStatement +
-        storeContent.slice(lastStoreImportIndex);
-    }
+  if (lastIdx !== -1) {
+    regContent =
+      regContent.slice(0, lastIdx) +
+      '\n' + regImport +
+      regContent.slice(lastIdx);
   }
 
-  // 7b. Add to Reducer
-  const reducerLine = `    ${camelName}: ${pascalName}Plugin.reducer,`;
-  const reducerStartRegex = /reducer:\s*\{/;
-  const reducerMatch = reducerStartRegex.exec(storeContent);
-
-  if (reducerMatch) {
-    const insertIndex = reducerMatch.index + reducerMatch[0].length;
-    storeContent =
-      storeContent.slice(0, insertIndex) +
-      '\n' + reducerLine +
-      storeContent.slice(insertIndex);
-  }
-
-  fs.writeFileSync(storePath, storeContent);
-  console.log('Updated src/store/store.ts with new plugin reducer');
+  fs.writeFileSync(registryPath, regContent);
+  console.log('Updated src/registry.ts with import for ' + pascalName + 'Plugin');
+  console.log('');
+  console.log('  ⚠  Add the plugin to a category in src/registry.ts:');
+  console.log('     plugins: [..., ' + pascalName + 'Plugin],');
+} else {
+  console.log('Could not find src/registry.ts — add the plugin to the registry manually.');
 }
 
+console.log('');
 console.log('Successfully created plugin "' + pluginName + '" in src/plugins/' + pluginName);

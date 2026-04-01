@@ -1,12 +1,10 @@
 import { configureStore } from "@reduxjs/toolkit";
 import simulationReducer from "./slices/simulationSlice";
-import LoadBalancerPlugin from "../plugins/load-balancer";
-import EventStreamingPlugin from "../plugins/event-streaming";
+import { pluginReducerMap } from "../registry";
 
 export const store = configureStore({
   reducer: {
-    loadBalancer: LoadBalancerPlugin.reducer,
-    eventStreaming: EventStreamingPlugin.reducer,
+    ...pluginReducerMap,
     simulation: simulationReducer,
   },
 });
