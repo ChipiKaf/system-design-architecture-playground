@@ -2,6 +2,7 @@ import type { DemoPlugin } from "./types/ModelPlugin";
 import LoadBalancerPlugin from "./plugins/load-balancer";
 import EventStreamingPlugin from "./plugins/event-streaming";
 import LanggraphPlugin from "./plugins/langgraph";
+import BigOPlugin from "./plugins/big-o";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -46,6 +47,14 @@ export const categories: PluginCategory[] = [
       "Design patterns, graph-based orchestration (LangGraph), AI pipelines, and other architectural concepts.",
     accent: "#8b5cf6",
     plugins: [LanggraphPlugin],
+  },
+  {
+    id: "algorithms",
+    name: "Algorithms",
+    description:
+      "Core algorithm ideas explained visually — time complexity, search strategies, growth curves, and more.",
+    accent: "#f97316",
+    plugins: [BigOPlugin],
   },
 ];
 
