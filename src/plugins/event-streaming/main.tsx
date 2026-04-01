@@ -1,9 +1,18 @@
-import React, { useRef, useLayoutEffect, useEffect } from "react";
+import React, {
+  useRef,
+  useLayoutEffect,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import "./main.scss";
 import { useEventStreamingAnimation } from "./useEventStreamingAnimation";
 import { useDispatch } from "react-redux";
 import { setAdapterType, toggleBroadcastOffline } from "./eventStreamingSlice";
 import { viz, type SignalOverlayParams } from "vizcraft";
+import InfoModal from "../../components/InfoModal/InfoModal";
+import VizInfoBeacon from "../../components/VizInfoBeacon/VizInfoBeacon";
+import { concepts, type ConceptKey } from "./concepts";
 
 interface Props {
   onAnimationComplete?: () => void;
@@ -12,12 +21,66 @@ interface Props {
 const W = 900;
 const H = 760;
 
+const centeredRect = (
+  centerX: number,
+  centerY: number,
+  width: number,
+  height: number,
+) => ({
+  x: centerX - width / 2,
+  y: centerY - height / 2,
+  width,
+  height,
+});
+
+const kafkaNodeBounds = centeredRect(450, 200, 220, 60);
+const kafkaHoverRegion = {
+  x: kafkaNodeBounds.x - 10,
+  y: kafkaNodeBounds.y - 10,
+  width: kafkaNodeBounds.width + 20,
+  height: kafkaNodeBounds.height + 20,
+};
+const kafkaIndicatorPos = {
+  x: kafkaNodeBounds.x + kafkaNodeBounds.width + 18,
+  y: kafkaNodeBounds.y + kafkaNodeBounds.height / 2,
+};
+
+const workersLabelBounds = centeredRect(230, 410, 240, 26);
+const workersHoverRegion = {
+  x: workersLabelBounds.x - 10,
+  y: workersLabelBounds.y - 10,
+  width: workersLabelBounds.width + 20,
+  height: workersLabelBounds.height + 20,
+};
+const workersIndicatorPos = {
+  x: workersLabelBounds.x + workersLabelBounds.width + 18,
+  y: workersLabelBounds.y + workersLabelBounds.height / 2,
+};
+
+const broadcastLabelBounds = centeredRect(670, 410, 240, 26);
+const broadcastHoverRegion = {
+  x: broadcastLabelBounds.x - 10,
+  y: broadcastLabelBounds.y - 10,
+  width: broadcastLabelBounds.width + 20,
+  height: broadcastLabelBounds.height + 20,
+};
+const broadcastIndicatorPos = {
+  x: broadcastLabelBounds.x + broadcastLabelBounds.width + 18,
+  y: broadcastLabelBounds.y + broadcastLabelBounds.height / 2,
+};
+
 const EventStreamingVisualization: React.FC<Props> = ({
   onAnimationComplete,
 }) => {
   const dispatch = useDispatch();
   const { streaming, currentStep, animPhase, signals } =
     useEventStreamingAnimation(onAnimationComplete);
+  const [activeConcept, setActiveConcept] = useState<ConceptKey | null>(null);
+  const openConcept = useCallback(
+    (key: ConceptKey) => setActiveConcept(key),
+    [],
+  );
+  const closeConcept = useCallback(() => setActiveConcept(null), []);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
 
@@ -194,6 +257,10 @@ const EventStreamingVisualization: React.FC<Props> = ({
             value:
               "A cluster can host many topics. This diagram is showing one topic split into partitions",
           },
+          {
+            label: "💡",
+            value: "Hover the Kafka badge to reveal the info button",
+          },
         ],
       });
 
@@ -231,6 +298,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
           fontWeight: "bold",
           dy: -6,
         })
+        .onClick(() => openConcept("partitioning"))
         .tooltip({
           title: `Topic Partition ${i}`,
           sections: [
@@ -239,6 +307,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
               label: "Role",
               value: "One ordered log segment of the topic shown above",
             },
+            { label: "💡", value: "Click to learn about partitioning" },
           ],
         });
 
@@ -286,16 +355,27 @@ const EventStreamingVisualization: React.FC<Props> = ({
         fill: "#fff",
         background: "#4f46e5",
         fontSize: 8,
-      });
+      })
+      .onClick(() => openConcept("worker-group"));
 
     // Inline annotation
     b.node("workers-hint")
       .at(230, 430)
       .rect(0, 0, 0)
       .fill("transparent")
-      .label("each partition → exactly 1 worker", {
+      .label("each partition → exactly 1 worker  (click to learn)", {
         fill: broadcastActive ? "#475569" : "#818cf8",
         fontSize: 8,
+      });
+
+    // Subscription annotation
+    b.node("workers-sub-hint")
+      .at(230, 445)
+      .rect(0, 0, 0)
+      .fill("transparent")
+      .label('subscribes with group.id = "store-workers"', {
+        fill: broadcastActive ? "#3b3570" : "#6366f1",
+        fontSize: 7,
       });
 
     workers.instances.forEach((inst, i) => {
@@ -364,7 +444,8 @@ const EventStreamingVisualization: React.FC<Props> = ({
         fill: "#fff",
         background: "#16a34a",
         fontSize: 8,
-      });
+      })
+      .onClick(() => openConcept("broadcast-group"));
 
     // Inline annotation
     b.node("broadcast-hint")
@@ -374,6 +455,16 @@ const EventStreamingVisualization: React.FC<Props> = ({
       .label("every event → all nodes → each node's clients", {
         fill: workersActive && !broadcastActive ? "#1a3a2a" : "#4ade80",
         fontSize: 8,
+      });
+
+    // Subscription annotation
+    b.node("broadcast-sub-hint")
+      .at(670, 445)
+      .rect(0, 0, 0)
+      .fill("transparent")
+      .label("each node uses unique group.id → gets ALL partitions", {
+        fill: workersActive && !broadcastActive ? "#0f3d1d" : "#22c55e",
+        fontSize: 7,
       });
 
     broadcast.instances.forEach((inst, i) => {
@@ -547,11 +638,23 @@ const EventStreamingVisualization: React.FC<Props> = ({
         fontWeight: "bold",
         dy: -2,
       })
+      .onClick(() => openConcept("idempotency"))
       .tooltip({
         title: "Persistent Storage",
         sections: [
           { label: "Role", value: "Durable event log with idempotency checks" },
+          { label: "💡", value: "Click to learn about idempotency" },
         ],
+      });
+
+    // Idempotency annotation
+    b.node("idempotency-hint")
+      .at(230, 620)
+      .rect(0, 0, 0)
+      .fill("transparent")
+      .label("⚡ idempotent writes — click store to learn", {
+        fill: "#c4b5fd",
+        fontSize: 8,
       });
 
     b.edge("worker-0", "data-store", "e-w0-store")
@@ -628,9 +731,65 @@ const EventStreamingVisualization: React.FC<Props> = ({
             <option value="production">Production (librdkafka)</option>
           </select>
         </div>
+
+        <div className="es-concept-pills">
+          <button
+            className="es-pill es-pill--kafka"
+            onClick={() => openConcept("kafka")}
+          >
+            Kafka
+          </button>
+          <button
+            className="es-pill es-pill--sub"
+            onClick={() => openConcept("subscription")}
+          >
+            Subscriptions
+          </button>
+          <button
+            className="es-pill es-pill--idem"
+            onClick={() => openConcept("idempotency")}
+          >
+            Idempotency
+          </button>
+          <button
+            className="es-pill es-pill--part"
+            onClick={() => openConcept("partitioning")}
+          >
+            Partitioning
+          </button>
+        </div>
       </div>
 
-      <div className="es-canvas" ref={containerRef} />
+      <div className="es-canvas">
+        <div className="es-canvas-stage" ref={containerRef} />
+        <VizInfoBeacon
+          viewWidth={W}
+          viewHeight={H}
+          hoverRegion={kafkaHoverRegion}
+          indicatorPosition={kafkaIndicatorPos}
+          ariaLabel="Open Kafka details"
+          accentColor="#38bdf8"
+          onActivate={() => openConcept("kafka")}
+        />
+        <VizInfoBeacon
+          viewWidth={W}
+          viewHeight={H}
+          hoverRegion={workersHoverRegion}
+          indicatorPosition={workersIndicatorPos}
+          ariaLabel="Why workers get one partition each"
+          accentColor="#818cf8"
+          onActivate={() => openConcept("worker-group")}
+        />
+        <VizInfoBeacon
+          viewWidth={W}
+          viewHeight={H}
+          hoverRegion={broadcastHoverRegion}
+          indicatorPosition={broadcastIndicatorPos}
+          ariaLabel="Why every node gets every event"
+          accentColor="#4ade80"
+          onActivate={() => openConcept("broadcast-group")}
+        />
+      </div>
 
       <div className="es-stats">
         <div className="es-stat">
@@ -655,6 +814,18 @@ const EventStreamingVisualization: React.FC<Props> = ({
           </div>
         )}
       </div>
+
+      {activeConcept && (
+        <InfoModal
+          isOpen
+          onClose={closeConcept}
+          title={concepts[activeConcept].title}
+          subtitle={concepts[activeConcept].subtitle}
+          accentColor={concepts[activeConcept].accentColor}
+          sections={concepts[activeConcept].sections}
+          aside={concepts[activeConcept].aside}
+        />
+      )}
     </div>
   );
 };

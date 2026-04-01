@@ -1,0 +1,41 @@
+.viz-info-beacon {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  overflow: visible;
+
+  &__hover-region {
+    pointer-events: auto;
+    cursor: default;
+  }
+
+  &__indicator {
+    pointer-events: none;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity 0.22s ease,
+      transform 0.22s ease;
+    transform-origin: center;
+    transform: scale(0.85);
+    outline: none;
+
+    &--visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: scale(1);
+    }
+
+    &:hover circle:nth-child(2),
+    &:focus-visible circle:nth-child(2) {
+      filter: brightness(1.3);
+    }
+
+    &:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 4px;
+      border-radius: 50%;
+    }
+  }
+}
