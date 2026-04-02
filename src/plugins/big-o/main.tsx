@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import InfoModal from "../../components/InfoModal/InfoModal";
+import { useConceptModal, ConceptPills, SidePanel } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 import {
   getBinaryTargetIndex,
@@ -42,14 +42,8 @@ const curveValue = (curve: CurveKey, n: number) => {
 const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const dispatch = useDispatch();
   const { bigO, currentStep } = useBigOAnimation(onAnimationComplete);
-  const [activeConcept, setActiveConcept] = useState<ConceptKey | null>(null);
+  const { openConcept, closeConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
   const [focusedCurve, setFocusedCurve] = useState<CurveKey | "all">("all");
-
-  const openConcept = useCallback(
-    (key: ConceptKey) => setActiveConcept(key),
-    [],
-  );
-  const closeConcept = useCallback(() => setActiveConcept(null), []);
 
   const items = useMemo(
     () => Array.from({ length: bigO.inputSize }, (_, index) => index + 1),
@@ -164,7 +158,7 @@ const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       : (graphSeries.find((series) => series.key === focusedCurve) ?? null);
 
   useEffect(() => {
-    setActiveConcept(null);
+    closeConcept();
   }, [bigO.inputSize, currentStep]);
 
   useEffect(() => {
@@ -410,6 +404,15 @@ const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     </div>
   );
 
+  const boPills = [
+    { key: "big-o", label: "Big O", color: "#c2410c", borderColor: "rgba(249,115,22,0.22)" },
+    { key: "n", label: "n", color: "#b45309", borderColor: "rgba(245,158,11,0.26)" },
+    { key: "constant", label: "O(1)", color: "#0369a1", borderColor: "rgba(14,165,233,0.25)" },
+    { key: "logarithmic", label: "O(log n)", color: "#6d28d9", borderColor: "rgba(139,92,246,0.25)" },
+    { key: "linear", label: "O(n)", color: "#15803d", borderColor: "rgba(34,197,94,0.28)" },
+    { key: "quadratic", label: "O(n^2)", color: "#b91c1c", borderColor: "rgba(239,68,68,0.28)" },
+  ];
+
   return (
     <div className="bo-root">
       <div className="bo-toolbar">
@@ -428,44 +431,7 @@ const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
           </div>
         </div>
 
-        <div className="bo-pills">
-          <button
-            className="bo-pill bo-pill--o"
-            onClick={() => openConcept("big-o")}
-          >
-            Big O
-          </button>
-          <button
-            className="bo-pill bo-pill--n"
-            onClick={() => openConcept("n")}
-          >
-            n
-          </button>
-          <button
-            className="bo-pill bo-pill--constant"
-            onClick={() => openConcept("constant")}
-          >
-            O(1)
-          </button>
-          <button
-            className="bo-pill bo-pill--logarithmic"
-            onClick={() => openConcept("logarithmic")}
-          >
-            O(log n)
-          </button>
-          <button
-            className="bo-pill bo-pill--linear"
-            onClick={() => openConcept("linear")}
-          >
-            O(n)
-          </button>
-          <button
-            className="bo-pill bo-pill--quadratic"
-            onClick={() => openConcept("quadratic")}
-          >
-            O(n^2)
-          </button>
-        </div>
+        <ConceptPills pills={boPills} onOpen={openConcept} className="bo-pills" />
       </div>
 
       <div className="bo-body">
@@ -491,7 +457,7 @@ const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
           {currentStep === 5 && renderSummaryStage()}
         </div>
 
-        <aside className="bo-sidebar">
+        <SidePanel className="bo-sidebar">
           <div className="bo-card bo-card--story">
             <h3>Story Mode</h3>
             {activeComplexity === "intro" && (
@@ -820,20 +786,10 @@ const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
               </div>
             </div>
           )}
-        </aside>
+        </SidePanel>
       </div>
 
-      {activeConcept && (
-        <InfoModal
-          isOpen
-          onClose={closeConcept}
-          title={concepts[activeConcept].title}
-          subtitle={concepts[activeConcept].subtitle}
-          accentColor={concepts[activeConcept].accentColor}
-          sections={concepts[activeConcept].sections}
-          aside={concepts[activeConcept].aside}
-        />
-      )}
+      <ConceptModal />
     </div>
   );
 };

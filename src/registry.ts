@@ -5,6 +5,7 @@ import LanggraphPlugin from "./plugins/langgraph";
 import BigOPlugin from "./plugins/big-o";
 import EventLoopPlugin from "./plugins/event-loop";
 import EcsAutoscalingPlugin from "./plugins/ecs-autoscaling";
+import PalindromePlugin from "./plugins/palindrome";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -56,7 +57,7 @@ export const categories: PluginCategory[] = [
     description:
       "Core algorithm ideas explained visually — time complexity, search strategies, growth curves, and more.",
     accent: "#f97316",
-    plugins: [BigOPlugin],
+    plugins: [BigOPlugin, PalindromePlugin],
   },
   {
     id: "language-runtime",

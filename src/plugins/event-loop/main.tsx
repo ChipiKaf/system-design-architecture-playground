@@ -1,16 +1,23 @@
 import React, {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
 } from "react";
 import {
   viz,
   type PanZoomController,
   type SignalOverlayParams,
 } from "vizcraft";
-import InfoModal from "../../components/InfoModal/InfoModal";
+import {
+  useConceptModal,
+  ConceptPills,
+  PluginLayout,
+  StageHeader,
+  StatBadge,
+  SidePanel,
+  SideCard,
+  CanvasStage,
+} from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 import { useEventLoopAnimation } from "./useEventLoopAnimation";
 import type { LoopItem } from "./eventLoopSlice";
@@ -78,16 +85,10 @@ const preview = (items: LoopItem[]) => {
 const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const { runtime, signals, phase } =
     useEventLoopAnimation(onAnimationComplete);
-  const [activeConcept, setActiveConcept] = useState<ConceptKey | null>(null);
+  const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
-
-  const openConcept = useCallback(
-    (key: ConceptKey) => setActiveConcept(key),
-    [],
-  );
-  const closeConcept = useCallback(() => setActiveConcept(null), []);
 
   const {
     callStack,
@@ -605,92 +606,46 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     );
   };
 
+  const elPills = [
+    { key: "event-loop", label: "Event Loop", color: "#fbbf24", borderColor: "rgba(245,158,11,0.28)" },
+    { key: "call-stack", label: "Call Stack", color: "#7dd3fc", borderColor: "rgba(56,189,248,0.28)" },
+    { key: "web-apis", label: "Web APIs", color: "#fdba74", borderColor: "rgba(249,115,22,0.28)" },
+    { key: "microtasks", label: "Microtasks", color: "#d8b4fe", borderColor: "rgba(139,92,246,0.28)" },
+    { key: "tasks", label: "Task Queue", color: "#86efac", borderColor: "rgba(74,222,128,0.28)" },
+    { key: "render", label: "Render", color: "#99f6e4", borderColor: "rgba(45,212,191,0.28)" },
+  ];
+
   return (
     <div className="el-root">
-      <div className="el-pills">
-        <button
-          className="el-pill el-pill--loop"
-          onClick={() => openConcept("event-loop")}
-        >
-          Event Loop
-        </button>
-        <button
-          className="el-pill el-pill--stack"
-          onClick={() => openConcept("call-stack")}
-        >
-          Call Stack
-        </button>
-        <button
-          className="el-pill el-pill--apis"
-          onClick={() => openConcept("web-apis")}
-        >
-          Web APIs
-        </button>
-        <button
-          className="el-pill el-pill--micro"
-          onClick={() => openConcept("microtasks")}
-        >
-          Microtasks
-        </button>
-        <button
-          className="el-pill el-pill--task"
-          onClick={() => openConcept("tasks")}
-        >
-          Task Queue
-        </button>
-        <button
-          className="el-pill el-pill--render"
-          onClick={() => openConcept("render")}
-        >
-          Render
-        </button>
-      </div>
+      <PluginLayout
+        toolbar={
+          <ConceptPills pills={elPills} onOpen={openConcept} className="el-pills" />
+        }
+        canvas={
+          <div className="el-stage">
+            <StageHeader
+              title="JavaScript Event Loop"
+              subtitle="One script, one timer, one Promise callback, one nested microtask. Watch how the runtime chooses the next piece of work."
+            >
+              <StatBadge
+                label="Phase"
+                value={phaseLabel[phase]}
+                className={`el-phase el-phase--${phase}`}
+              />
+              <StatBadge label="Paints" value={renderCount} />
+              <StatBadge label="Output" value={consoleOutput.length} />
+            </StageHeader>
 
-      <div className="el-body">
-        <div className="el-stage">
-          <div className="el-stage__head">
-            <div>
-              <h2>JavaScript Event Loop</h2>
-              <p>
-                One script, one timer, one Promise callback, one nested
-                microtask. Watch how the runtime chooses the next piece of work.
-              </p>
-            </div>
-
-            <div className="el-stage__stats">
-              <div className={`el-phase el-phase--${phase}`}>
-                <span className="el-phase__label">Phase</span>
-                <span className="el-phase__value">{phaseLabel[phase]}</span>
-              </div>
-              <div className="el-stat">
-                <span className="el-stat__label">Paints</span>
-                <span className="el-stat__value">{renderCount}</span>
-              </div>
-              <div className="el-stat">
-                <span className="el-stat__label">Output</span>
-                <span className="el-stat__value">{consoleOutput.length}</span>
-              </div>
-            </div>
+            <CanvasStage canvasRef={containerRef} className="el-stage__canvas-wrap" />
           </div>
+        }
+        sidebar={
+          <SidePanel>
+            <SideCard label="What just happened?" variant="explanation">
+              <p>{explanation}</p>
+            </SideCard>
 
-          <div className="el-stage__canvas-wrap">
-            <div className="el-stage__canvas" ref={containerRef} />
-          </div>
-        </div>
-
-        <aside className="el-sidebar">
-          <div className="el-card el-card--explanation">
-            <div className="el-card__label">What just happened?</div>
-            <p>{explanation}</p>
-          </div>
-
-          <div className="el-card el-card--code">
-            <div className="el-card__head">
-              <h3>Example Script</h3>
-              <span className="el-card__sub">
-                Current line: {currentLine ?? "-"}
-              </span>
-            </div>
+            <SideCard heading="Example Script" sub={`Current line: ${currentLine ?? "-"}`} className="el-card--code">
 
             <div className="el-code">
               {CODE_LINES.map((line) => (
@@ -706,13 +661,9 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                 </div>
               ))}
             </div>
-          </div>
+            </SideCard>
 
-          <div className="el-card el-card--queues">
-            <div className="el-card__head">
-              <h3>Queue Inspector</h3>
-              <span className="el-card__sub">live runtime state</span>
-            </div>
+            <SideCard heading="Queue Inspector" sub="live runtime state" className="el-card--queues">
 
             <div className="el-lanes">
               {renderLane(
@@ -730,13 +681,9 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
               )}
               {renderLane("Task Queue", taskQueue, "el-lane--task", "tasks")}
             </div>
-          </div>
+            </SideCard>
 
-          <div className="el-card el-card--rules">
-            <div className="el-card__head">
-              <h3>Turn Priority</h3>
-              <span className="el-card__sub">why Promise beats timeout</span>
-            </div>
+            <SideCard heading="Turn Priority" sub="why Promise beats timeout" className="el-card--rules">
 
             <div className="el-rules">
               {ladder.map((rule, index) => {
@@ -762,13 +709,9 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                 );
               })}
             </div>
-          </div>
+            </SideCard>
 
-          <div className="el-card el-card--output">
-            <div className="el-card__head">
-              <h3>Console Output</h3>
-              <span className="el-card__sub">actual execution order</span>
-            </div>
+            <SideCard heading="Console Output" sub="actual execution order" className="el-card--output">
 
             <div className="el-output">
               {consoleOutput.length === 0 && (
@@ -785,21 +728,12 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                 </div>
               ))}
             </div>
-          </div>
-        </aside>
-      </div>
+            </SideCard>
+          </SidePanel>
+        }
+      />
 
-      {activeConcept && (
-        <InfoModal
-          isOpen
-          onClose={closeConcept}
-          title={concepts[activeConcept].title}
-          subtitle={concepts[activeConcept].subtitle}
-          accentColor={concepts[activeConcept].accentColor}
-          sections={concepts[activeConcept].sections}
-          aside={concepts[activeConcept].aside}
-        />
-      )}
+      <ConceptModal />
     </div>
   );
 };

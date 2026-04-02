@@ -1,9 +1,7 @@
 import React, {
-  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
 } from "react";
 import { useDispatch } from "react-redux";
 import {
@@ -11,7 +9,16 @@ import {
   type PanZoomController,
   type SignalOverlayParams,
 } from "vizcraft";
-import InfoModal from "../../components/InfoModal/InfoModal";
+import {
+  useConceptModal,
+  ConceptPills,
+  PluginLayout,
+  StageHeader,
+  StatBadge,
+  SidePanel,
+  SideCard,
+  CanvasStage,
+} from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 import {
   useEcsAutoscalingAnimation,
@@ -56,16 +63,10 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
   const dispatch = useDispatch();
   const { runtime, currentStep, signals, phase } =
     useEcsAutoscalingAnimation(onAnimationComplete);
-  const [activeConcept, setActiveConcept] = useState<ConceptKey | null>(null);
+  const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
-
-  const openConcept = useCallback(
-    (key: ConceptKey) => setActiveConcept(key),
-    [],
-  );
-  const closeConcept = useCallback(() => setActiveConcept(null), []);
 
   const {
     tasks,
@@ -586,77 +587,50 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
     avgCpu > 80 ? "#ef4444" : avgCpu > 60 ? "#f59e0b" : "#22c55e";
   const cpuPct = Math.min(avgCpu, 100);
 
+  const ecsPills = [
+    { key: "ecs", label: "ECS", color: "#fdba74", borderColor: "rgba(249,115,22,0.28)" },
+    { key: "alb", label: "ALB", color: "#93c5fd", borderColor: "rgba(59,130,246,0.28)" },
+    { key: "cloudwatch", label: "CloudWatch", color: "#fda4af", borderColor: "rgba(225,29,72,0.28)" },
+    { key: "scaling-policy", label: "Scaling", color: "#d8b4fe", borderColor: "rgba(168,85,247,0.28)" },
+    { key: "ecr", label: "ECR", color: "#fed7aa", borderColor: "rgba(251,146,60,0.28)" },
+    { key: "docker", label: "Docker", color: "#7dd3fc", borderColor: "rgba(14,165,233,0.28)" },
+    { key: "database", label: "Database", color: "#86efac", borderColor: "rgba(34,197,94,0.28)" },
+    { key: "cicd", label: "CI/CD", color: "#c4b5fd", borderColor: "rgba(167,139,250,0.28)" },
+  ];
+
   return (
     <div className="ecs-root">
-      {/* ── Concept pills ────────────────────────────── */}
-      <div className="ecs-pills">
-        {(
-          [
-            ["ecs", "ECS", "--ecs"],
-            ["alb", "ALB", "--alb"],
-            ["cloudwatch", "CloudWatch", "--cw"],
-            ["scaling-policy", "Scaling", "--sp"],
-            ["ecr", "ECR", "--ecr"],
-            ["docker", "Docker", "--docker"],
-            ["database", "Database", "--db"],
-            ["cicd", "CI/CD", "--cicd"],
-          ] as [ConceptKey, string, string][]
-        ).map(([key, label, cls]) => (
-          <button
-            key={key}
-            className={`ecs-pill ecs-pill${cls}`}
-            onClick={() => openConcept(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <PluginLayout
+        toolbar={
+          <ConceptPills pills={ecsPills} onOpen={openConcept} className="ecs-pills" />
+        }
+        canvas={
+          <div className="ecs-stage">
+            <StageHeader
+              title="ECS Autoscaling"
+              subtitle="Watch how AWS scales containers in response to traffic changes"
+            >
+              <StatBadge
+                label="Phase"
+                value={phase.replace(/-/g, " ")}
+                className={`ecs-phase ecs-phase--${phase}`}
+              />
+              <StatBadge
+                label="Tasks"
+                value={`${runningTasks.length}/${desiredCount}`}
+              />
+            </StageHeader>
 
-      <div className="ecs-body">
-        {/* ── Canvas ─────────────────────────────────── */}
-        <div className="ecs-stage">
-          <div className="ecs-stage__head">
-            <div>
-              <h2>ECS Autoscaling</h2>
-              <p>
-                Watch how AWS scales containers in response to traffic changes
-              </p>
-            </div>
-            <div className="ecs-stage__stats">
-              <div className={`ecs-phase ecs-phase--${phase}`}>
-                <span className="ecs-phase__label">Phase</span>
-                <span className="ecs-phase__value">
-                  {phase.replace(/-/g, " ")}
-                </span>
-              </div>
-              <div className="ecs-stat">
-                <span className="ecs-stat__label">Tasks</span>
-                <span className="ecs-stat__value">
-                  {runningTasks.length}/{desiredCount}
-                </span>
-              </div>
-            </div>
+            <CanvasStage canvasRef={containerRef} />
           </div>
+        }
+        sidebar={
+          <SidePanel>
+            <SideCard label="What's happening" variant="explanation">
+              <p>{explanation}</p>
+            </SideCard>
 
-          <div className="ecs-stage__canvas-wrap">
-            <div className="ecs-stage__canvas" ref={containerRef} />
-          </div>
-        </div>
-
-        {/* ── Sidebar ────────────────────────────────── */}
-        <aside className="ecs-sidebar">
-          {/* Explanation card */}
-          <div className="ecs-card ecs-card--explanation">
-            <div className="ecs-card__label">What's happening</div>
-            <p>{explanation}</p>
-          </div>
-
-          {/* Client load control */}
-          <div className="ecs-card ecs-card--clients">
-            <div className="ecs-card__head">
-              <h3>Client Load</h3>
-              <span className="ecs-card__sub">simulate traffic</span>
-            </div>
+            <SideCard heading="Client Load" sub="simulate traffic" className="ecs-card--clients">
             <div className="ecs-client-control">
               <button
                 className="ecs-client-btn"
@@ -681,14 +655,9 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
               {requestsPerSecond} req/s &middot;{" "}
               {avgCpu > targetCpu ? "⚠ above target" : "within target"}
             </div>
-          </div>
+            </SideCard>
 
-          {/* Metrics card */}
-          <div className="ecs-card ecs-card--metrics">
-            <div className="ecs-card__head">
-              <h3>Live Metrics</h3>
-              <span className="ecs-card__sub">CloudWatch</span>
-            </div>
+            <SideCard heading="Live Metrics" sub="CloudWatch" className="ecs-card--metrics">
 
             {/* CPU gauge */}
             <div className="ecs-gauge">
@@ -738,16 +707,13 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
                 </span>
               </div>
             </div>
-          </div>
+            </SideCard>
 
-          {/* Task inspector */}
-          <div className="ecs-card ecs-card--tasks">
-            <div className="ecs-card__head">
-              <h3>Task Inspector</h3>
-              <span className="ecs-card__sub">
-                {tasks.length} task{tasks.length !== 1 ? "s" : ""}
-              </span>
-            </div>
+            <SideCard
+              heading="Task Inspector"
+              sub={`${tasks.length} task${tasks.length !== 1 ? "s" : ""}`}
+              className="ecs-card--tasks"
+            >
             <div className="ecs-task-list">
               {tasks.map((task) => (
                 <div
@@ -770,14 +736,10 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
                 </div>
               ))}
             </div>
-          </div>
+          </SideCard>
 
           {/* Infrastructure toggles */}
-          <div className="ecs-card ecs-card--infra">
-            <div className="ecs-card__head">
-              <h3>Infrastructure</h3>
-              <span className="ecs-card__sub">swap components</span>
-            </div>
+          <SideCard heading="Infrastructure" sub="swap components" className="ecs-card--infra">
             <div className="ecs-infra-grid">
               <div className="ecs-control-group">
                 <label htmlFor="ecs-db-select">Database</label>
@@ -821,21 +783,12 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
                 </select>
               </div>
             </div>
-          </div>
-        </aside>
-      </div>
+          </SideCard>
+          </SidePanel>
+        }
+      />
 
-      {activeConcept && (
-        <InfoModal
-          isOpen
-          onClose={closeConcept}
-          title={concepts[activeConcept].title}
-          subtitle={concepts[activeConcept].subtitle}
-          accentColor={concepts[activeConcept].accentColor}
-          sections={concepts[activeConcept].sections}
-          aside={concepts[activeConcept].aside}
-        />
-      )}
+      <ConceptModal />
     </div>
   );
 };

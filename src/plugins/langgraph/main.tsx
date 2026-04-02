@@ -2,13 +2,14 @@ import React, {
   useRef,
   useLayoutEffect,
   useEffect,
-  useState,
-  useCallback,
 } from "react";
 import "./main.scss";
 import { useLanggraphAnimation } from "./useLanggraphAnimation";
 import { viz, type SignalOverlayParams } from "vizcraft";
-import InfoModal from "../../components/InfoModal/InfoModal";
+import {
+  useConceptModal,
+  ConceptPills,
+} from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 
 import { setChannelMode, type NodePatch } from "./langgraphSlice";
@@ -41,12 +42,7 @@ const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const { lgState, currentStep, animPhase, signals } =
     useLanggraphAnimation(onAnimationComplete);
 
-  const [activeConcept, setActiveConcept] = useState<ConceptKey | null>(null);
-  const openConcept = useCallback(
-    (key: ConceptKey) => setActiveConcept(key),
-    [],
-  );
-  const closeConcept = useCallback(() => setActiveConcept(null), []);
+  const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const reduxDispatch = useDispatch();
@@ -731,54 +727,21 @@ const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     },
   ];
 
+  const lgPills = [
+    { key: "state-graph", label: "StateGraph", color: "#c4b5fd", borderColor: "#7c3aed" },
+    { key: "nodes", label: "Nodes", color: "#a5b4fc", borderColor: "#6366f1" },
+    { key: "edges", label: "Edges", color: "#fde68a", borderColor: "#f59e0b" },
+    { key: "state-annotation", label: "State & Annotations", color: "#86efac", borderColor: "#22c55e" },
+    { key: "channels", label: "Channels", color: "#67e8f9", borderColor: "#06b6d4" },
+    { key: "send", label: "Send()", color: "#fda4af", borderColor: "#f43f5e" },
+    { key: "interrupt", label: "Interrupt", color: "#fdba74", borderColor: "#f97316" },
+  ];
+
   /* ── Render ─────────────────────────────────────────────── */
   return (
     <div className="lg-root">
       {/* Concept pills */}
-      <div className="lg-pills">
-        <button
-          className="lg-pill lg-pill--graph"
-          onClick={() => openConcept("state-graph")}
-        >
-          StateGraph
-        </button>
-        <button
-          className="lg-pill lg-pill--node"
-          onClick={() => openConcept("nodes")}
-        >
-          Nodes
-        </button>
-        <button
-          className="lg-pill lg-pill--edge"
-          onClick={() => openConcept("edges")}
-        >
-          Edges
-        </button>
-        <button
-          className="lg-pill lg-pill--state"
-          onClick={() => openConcept("state-annotation")}
-        >
-          State &amp; Annotations
-        </button>
-        <button
-          className="lg-pill lg-pill--channel"
-          onClick={() => openConcept("channels")}
-        >
-          Channels
-        </button>
-        <button
-          className="lg-pill lg-pill--send"
-          onClick={() => openConcept("send")}
-        >
-          Send()
-        </button>
-        <button
-          className="lg-pill lg-pill--int"
-          onClick={() => openConcept("interrupt")}
-        >
-          Interrupt
-        </button>
-      </div>
+      <ConceptPills pills={lgPills} onOpen={openConcept} className="lg-pills" />
 
       {/* Main body: graph + state panel */}
       <div className="lg-body">
@@ -969,17 +932,7 @@ const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       </div>
 
       {/* InfoModal */}
-      {activeConcept && (
-        <InfoModal
-          isOpen
-          onClose={closeConcept}
-          title={concepts[activeConcept].title}
-          subtitle={concepts[activeConcept].subtitle}
-          accentColor={concepts[activeConcept].accentColor}
-          sections={concepts[activeConcept].sections}
-          aside={concepts[activeConcept].aside}
-        />
-      )}
+      <ConceptModal />
     </div>
   );
 };

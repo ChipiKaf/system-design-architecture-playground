@@ -2,15 +2,13 @@ import React, {
   useRef,
   useLayoutEffect,
   useEffect,
-  useState,
-  useCallback,
 } from "react";
 import "./main.scss";
 import { useEventStreamingAnimation } from "./useEventStreamingAnimation";
 import { useDispatch } from "react-redux";
 import { setAdapterType, toggleBroadcastOffline } from "./eventStreamingSlice";
 import { viz, type SignalOverlayParams } from "vizcraft";
-import InfoModal from "../../components/InfoModal/InfoModal";
+import { useConceptModal, ConceptPills } from "../../components/plugin-kit";
 import VizInfoBeacon from "../../components/VizInfoBeacon/VizInfoBeacon";
 import { concepts, type ConceptKey } from "./concepts";
 
@@ -75,12 +73,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
   const dispatch = useDispatch();
   const { streaming, currentStep, animPhase, signals } =
     useEventStreamingAnimation(onAnimationComplete);
-  const [activeConcept, setActiveConcept] = useState<ConceptKey | null>(null);
-  const openConcept = useCallback(
-    (key: ConceptKey) => setActiveConcept(key),
-    [],
-  );
-  const closeConcept = useCallback(() => setActiveConcept(null), []);
+  const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
 
@@ -712,6 +705,13 @@ const EventStreamingVisualization: React.FC<Props> = ({
     0,
   );
 
+  const esPills = [
+    { key: "kafka", label: "Kafka", color: "#7dd3fc", borderColor: "#0ea5e9" },
+    { key: "subscription", label: "Subscriptions", color: "#86efac", borderColor: "#22c55e" },
+    { key: "idempotency", label: "Idempotency", color: "#c4b5fd", borderColor: "#8b5cf6" },
+    { key: "partitioning", label: "Partitioning", color: "#fde68a", borderColor: "#f59e0b" },
+  ];
+
   return (
     <div className="es-visualization">
       <div className="es-controls">
@@ -732,32 +732,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
           </select>
         </div>
 
-        <div className="es-concept-pills">
-          <button
-            className="es-pill es-pill--kafka"
-            onClick={() => openConcept("kafka")}
-          >
-            Kafka
-          </button>
-          <button
-            className="es-pill es-pill--sub"
-            onClick={() => openConcept("subscription")}
-          >
-            Subscriptions
-          </button>
-          <button
-            className="es-pill es-pill--idem"
-            onClick={() => openConcept("idempotency")}
-          >
-            Idempotency
-          </button>
-          <button
-            className="es-pill es-pill--part"
-            onClick={() => openConcept("partitioning")}
-          >
-            Partitioning
-          </button>
-        </div>
+        <ConceptPills pills={esPills} onOpen={openConcept} className="es-concept-pills" />
       </div>
 
       <div className="es-canvas">
@@ -815,17 +790,7 @@ const EventStreamingVisualization: React.FC<Props> = ({
         )}
       </div>
 
-      {activeConcept && (
-        <InfoModal
-          isOpen
-          onClose={closeConcept}
-          title={concepts[activeConcept].title}
-          subtitle={concepts[activeConcept].subtitle}
-          accentColor={concepts[activeConcept].accentColor}
-          sections={concepts[activeConcept].sections}
-          aside={concepts[activeConcept].aside}
-        />
-      )}
+      <ConceptModal />
     </div>
   );
 };
