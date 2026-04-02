@@ -3,6 +3,7 @@ import LoadBalancerPlugin from "./plugins/load-balancer";
 import EventStreamingPlugin from "./plugins/event-streaming";
 import LanggraphPlugin from "./plugins/langgraph";
 import BigOPlugin from "./plugins/big-o";
+import EventLoopPlugin from "./plugins/event-loop";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -55,6 +56,14 @@ export const categories: PluginCategory[] = [
       "Core algorithm ideas explained visually — time complexity, search strategies, growth curves, and more.",
     accent: "#f97316",
     plugins: [BigOPlugin],
+  },
+  {
+    id: "language-runtime",
+    name: "Language & Runtime",
+    description:
+      "How code actually runs — event loops, call stacks, queues, rendering, and other runtime mechanics.",
+    accent: "#14b8a6",
+    plugins: [EventLoopPlugin],
   },
 ];
 
