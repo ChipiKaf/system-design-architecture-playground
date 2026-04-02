@@ -4,6 +4,7 @@ import EventStreamingPlugin from "./plugins/event-streaming";
 import LanggraphPlugin from "./plugins/langgraph";
 import BigOPlugin from "./plugins/big-o";
 import EventLoopPlugin from "./plugins/event-loop";
+import EcsAutoscalingPlugin from "./plugins/ecs-autoscaling";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -39,7 +40,7 @@ export const categories: PluginCategory[] = [
     description:
       "Core infrastructure components — load balancers, message brokers, caching layers, and more.",
     accent: "#3b82f6",
-    plugins: [LoadBalancerPlugin, EventStreamingPlugin],
+    plugins: [LoadBalancerPlugin, EventStreamingPlugin, EcsAutoscalingPlugin],
   },
   {
     id: "architecture",

@@ -5,7 +5,11 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { viz, type SignalOverlayParams } from "vizcraft";
+import {
+  viz,
+  type PanZoomController,
+  type SignalOverlayParams,
+} from "vizcraft";
 import InfoModal from "../../components/InfoModal/InfoModal";
 import { concepts, type ConceptKey } from "./concepts";
 import { useEventLoopAnimation } from "./useEventLoopAnimation";
@@ -77,10 +81,7 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const [activeConcept, setActiveConcept] = useState<ConceptKey | null>(null);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
-  const pzStateRef = useRef<{
-    zoom: number;
-    pan: { x: number; y: number };
-  } | null>(null);
+  const pzRef = useRef<PanZoomController | null>(null);
 
   const openConcept = useCallback(
     (key: ConceptKey) => setActiveConcept(key),
@@ -533,53 +534,26 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   useLayoutEffect(() => {
     if (!containerRef.current) return;
 
-    // Save current viewport from the SVG transform before destroying
-    const prevSvg = containerRef.current.querySelector("svg");
-    if (prevSvg) {
-      const vg = prevSvg.querySelector<SVGGElement>(":scope > g");
-      if (vg) {
-        const t = vg.getAttribute("transform") ?? "";
-        const tr = t.match(/translate\(\s*([-\d.e]+)[,\s]+([-\d.e]+)/);
-        const sc = t.match(/scale\(\s*([-\d.e]+)/);
-        if (tr && sc) {
-          pzStateRef.current = {
-            pan: { x: parseFloat(tr[1]), y: parseFloat(tr[2]) },
-            zoom: parseFloat(sc[1]),
-          };
-        }
-      }
-    }
+    // Save viewport from the live PanZoomController before destroying
+    const saved = pzRef.current?.getState() ?? null;
 
     builderRef.current?.destroy();
     builderRef.current = scene;
 
-    scene.mount(containerRef.current, {
-      autoplay: true,
-      panZoom: true,
-      initialZoom: pzStateRef.current?.zoom ?? 1,
-    });
-
-    // Directly stamp the saved transform on the new SVG viewport group
-    // This runs before the browser paints (useLayoutEffect), so no flash
-    if (pzStateRef.current) {
-      const newSvg = containerRef.current.querySelector("svg");
-      if (newSvg) {
-        const vg = newSvg.querySelector<SVGGElement>(":scope > g");
-        if (vg) {
-          const { pan, zoom } = pzStateRef.current;
-          vg.setAttribute(
-            "transform",
-            `translate(${pan.x}, ${pan.y}) scale(${zoom})`,
-          );
-        }
-      }
-    }
+    pzRef.current =
+      scene.mount(containerRef.current, {
+        autoplay: true,
+        panZoom: true,
+        initialZoom: saved?.zoom ?? 1,
+        initialPan: saved?.pan ?? { x: 0, y: 0 },
+      }) ?? null;
   }, [scene]);
 
   useEffect(() => {
     return () => {
       builderRef.current?.destroy();
       builderRef.current = null;
+      pzRef.current = null;
     };
   }, []);
 
