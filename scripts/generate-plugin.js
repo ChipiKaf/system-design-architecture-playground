@@ -1,27 +1,43 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const pluginName = process.argv[2];
+// ── Arg parsing ────────────────────────────────────────────
+// Usage:  npm run generate <plugin-name> [--category "Category Name"]
+const args = process.argv.slice(2);
+let pluginName = null;
+let categoryName = null;
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === "--category" || args[i] === "-c") {
+    categoryName = args[++i];
+  } else if (!args[i].startsWith("-")) {
+    pluginName = args[i];
+  }
+}
 
 if (!pluginName) {
-  console.error('Please provide a plugin name (kebab-case), e.g., npm run generate load-balancer');
+  console.error(
+    "Usage: npm run generate <plugin-name> [--category \"Category Name\"]\n" +
+      "       Name must be kebab-case, e.g. npm run generate api-gateway\n" +
+      "       --category / -c   Existing or new category to place the plugin in",
+  );
   process.exit(1);
 }
 
-// Helpers
+// ── Helpers ────────────────────────────────────────────────
 const toPascalCase = (str) =>
-  str.replace(/(^\w|-\w)/g, (clear) => clear.replace(/-/, '').toUpperCase());
+  str.replace(/(^\w|-\w)/g, (m) => m.replace(/-/, "").toUpperCase());
 
 const toCamelCase = (str) =>
-  str.replace(/-\w/g, (clear) => clear[1].toUpperCase());
+  str.replace(/-\w/g, (m) => m[1].toUpperCase());
 
 const pascalName = toPascalCase(pluginName);
 const camelName = toCamelCase(pluginName);
-const targetDir = path.join(__dirname, '../src/plugins', pluginName);
+const targetDir = path.join(__dirname, "../src/plugins", pluginName);
 
 if (fs.existsSync(targetDir)) {
   console.error(`Plugin "${pluginName}" already exists at ${targetDir}`);
@@ -30,176 +46,320 @@ if (fs.existsSync(targetDir)) {
 
 fs.mkdirSync(targetDir, { recursive: true });
 
-// 1. Slice
-const sliceContent = `import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+/* ================================================================
+   1. Redux Slice  — ${camelName}Slice.ts
+   ================================================================ */
+const sliceContent = `import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+
+export type ${pascalName}Phase = "overview" | "processing" | "summary";
 
 export interface ${pascalName}State {
-  // Add specific state here
-  value: number;
+  phase: ${pascalName}Phase;
+  explanation: string;
+  hotZones: string[];
 }
 
 export const initialState: ${pascalName}State = {
-  value: 0,
+  phase: "overview",
+  explanation: "Welcome — explore the architecture before stepping through.",
+  hotZones: [],
 };
 
 const ${camelName}Slice = createSlice({
-  name: '${camelName}',
+  name: "${camelName}",
   initialState,
   reducers: {
-    setValue(state, action: PayloadAction<number>) {
-      state.value = action.payload;
+    patchState(state, action: PayloadAction<Partial<${pascalName}State>>) {
+      Object.assign(state, action.payload);
+    },
+    reset() {
+      return initialState;
     },
   },
 });
 
-export const { setValue } = ${camelName}Slice.actions;
+export const { patchState, reset } = ${camelName}Slice.actions;
 export default ${camelName}Slice.reducer;
 `;
 
 fs.writeFileSync(path.join(targetDir, `${camelName}Slice.ts`), sliceContent);
 
-// 2. Animation Hook
-const hookContent = `import { useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { type RootState } from '../../store/store';
+/* ================================================================
+   2. Animation Hook  — use${pascalName}Animation.ts
+   ================================================================ */
+const hookContent = `import { useCallback, useEffect, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import type { SignalOverlayParams } from "vizcraft";
+import { type RootState } from "../../store/store";
+import { patchState, reset, type ${pascalName}Phase } from "./${camelName}Slice";
 
-// We listen to the GLOBAL simulation step to drive our logic,
-// similar to how the ANN plugin works.
+export type Signal = { id: string } & SignalOverlayParams;
+
 export const use${pascalName}Animation = (onAnimationComplete?: () => void) => {
   const dispatch = useDispatch();
-  
-  // Select global simulation state
   const { currentStep } = useSelector((state: RootState) => state.simulation);
-  
-  // Local state for animation progress
-  const [signalProgress, setSignalProgress] = useState(0);
-  const requestRef = useRef<number>();
+  const runtime = useSelector((state: RootState) => state.${camelName});
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [animPhase, setAnimPhase] = useState<string>("idle");
+  const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const onCompleteRef = useRef(onAnimationComplete);
 
+  onCompleteRef.current = onAnimationComplete;
+
+  const cleanup = useCallback(() => {
+    timeoutsRef.current.forEach((id) => clearTimeout(id));
+    timeoutsRef.current = [];
+    setSignals([]);
+  }, []);
+
+  const sleep = useCallback((ms: number) => {
+    return new Promise<void>((resolve) => {
+      const id = setTimeout(() => resolve(), ms);
+      timeoutsRef.current.push(id);
+    });
+  }, []);
+
+  const finish = useCallback(() => {
+    onCompleteRef.current?.();
+  }, []);
+
+  /* ── Step orchestration ─────────────────────────────────── */
   useEffect(() => {
-    // Cancel loop on step change
-    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    cleanup();
 
-    if (currentStep === 0) {
-      // Step 0: Start (Idle)
-      // Reset everything
-      setSignalProgress(0);
-      
-      // Signal completion immediately for idle steps so the "Next" button enables
-      // wrapper in timeout to ensure state is settled
-      setTimeout(() => onAnimationComplete?.(), 0);
+    const run = async () => {
+      switch (currentStep) {
+        case 0:
+          dispatch(reset());
+          setAnimPhase("idle");
+          finish();
+          break;
 
-    } else if (currentStep === 1) {
-      // Step 1: Process (Flow Animation)
-      // Run the animation
-      const startTime = performance.now();
-      const duration = 2000; // 2 seconds
+        case 1:
+          dispatch(
+            patchState({
+              phase: "processing",
+              explanation: "Step 1 — describe what is happening here.",
+              hotZones: ["node-a"],
+            }),
+          );
+          setAnimPhase("processing");
+          await sleep(1200);
+          finish();
+          break;
 
-      const animate = (time: number) => {
-        const elapsed = time - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        
-        setSignalProgress(progress);
+        case 2:
+          dispatch(
+            patchState({
+              phase: "summary",
+              explanation: "All done — here is the takeaway.",
+              hotZones: [],
+            }),
+          );
+          setAnimPhase("idle");
+          finish();
+          break;
 
-        if (progress < 1) {
-          requestRef.current = requestAnimationFrame(animate);
-        } else {
-          // Animation done
-          if (onAnimationComplete) {
-            onAnimationComplete();
-          }
-        }
-      };
-      
-      requestRef.current = requestAnimationFrame(animate);
-      
-    } else {
-        // Step 2+: Finished
-        setSignalProgress(1); // Keep it at end
-        setTimeout(() => onAnimationComplete?.(), 0);
-    }
-
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        default:
+          finish();
+      }
     };
-  }, [currentStep, dispatch]); // Not including onAnimationComplete in deps to avoid loops if it changes
+
+    run();
+    return cleanup;
+  }, [currentStep]);
 
   return {
+    runtime,
     currentStep,
-    signalProgress,
+    signals,
+    animPhase,
+    phase: runtime.phase,
   };
 };
 `;
 
-fs.writeFileSync(path.join(targetDir, `use${pascalName}Animation.ts`), hookContent);
+fs.writeFileSync(
+  path.join(targetDir, `use${pascalName}Animation.ts`),
+  hookContent,
+);
 
-// 3. Main Component
-const mainComponentContent = `import React, { useMemo } from 'react';
-import './main.scss';
-import { use${pascalName}Animation } from './use${pascalName}Animation';
-import { viz, VizCanvas } from '../../viz-kit';
+/* ================================================================
+   3. Concepts  — concepts.tsx
+   ================================================================ */
+const conceptsContent = `import React from "react";
+import type { InfoModalSection } from "../../components/InfoModal/InfoModal";
 
-interface ${pascalName}VisualizationProps {
+export type ConceptKey = "overview";
+
+interface ConceptDefinition {
+  title: string;
+  subtitle: string;
+  accentColor: string;
+  sections: InfoModalSection[];
+  aside?: React.ReactNode;
+}
+
+export const concepts: Record<ConceptKey, ConceptDefinition> = {
+  overview: {
+    title: "${pascalName}",
+    subtitle: "A brief explanation of this concept",
+    accentColor: "#60a5fa",
+    sections: [
+      {
+        title: "What it does",
+        accent: "#60a5fa",
+        content: (
+          <p>
+            Explain the core concept here. Keep it concise — one or two
+            paragraphs is usually enough.
+          </p>
+        ),
+      },
+    ],
+  },
+};
+`;
+
+fs.writeFileSync(path.join(targetDir, "concepts.tsx"), conceptsContent);
+
+/* ================================================================
+   4. Main Component  — main.tsx
+   ================================================================ */
+const mainContent = `import React, { useLayoutEffect, useRef, useEffect } from "react";
+import {
+  viz,
+  type PanZoomController,
+  type SignalOverlayParams,
+} from "vizcraft";
+import {
+  useConceptModal,
+  ConceptPills,
+  PluginLayout,
+  StageHeader,
+  StatBadge,
+  SidePanel,
+  SideCard,
+  CanvasStage,
+} from "../../components/plugin-kit";
+import { concepts, type ConceptKey } from "./concepts";
+import { use${pascalName}Animation, type Signal } from "./use${pascalName}Animation";
+import "./main.scss";
+
+interface Props {
   onAnimationComplete?: () => void;
 }
 
-const ${pascalName}Visualization: React.FC<${pascalName}VisualizationProps> = ({
-  onAnimationComplete,
-}) => {
-  const { currentStep, signalProgress } = use${pascalName}Animation(onAnimationComplete);
+const W = 900;
+const H = 600;
 
-  const scene = useMemo(() => {
-    const width = 800;
-    const height = 600;
-    
-    // Create a new visualization builder
-    const b = viz().view(width, height);
+const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) => {
+  const { runtime, currentStep, signals, animPhase, phase } =
+    use${pascalName}Animation(onAnimationComplete);
+  const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
+  const containerRef = useRef<HTMLDivElement>(null!);
+  const builderRef = useRef<ReturnType<typeof viz> | null>(null);
+  const pzRef = useRef<PanZoomController | null>(null);
 
-    // Node 1 (Start)
-    b.node('node-1')
-        .at(250, 300)
-        .circle(40)
-        .label('Start')
-        .class('node-start');
+  const { explanation, hotZones } = runtime;
+  const hot = (zone: string) => hotZones.includes(zone);
 
-    // Node 2 (End)
-    b.node('node-2')
-        .at(550, 300)
-        .circle(40)
-        .label('End')
-        .class('node-end');
+  /* ── Build VizCraft scene ─────────────────────────────── */
+  const scene = (() => {
+    const b = viz().view(W, H);
 
-    // Edge
-    const edge = b.edge('node-1', 'node-2', 'edge-1')
-        .label('Flow')
-        .arrow(true);
-    
-    // Always show idle animation
-    edge.animate('flow', { duration: '2s' });
+    // ── Nodes ────────────────────────────────────────────
+    b.node("node-a")
+      .at(200, 300)
+      .rect(140, 60, 12)
+      .fill(hot("node-a") ? "#1e40af" : "#0f172a")
+      .stroke(hot("node-a") ? "#60a5fa" : "#334155", 2)
+      .label("Node A", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
 
-    // Signal Overlay (The Ball)
-    // Show ball if we are processing (step 1) or finished (step 2)
-    if (currentStep === 1 || currentStep === 2) {
-        b.overlay('signal', {
-            from: 'node-1',
-            to: 'node-2',
-            progress: signalProgress,
-            magnitude: 1, 
-        }, 'signal-1');
+    b.node("node-b")
+      .at(650, 300)
+      .rect(140, 60, 12)
+      .fill(hot("node-b") ? "#065f46" : "#0f172a")
+      .stroke(hot("node-b") ? "#34d399" : "#334155", 2)
+      .label("Node B", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    // ── Edges ────────────────────────────────────────────
+    b.edge("node-a", "node-b", "edge-ab")
+      .stroke("#475569", 2)
+      .animate("flow", { duration: "3s" });
+
+    // ── Signals ──────────────────────────────────────────
+    if (signals.length > 0) {
+      b.overlay((o) => {
+        signals.forEach((sig) => {
+          const { id, ...params } = sig;
+          o.add("signal", params as SignalOverlayParams, { key: id });
+        });
+      });
     }
 
-    return b.build();
-  }, [currentStep, signalProgress]);
+    return b;
+  })();
 
+  /* ── Mount / destroy VizCraft scene ─────────────────── */
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const saved = pzRef.current?.getState() ?? null;
+    builderRef.current?.destroy();
+    builderRef.current = scene;
+    pzRef.current =
+      scene.mount(containerRef.current, {
+        autoplay: true,
+        panZoom: true,
+        initialZoom: saved?.zoom ?? 1,
+        initialPan: saved?.pan ?? { x: 0, y: 0 },
+      }) ?? null;
+  }, [scene]);
+
+  useEffect(() => {
+    return () => {
+      builderRef.current?.destroy();
+      builderRef.current = null;
+      pzRef.current = null;
+    };
+  }, []);
+
+  /* ── Pill definitions ───────────────────────────────── */
+  const pills = [
+    { key: "overview", label: "${pascalName}", color: "#93c5fd", borderColor: "#3b82f6" },
+  ];
+
+  /* ── Render ─────────────────────────────────────────── */
   return (
-    <div className="${pluginName}-visualization">
-       <div className="canvas-wrapper">
-          <VizCanvas scene={scene} className="${pluginName}-canvas" />
-       </div>
-       <div className="info-panel">
-          <h3>${pascalName} Status</h3>
-          <p>Global Step: {currentStep}</p>
-          <p>Progress: {(signalProgress * 100).toFixed(0)}%</p>
-       </div>
+    <div className="${pluginName}-root">
+      <PluginLayout
+        toolbar={
+          <ConceptPills pills={pills} onOpen={openConcept} />
+        }
+        canvas={
+          <div className="${pluginName}-stage">
+            <StageHeader
+              title="${pascalName}"
+              subtitle="Describe the visualisation in one line."
+            >
+              <StatBadge
+                label="Phase"
+                value={phase}
+                className={\`${pluginName}-phase ${pluginName}-phase--\${phase}\`}
+              />
+            </StageHeader>
+            <CanvasStage canvasRef={containerRef} />
+          </div>
+        }
+        sidebar={
+          <SidePanel>
+            <SideCard label="What's happening" variant="explanation">
+              <p>{explanation}</p>
+            </SideCard>
+          </SidePanel>
+        }
+      />
+      <ConceptModal />
     </div>
   );
 };
@@ -207,89 +367,95 @@ const ${pascalName}Visualization: React.FC<${pascalName}VisualizationProps> = ({
 export default ${pascalName}Visualization;
 `;
 
-fs.writeFileSync(path.join(targetDir, 'main.tsx'), mainComponentContent);
+fs.writeFileSync(path.join(targetDir, "main.tsx"), mainContent);
 
-// 4. SCSS
-const scssContent = `.${pluginName}-visualization {
-  width: 100%;
-  height: 100%;
+/* ================================================================
+   5. Styles  — main.scss
+   ================================================================ */
+const scssContent = `.${pluginName}-root {
+  --${pluginName}-bg: #020617;
+  --${pluginName}-panel: rgba(7, 17, 34, 0.88);
+  --${pluginName}-border: rgba(148, 163, 184, 0.18);
+  --${pluginName}-text: #e2e8f0;
+  --${pluginName}-muted: #94a3b8;
+
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background: #f8f9fa;
-  border-radius: 12px;
-  
-  .canvas-wrapper {
-    width: 100%;
-    flex: 1;
-    min-height: 400px;
-  }
-
-  .info-panel {
-    padding: 1rem;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    margin: 1rem;
-    min-width: 200px;
-  }
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--${pluginName}-text);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.12), transparent 30%),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
 }
 
-// Viz Styles
-.${pluginName}-canvas {
-    .node-start circle {
-        fill: #3b82f6; // Blue
-        stroke: #1d4ed8;
-    }
-    
-    .node-end circle {
-        fill: #10b981; // Green
-        stroke: #047857;
-    }
-
-    .viz-edge {
-        stroke: #cbd5e1;
-        stroke-width: 2px;
-    }
+/* ── Stage ──────────────────────────────────────────── */
+.${pluginName}-stage {
+  background: var(--${pluginName}-panel);
+  border: 1px solid var(--${pluginName}-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
+
+/* ── Phase colours ──────────────────────────────────── */
+.${pluginName}-phase--overview .vc-stat-badge__value { color: #fbbf24; }
+.${pluginName}-phase--processing .vc-stat-badge__value { color: #60a5fa; }
+.${pluginName}-phase--summary .vc-stat-badge__value { color: #86efac; }
 `;
 
-fs.writeFileSync(path.join(targetDir, 'main.scss'), scssContent);
+fs.writeFileSync(path.join(targetDir, "main.scss"), scssContent);
 
-// 5. Index
-const indexContent = `import type { DemoPlugin } from '../../types/ModelPlugin';
-import ${camelName}Reducer, { type ${pascalName}State, initialState } from './${camelName}Slice';
-import ${pascalName}Visualization from './main';
-import type { Action, Dispatch } from '@reduxjs/toolkit';
+/* ================================================================
+   6. Plugin Registration  — index.ts
+   ================================================================ */
+const indexContent = `import type { Action, Dispatch } from "@reduxjs/toolkit";
+import type { DemoPlugin, DemoStep } from "../../types/ModelPlugin";
+import ${pascalName}Visualization from "./main";
+import ${camelName}Reducer, {
+  type ${pascalName}State,
+  initialState,
+  reset,
+} from "./${camelName}Slice";
 
 type LocalRootState = { ${camelName}: ${pascalName}State };
 
-const ${pascalName}Plugin: DemoPlugin<${pascalName}State, Action, LocalRootState, Dispatch<Action>> = {
-  id: '${pluginName}',
-  name: '${pascalName}',
-  description: 'Description for ${pascalName} demo.',
+const ${pascalName}Plugin: DemoPlugin<
+  ${pascalName}State,
+  Action,
+  LocalRootState,
+  Dispatch<Action>
+> = {
+  id: "${pluginName}",
+  name: "${pascalName}",
+  description: "Describe what this demo teaches in one sentence.",
   initialState,
   reducer: ${camelName}Reducer,
   Component: ${pascalName}Visualization,
-  getSteps: (state: ${pascalName}State) => {
-    return [
-        { 
-            label: 'Start (Idle)', 
-            autoAdvance: false,
-        },
-        { 
-            label: 'Process (Flow)', 
-            autoAdvance: true,
-        },
-        {
-            label: 'Finished',
-            autoAdvance: true,
-        }
-    ];
-  },
+  restartConfig: { text: "Replay", color: "#1e40af" },
+  getSteps: (_: ${pascalName}State): DemoStep[] => [
+    {
+      label: "Overview",
+      autoAdvance: false,
+      nextButtonText: "Begin",
+    },
+    {
+      label: "Step One",
+      autoAdvance: true,
+      processingText: "Running…",
+    },
+    {
+      label: "Summary",
+      autoAdvance: true,
+    },
+  ],
   init: (dispatch) => {
-    // Init logic
+    dispatch(reset());
   },
   selector: (state: LocalRootState) => state.${camelName},
 };
@@ -297,18 +463,16 @@ const ${pascalName}Plugin: DemoPlugin<${pascalName}State, Action, LocalRootState
 export default ${pascalName}Plugin;
 `;
 
-fs.writeFileSync(path.join(targetDir, 'index.ts'), indexContent);
+fs.writeFileSync(path.join(targetDir, "index.ts"), indexContent);
 
-
-// 6. Update registry.ts — add the import and put the plugin into a category.
-//    The store and routes are built automatically from the registry,
-//    so no other files need to change.
-
-const registryPath = path.join(__dirname, '../src/registry.ts');
+/* ================================================================
+   7. Update registry.ts — add import + wire into category
+   ================================================================ */
+const registryPath = path.join(__dirname, "../src/registry.ts");
 if (fs.existsSync(registryPath)) {
-  let regContent = fs.readFileSync(registryPath, 'utf-8');
+  let regContent = fs.readFileSync(registryPath, "utf-8");
 
-  // 6a. Add import after the last plugin import
+  // ── 7a. Add import after the last plugin import ──────────
   const regImport = `import ${pascalName}Plugin from "./plugins/${pluginName}";`;
   const lastPluginImportRegex = /import .*Plugin from ".\/plugins\/.*";/g;
   let match;
@@ -320,18 +484,111 @@ if (fs.existsSync(registryPath)) {
   if (lastIdx !== -1) {
     regContent =
       regContent.slice(0, lastIdx) +
-      '\n' + regImport +
+      "\n" +
+      regImport +
       regContent.slice(lastIdx);
   }
 
+  console.log("✔ Updated src/registry.ts with import for " + pascalName + "Plugin");
+
+  // ── 7b. Place plugin into a category ─────────────────────
+  if (categoryName) {
+    // Check if category already exists by matching  name: "Category Name"
+    // We look for   name: "...",   inside the categories array.
+    const nameLiteralEscaped = categoryName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const categoryNameRegex = new RegExp(
+      `name:\\s*["']${nameLiteralEscaped}["']`,
+    );
+    const categoryMatch = categoryNameRegex.exec(regContent);
+
+    if (categoryMatch) {
+      // ── Category exists: append plugin to its plugins array ──
+      // Find the `plugins: [...]` line that follows this category name.
+      // Search from the category name match position forward.
+      const afterName = regContent.slice(categoryMatch.index);
+      const pluginsArrayRegex = /plugins:\s*\[([^\]]*)\]/;
+      const pluginsMatch = pluginsArrayRegex.exec(afterName);
+
+      if (pluginsMatch) {
+        const arrayContent = pluginsMatch[1].trimEnd();
+        // Build the new array content — append the new plugin
+        const newArrayContent = arrayContent.endsWith(",")
+          ? arrayContent + " " + pascalName + "Plugin"
+          : arrayContent + ", " + pascalName + "Plugin";
+
+        const absStart = categoryMatch.index + pluginsMatch.index;
+        const absEnd = absStart + pluginsMatch[0].length;
+        regContent =
+          regContent.slice(0, absStart) +
+          "plugins: [" + newArrayContent + "]" +
+          regContent.slice(absEnd);
+
+        console.log(
+          '✔ Added ' + pascalName + 'Plugin to existing category "' + categoryName + '"',
+        );
+      }
+    } else {
+      // ── Category does not exist: create a new one ────────────
+      const categorySlug = categoryName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+
+      const newCategory =
+        "  {\n" +
+        '    id: "' + categorySlug + '",\n' +
+        '    name: "' + categoryName + '",\n' +
+        '    description: "Add a description for this category.",\n' +
+        '    accent: "#6366f1",\n' +
+        "    plugins: [" + pascalName + "Plugin],\n" +
+        "  },";
+
+      // Insert before the closing `];` of the categories array.
+      const closingBracket = /^];\s*$/m;
+      const closingMatch = closingBracket.exec(regContent);
+
+      if (closingMatch) {
+        regContent =
+          regContent.slice(0, closingMatch.index) +
+          newCategory + "\n" +
+          regContent.slice(closingMatch.index);
+
+        console.log(
+          '✔ Created new category "' + categoryName + '" with ' + pascalName + "Plugin",
+        );
+      } else {
+        console.log(
+          '⚠  Could not locate categories array — add "' + categoryName + '" manually.',
+        );
+      }
+    }
+  } else {
+    console.log("");
+    console.log("  ⚠  No --category flag provided. Add the plugin to a category manually:");
+    console.log("     plugins: [..., " + pascalName + "Plugin],");
+  }
+
   fs.writeFileSync(registryPath, regContent);
-  console.log('Updated src/registry.ts with import for ' + pascalName + 'Plugin');
-  console.log('');
-  console.log('  ⚠  Add the plugin to a category in src/registry.ts:');
-  console.log('     plugins: [..., ' + pascalName + 'Plugin],');
 } else {
-  console.log('Could not find src/registry.ts — add the plugin to the registry manually.');
+  console.log(
+    "Could not find src/registry.ts — add the plugin to the registry manually.",
+  );
 }
 
-console.log('');
-console.log('Successfully created plugin "' + pluginName + '" in src/plugins/' + pluginName);
+console.log("");
+console.log(
+  '✔ Created plugin "' + pluginName + '" in src/plugins/' + pluginName,
+);
+console.log("");
+console.log("  Files generated:");
+console.log("    • " + camelName + "Slice.ts      — Redux state & actions");
+console.log("    • use" + pascalName + "Animation.ts — Step orchestration & signals");
+console.log("    • concepts.tsx        — InfoModal concept definitions");
+console.log("    • main.tsx            — Component (uses plugin-kit)");
+console.log("    • main.scss           — Styles");
+console.log("    • index.ts            — Plugin registration");
+console.log("");
+console.log("  Next steps:");
+console.log("    1. Define your VizCraft nodes/edges in main.tsx");
+console.log("    2. Add step animations in use" + pascalName + "Animation.ts");
+console.log("    3. Add concept pills & definitions in concepts.tsx");
