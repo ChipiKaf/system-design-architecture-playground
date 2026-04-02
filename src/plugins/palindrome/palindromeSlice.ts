@@ -91,8 +91,7 @@ const palindromeSlice = createSlice({
       state.left = -1;
       state.right = -1;
       state.isPalindrome = null;
-      state.explanation =
-        `"${input}" → cleaned: "${cleaned}" (${cleaned.length} chars). Ready to check.`;
+      state.explanation = `"${input}" → cleaned: "${cleaned}" (${cleaned.length} chars). Ready to check.`;
     },
 
     prepareSteps(state) {

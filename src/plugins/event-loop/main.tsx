@@ -1,8 +1,4 @@
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-} from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import {
   viz,
   type PanZoomController,
@@ -607,19 +603,53 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   };
 
   const elPills = [
-    { key: "event-loop", label: "Event Loop", color: "#fbbf24", borderColor: "rgba(245,158,11,0.28)" },
-    { key: "call-stack", label: "Call Stack", color: "#7dd3fc", borderColor: "rgba(56,189,248,0.28)" },
-    { key: "web-apis", label: "Web APIs", color: "#fdba74", borderColor: "rgba(249,115,22,0.28)" },
-    { key: "microtasks", label: "Microtasks", color: "#d8b4fe", borderColor: "rgba(139,92,246,0.28)" },
-    { key: "tasks", label: "Task Queue", color: "#86efac", borderColor: "rgba(74,222,128,0.28)" },
-    { key: "render", label: "Render", color: "#99f6e4", borderColor: "rgba(45,212,191,0.28)" },
+    {
+      key: "event-loop",
+      label: "Event Loop",
+      color: "#fbbf24",
+      borderColor: "rgba(245,158,11,0.28)",
+    },
+    {
+      key: "call-stack",
+      label: "Call Stack",
+      color: "#7dd3fc",
+      borderColor: "rgba(56,189,248,0.28)",
+    },
+    {
+      key: "web-apis",
+      label: "Web APIs",
+      color: "#fdba74",
+      borderColor: "rgba(249,115,22,0.28)",
+    },
+    {
+      key: "microtasks",
+      label: "Microtasks",
+      color: "#d8b4fe",
+      borderColor: "rgba(139,92,246,0.28)",
+    },
+    {
+      key: "tasks",
+      label: "Task Queue",
+      color: "#86efac",
+      borderColor: "rgba(74,222,128,0.28)",
+    },
+    {
+      key: "render",
+      label: "Render",
+      color: "#99f6e4",
+      borderColor: "rgba(45,212,191,0.28)",
+    },
   ];
 
   return (
     <div className="el-root">
       <PluginLayout
         toolbar={
-          <ConceptPills pills={elPills} onOpen={openConcept} className="el-pills" />
+          <ConceptPills
+            pills={elPills}
+            onOpen={openConcept}
+            className="el-pills"
+          />
         }
         canvas={
           <div className="el-stage">
@@ -636,7 +666,10 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
               <StatBadge label="Output" value={consoleOutput.length} />
             </StageHeader>
 
-            <CanvasStage canvasRef={containerRef} className="el-stage__canvas-wrap" />
+            <CanvasStage
+              canvasRef={containerRef}
+              className="el-stage__canvas-wrap"
+            />
           </div>
         }
         sidebar={
@@ -645,89 +678,101 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
               <p>{explanation}</p>
             </SideCard>
 
-            <SideCard heading="Example Script" sub={`Current line: ${currentLine ?? "-"}`} className="el-card--code">
-
-            <div className="el-code">
-              {CODE_LINES.map((line) => (
-                <div
-                  key={line.no}
-                  className={`el-code__line${currentLine === line.no ? " el-code__line--active" : ""}`}
-                >
-                  <span className="el-code__no">{line.no}</span>
-                  <span className={`el-code__tag el-code__tag--${line.tag}`}>
-                    {line.tag}
-                  </span>
-                  <code>{line.code}</code>
-                </div>
-              ))}
-            </div>
-            </SideCard>
-
-            <SideCard heading="Queue Inspector" sub="live runtime state" className="el-card--queues">
-
-            <div className="el-lanes">
-              {renderLane(
-                "Call Stack",
-                callStack,
-                "el-lane--stack",
-                "call-stack",
-              )}
-              {renderLane("Web APIs", webApis, "el-lane--apis", "web-apis")}
-              {renderLane(
-                "Microtasks",
-                microtaskQueue,
-                "el-lane--micro",
-                "microtasks",
-              )}
-              {renderLane("Task Queue", taskQueue, "el-lane--task", "tasks")}
-            </div>
-            </SideCard>
-
-            <SideCard heading="Turn Priority" sub="why Promise beats timeout" className="el-card--rules">
-
-            <div className="el-rules">
-              {ladder.map((rule, index) => {
-                const status =
-                  index < ladderIndex
-                    ? "completed"
-                    : index === ladderIndex
-                      ? "active"
-                      : "pending";
-
-                return (
-                  <button
-                    key={rule.label}
-                    className={`el-rule el-rule--${status}`}
-                    onClick={() => openConcept(rule.concept)}
+            <SideCard
+              heading="Example Script"
+              sub={`Current line: ${currentLine ?? "-"}`}
+              className="el-card--code"
+            >
+              <div className="el-code">
+                {CODE_LINES.map((line) => (
+                  <div
+                    key={line.no}
+                    className={`el-code__line${currentLine === line.no ? " el-code__line--active" : ""}`}
                   >
-                    <span className="el-rule__index">{index + 1}</span>
-                    <span className="el-rule__body">
-                      <strong>{rule.label}</strong>
-                      <span>{rule.helper}</span>
+                    <span className="el-code__no">{line.no}</span>
+                    <span className={`el-code__tag el-code__tag--${line.tag}`}>
+                      {line.tag}
                     </span>
-                  </button>
-                );
-              })}
-            </div>
+                    <code>{line.code}</code>
+                  </div>
+                ))}
+              </div>
             </SideCard>
 
-            <SideCard heading="Console Output" sub="actual execution order" className="el-card--output">
+            <SideCard
+              heading="Queue Inspector"
+              sub="live runtime state"
+              className="el-card--queues"
+            >
+              <div className="el-lanes">
+                {renderLane(
+                  "Call Stack",
+                  callStack,
+                  "el-lane--stack",
+                  "call-stack",
+                )}
+                {renderLane("Web APIs", webApis, "el-lane--apis", "web-apis")}
+                {renderLane(
+                  "Microtasks",
+                  microtaskQueue,
+                  "el-lane--micro",
+                  "microtasks",
+                )}
+                {renderLane("Task Queue", taskQueue, "el-lane--task", "tasks")}
+              </div>
+            </SideCard>
 
-            <div className="el-output">
-              {consoleOutput.length === 0 && (
-                <div className="el-empty">Nothing logged yet</div>
-              )}
+            <SideCard
+              heading="Turn Priority"
+              sub="why Promise beats timeout"
+              className="el-card--rules"
+            >
+              <div className="el-rules">
+                {ladder.map((rule, index) => {
+                  const status =
+                    index < ladderIndex
+                      ? "completed"
+                      : index === ladderIndex
+                        ? "active"
+                        : "pending";
 
-              {consoleOutput.map((entry, index) => (
-                <div
-                  key={`${entry}-${index}`}
-                  className={`el-output__row${index === consoleOutput.length - 1 ? " el-output__row--latest" : ""}`}
-                >
-                  <span className="el-output__order">{index + 1}</span>
-                  <span className="el-output__value">{entry}</span>
-                </div>
-              ))}
-            </div>
+                  return (
+                    <button
+                      key={rule.label}
+                      className={`el-rule el-rule--${status}`}
+                      onClick={() => openConcept(rule.concept)}
+                    >
+                      <span className="el-rule__index">{index + 1}</span>
+                      <span className="el-rule__body">
+                        <strong>{rule.label}</strong>
+                        <span>{rule.helper}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </SideCard>
+
+            <SideCard
+              heading="Console Output"
+              sub="actual execution order"
+              className="el-card--output"
+            >
+              <div className="el-output">
+                {consoleOutput.length === 0 && (
+                  <div className="el-empty">Nothing logged yet</div>
+                )}
+
+                {consoleOutput.map((entry, index) => (
+                  <div
+                    key={`${entry}-${index}`}
+                    className={`el-output__row${index === consoleOutput.length - 1 ? " el-output__row--latest" : ""}`}
+                  >
+                    <span className="el-output__order">{index + 1}</span>
+                    <span className="el-output__value">{entry}</span>
+                  </div>
+                ))}
+              </div>
             </SideCard>
           </SidePanel>
         }

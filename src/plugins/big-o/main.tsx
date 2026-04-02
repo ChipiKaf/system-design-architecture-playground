@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { useConceptModal, ConceptPills, SidePanel } from "../../components/plugin-kit";
+import {
+  useConceptModal,
+  ConceptPills,
+  SidePanel,
+} from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 import {
   getBinaryTargetIndex,
@@ -42,7 +46,8 @@ const curveValue = (curve: CurveKey, n: number) => {
 const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const dispatch = useDispatch();
   const { bigO, currentStep } = useBigOAnimation(onAnimationComplete);
-  const { openConcept, closeConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
+  const { openConcept, closeConcept, ConceptModal } =
+    useConceptModal<ConceptKey>(concepts);
   const [focusedCurve, setFocusedCurve] = useState<CurveKey | "all">("all");
 
   const items = useMemo(
@@ -405,12 +410,42 @@ const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   );
 
   const boPills = [
-    { key: "big-o", label: "Big O", color: "#c2410c", borderColor: "rgba(249,115,22,0.22)" },
-    { key: "n", label: "n", color: "#b45309", borderColor: "rgba(245,158,11,0.26)" },
-    { key: "constant", label: "O(1)", color: "#0369a1", borderColor: "rgba(14,165,233,0.25)" },
-    { key: "logarithmic", label: "O(log n)", color: "#6d28d9", borderColor: "rgba(139,92,246,0.25)" },
-    { key: "linear", label: "O(n)", color: "#15803d", borderColor: "rgba(34,197,94,0.28)" },
-    { key: "quadratic", label: "O(n^2)", color: "#b91c1c", borderColor: "rgba(239,68,68,0.28)" },
+    {
+      key: "big-o",
+      label: "Big O",
+      color: "#c2410c",
+      borderColor: "rgba(249,115,22,0.22)",
+    },
+    {
+      key: "n",
+      label: "n",
+      color: "#b45309",
+      borderColor: "rgba(245,158,11,0.26)",
+    },
+    {
+      key: "constant",
+      label: "O(1)",
+      color: "#0369a1",
+      borderColor: "rgba(14,165,233,0.25)",
+    },
+    {
+      key: "logarithmic",
+      label: "O(log n)",
+      color: "#6d28d9",
+      borderColor: "rgba(139,92,246,0.25)",
+    },
+    {
+      key: "linear",
+      label: "O(n)",
+      color: "#15803d",
+      borderColor: "rgba(34,197,94,0.28)",
+    },
+    {
+      key: "quadratic",
+      label: "O(n^2)",
+      color: "#b91c1c",
+      borderColor: "rgba(239,68,68,0.28)",
+    },
   ];
 
   return (
@@ -431,7 +466,11 @@ const BigOVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
           </div>
         </div>
 
-        <ConceptPills pills={boPills} onOpen={openConcept} className="bo-pills" />
+        <ConceptPills
+          pills={boPills}
+          onOpen={openConcept}
+          className="bo-pills"
+        />
       </div>
 
       <div className="bo-body">

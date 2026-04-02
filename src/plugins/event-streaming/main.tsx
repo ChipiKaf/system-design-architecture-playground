@@ -1,8 +1,4 @@
-import React, {
-  useRef,
-  useLayoutEffect,
-  useEffect,
-} from "react";
+import React, { useRef, useLayoutEffect, useEffect } from "react";
 import "./main.scss";
 import { useEventStreamingAnimation } from "./useEventStreamingAnimation";
 import { useDispatch } from "react-redux";
@@ -707,9 +703,24 @@ const EventStreamingVisualization: React.FC<Props> = ({
 
   const esPills = [
     { key: "kafka", label: "Kafka", color: "#7dd3fc", borderColor: "#0ea5e9" },
-    { key: "subscription", label: "Subscriptions", color: "#86efac", borderColor: "#22c55e" },
-    { key: "idempotency", label: "Idempotency", color: "#c4b5fd", borderColor: "#8b5cf6" },
-    { key: "partitioning", label: "Partitioning", color: "#fde68a", borderColor: "#f59e0b" },
+    {
+      key: "subscription",
+      label: "Subscriptions",
+      color: "#86efac",
+      borderColor: "#22c55e",
+    },
+    {
+      key: "idempotency",
+      label: "Idempotency",
+      color: "#c4b5fd",
+      borderColor: "#8b5cf6",
+    },
+    {
+      key: "partitioning",
+      label: "Partitioning",
+      color: "#fde68a",
+      borderColor: "#f59e0b",
+    },
   ];
 
   return (
@@ -732,7 +743,11 @@ const EventStreamingVisualization: React.FC<Props> = ({
           </select>
         </div>
 
-        <ConceptPills pills={esPills} onOpen={openConcept} className="es-concept-pills" />
+        <ConceptPills
+          pills={esPills}
+          onOpen={openConcept}
+          className="es-concept-pills"
+        />
       </div>
 
       <div className="es-canvas">

@@ -1,8 +1,4 @@
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-} from "react";
+import React, { useEffect, useLayoutEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import {
   viz,
@@ -588,21 +584,65 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
   const cpuPct = Math.min(avgCpu, 100);
 
   const ecsPills = [
-    { key: "ecs", label: "ECS", color: "#fdba74", borderColor: "rgba(249,115,22,0.28)" },
-    { key: "alb", label: "ALB", color: "#93c5fd", borderColor: "rgba(59,130,246,0.28)" },
-    { key: "cloudwatch", label: "CloudWatch", color: "#fda4af", borderColor: "rgba(225,29,72,0.28)" },
-    { key: "scaling-policy", label: "Scaling", color: "#d8b4fe", borderColor: "rgba(168,85,247,0.28)" },
-    { key: "ecr", label: "ECR", color: "#fed7aa", borderColor: "rgba(251,146,60,0.28)" },
-    { key: "docker", label: "Docker", color: "#7dd3fc", borderColor: "rgba(14,165,233,0.28)" },
-    { key: "database", label: "Database", color: "#86efac", borderColor: "rgba(34,197,94,0.28)" },
-    { key: "cicd", label: "CI/CD", color: "#c4b5fd", borderColor: "rgba(167,139,250,0.28)" },
+    {
+      key: "ecs",
+      label: "ECS",
+      color: "#fdba74",
+      borderColor: "rgba(249,115,22,0.28)",
+    },
+    {
+      key: "alb",
+      label: "ALB",
+      color: "#93c5fd",
+      borderColor: "rgba(59,130,246,0.28)",
+    },
+    {
+      key: "cloudwatch",
+      label: "CloudWatch",
+      color: "#fda4af",
+      borderColor: "rgba(225,29,72,0.28)",
+    },
+    {
+      key: "scaling-policy",
+      label: "Scaling",
+      color: "#d8b4fe",
+      borderColor: "rgba(168,85,247,0.28)",
+    },
+    {
+      key: "ecr",
+      label: "ECR",
+      color: "#fed7aa",
+      borderColor: "rgba(251,146,60,0.28)",
+    },
+    {
+      key: "docker",
+      label: "Docker",
+      color: "#7dd3fc",
+      borderColor: "rgba(14,165,233,0.28)",
+    },
+    {
+      key: "database",
+      label: "Database",
+      color: "#86efac",
+      borderColor: "rgba(34,197,94,0.28)",
+    },
+    {
+      key: "cicd",
+      label: "CI/CD",
+      color: "#c4b5fd",
+      borderColor: "rgba(167,139,250,0.28)",
+    },
   ];
 
   return (
     <div className="ecs-root">
       <PluginLayout
         toolbar={
-          <ConceptPills pills={ecsPills} onOpen={openConcept} className="ecs-pills" />
+          <ConceptPills
+            pills={ecsPills}
+            onOpen={openConcept}
+            className="ecs-pills"
+          />
         }
         canvas={
           <div className="ecs-stage">
@@ -630,83 +670,90 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
               <p>{explanation}</p>
             </SideCard>
 
-            <SideCard heading="Client Load" sub="simulate traffic" className="ecs-card--clients">
-            <div className="ecs-client-control">
-              <button
-                className="ecs-client-btn"
-                onClick={() => dispatch(adjustClients(-1))}
-                disabled={clientCount <= 1}
-              >
-                −
-              </button>
-              <div className="ecs-client-display">
-                <span className="ecs-client-count">{clientCount}</span>
-                <span className="ecs-client-label">clients</span>
+            <SideCard
+              heading="Client Load"
+              sub="simulate traffic"
+              className="ecs-card--clients"
+            >
+              <div className="ecs-client-control">
+                <button
+                  className="ecs-client-btn"
+                  onClick={() => dispatch(adjustClients(-1))}
+                  disabled={clientCount <= 1}
+                >
+                  −
+                </button>
+                <div className="ecs-client-display">
+                  <span className="ecs-client-count">{clientCount}</span>
+                  <span className="ecs-client-label">clients</span>
+                </div>
+                <button
+                  className="ecs-client-btn"
+                  onClick={() => dispatch(adjustClients(1))}
+                  disabled={clientCount >= 20}
+                >
+                  +
+                </button>
               </div>
-              <button
-                className="ecs-client-btn"
-                onClick={() => dispatch(adjustClients(1))}
-                disabled={clientCount >= 20}
-              >
-                +
-              </button>
-            </div>
-            <div className="ecs-client-hint">
-              {requestsPerSecond} req/s &middot;{" "}
-              {avgCpu > targetCpu ? "⚠ above target" : "within target"}
-            </div>
+              <div className="ecs-client-hint">
+                {requestsPerSecond} req/s &middot;{" "}
+                {avgCpu > targetCpu ? "⚠ above target" : "within target"}
+              </div>
             </SideCard>
 
-            <SideCard heading="Live Metrics" sub="CloudWatch" className="ecs-card--metrics">
+            <SideCard
+              heading="Live Metrics"
+              sub="CloudWatch"
+              className="ecs-card--metrics"
+            >
+              {/* CPU gauge */}
+              <div className="ecs-gauge">
+                <div className="ecs-gauge__label">
+                  <span>Avg CPU</span>
+                  <span style={{ color: cpuColor, fontWeight: 700 }}>
+                    {avgCpu}%
+                  </span>
+                </div>
+                <div className="ecs-gauge__bar">
+                  <div
+                    className="ecs-gauge__fill"
+                    style={{
+                      width: `${cpuPct}%`,
+                      background: cpuColor,
+                    }}
+                  />
+                  <div
+                    className="ecs-gauge__target"
+                    style={{ left: `${targetCpu}%` }}
+                    title={`Target: ${targetCpu}%`}
+                  />
+                </div>
+              </div>
 
-            {/* CPU gauge */}
-            <div className="ecs-gauge">
-              <div className="ecs-gauge__label">
-                <span>Avg CPU</span>
-                <span style={{ color: cpuColor, fontWeight: 700 }}>
-                  {avgCpu}%
-                </span>
+              <div className="ecs-metrics-grid">
+                <div className="ecs-metric">
+                  <span className="ecs-metric__label">Requests/sec</span>
+                  <span className="ecs-metric__value">{requestsPerSecond}</span>
+                </div>
+                <div className="ecs-metric">
+                  <span className="ecs-metric__label">Response time</span>
+                  <span className="ecs-metric__value">{responseTimeMs}ms</span>
+                </div>
+                <div className="ecs-metric">
+                  <span className="ecs-metric__label">Alarm</span>
+                  <span
+                    className={`ecs-metric__value ${alarmFiring ? "ecs-metric__value--alarm" : ""}`}
+                  >
+                    {alarmFiring ? "ALARM" : "OK"}
+                  </span>
+                </div>
+                <div className="ecs-metric">
+                  <span className="ecs-metric__label">Cooldown</span>
+                  <span className="ecs-metric__value">
+                    {scalingCooldown ? "Active" : "—"}
+                  </span>
+                </div>
               </div>
-              <div className="ecs-gauge__bar">
-                <div
-                  className="ecs-gauge__fill"
-                  style={{
-                    width: `${cpuPct}%`,
-                    background: cpuColor,
-                  }}
-                />
-                <div
-                  className="ecs-gauge__target"
-                  style={{ left: `${targetCpu}%` }}
-                  title={`Target: ${targetCpu}%`}
-                />
-              </div>
-            </div>
-
-            <div className="ecs-metrics-grid">
-              <div className="ecs-metric">
-                <span className="ecs-metric__label">Requests/sec</span>
-                <span className="ecs-metric__value">{requestsPerSecond}</span>
-              </div>
-              <div className="ecs-metric">
-                <span className="ecs-metric__label">Response time</span>
-                <span className="ecs-metric__value">{responseTimeMs}ms</span>
-              </div>
-              <div className="ecs-metric">
-                <span className="ecs-metric__label">Alarm</span>
-                <span
-                  className={`ecs-metric__value ${alarmFiring ? "ecs-metric__value--alarm" : ""}`}
-                >
-                  {alarmFiring ? "ALARM" : "OK"}
-                </span>
-              </div>
-              <div className="ecs-metric">
-                <span className="ecs-metric__label">Cooldown</span>
-                <span className="ecs-metric__value">
-                  {scalingCooldown ? "Active" : "—"}
-                </span>
-              </div>
-            </div>
             </SideCard>
 
             <SideCard
@@ -714,76 +761,80 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
               sub={`${tasks.length} task${tasks.length !== 1 ? "s" : ""}`}
               className="ecs-card--tasks"
             >
-            <div className="ecs-task-list">
-              {tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className={`ecs-task-chip ecs-task-chip--${task.status}`}
-                >
-                  <span className="ecs-task-chip__name">
-                    {task.id.replace("task-", "T")}
-                  </span>
-                  <span className="ecs-task-chip__cpu">
-                    {task.status === "provisioning"
-                      ? "..."
-                      : task.status === "draining"
-                        ? "drain"
-                        : `${task.cpuPercent}%`}
-                  </span>
-                  <span
-                    className={`ecs-task-chip__dot ecs-task-chip__dot--${task.status}`}
-                  />
-                </div>
-              ))}
-            </div>
-          </SideCard>
+              <div className="ecs-task-list">
+                {tasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className={`ecs-task-chip ecs-task-chip--${task.status}`}
+                  >
+                    <span className="ecs-task-chip__name">
+                      {task.id.replace("task-", "T")}
+                    </span>
+                    <span className="ecs-task-chip__cpu">
+                      {task.status === "provisioning"
+                        ? "..."
+                        : task.status === "draining"
+                          ? "drain"
+                          : `${task.cpuPercent}%`}
+                    </span>
+                    <span
+                      className={`ecs-task-chip__dot ecs-task-chip__dot--${task.status}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </SideCard>
 
-          {/* Infrastructure toggles */}
-          <SideCard heading="Infrastructure" sub="swap components" className="ecs-card--infra">
-            <div className="ecs-infra-grid">
-              <div className="ecs-control-group">
-                <label htmlFor="ecs-db-select">Database</label>
-                <select
-                  id="ecs-db-select"
-                  value={database}
-                  onChange={(e) =>
-                    dispatch(setDatabase(e.target.value as DatabaseChoice))
-                  }
-                >
-                  <option value="postgresql">PostgreSQL</option>
-                  <option value="mongodb">MongoDB</option>
-                </select>
+            {/* Infrastructure toggles */}
+            <SideCard
+              heading="Infrastructure"
+              sub="swap components"
+              className="ecs-card--infra"
+            >
+              <div className="ecs-infra-grid">
+                <div className="ecs-control-group">
+                  <label htmlFor="ecs-db-select">Database</label>
+                  <select
+                    id="ecs-db-select"
+                    value={database}
+                    onChange={(e) =>
+                      dispatch(setDatabase(e.target.value as DatabaseChoice))
+                    }
+                  >
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="mongodb">MongoDB</option>
+                  </select>
+                </div>
+                <div className="ecs-control-group">
+                  <label htmlFor="ecs-cicd-select">CI/CD</label>
+                  <select
+                    id="ecs-cicd-select"
+                    value={cicd}
+                    onChange={(e) =>
+                      dispatch(setCiCd(e.target.value as CiCdChoice))
+                    }
+                  >
+                    <option value="codepipeline">CodePipeline</option>
+                    <option value="jenkins">Jenkins</option>
+                  </select>
+                </div>
+                <div className="ecs-control-group">
+                  <label htmlFor="ecs-orch-select">Orchestration</label>
+                  <select
+                    id="ecs-orch-select"
+                    value={orchestration}
+                    onChange={(e) =>
+                      dispatch(
+                        setOrchestration(e.target.value as OrchestrationChoice),
+                      )
+                    }
+                  >
+                    <option value="ecs">ECS (Fargate)</option>
+                    <option value="eks">EKS (Kubernetes)</option>
+                  </select>
+                </div>
               </div>
-              <div className="ecs-control-group">
-                <label htmlFor="ecs-cicd-select">CI/CD</label>
-                <select
-                  id="ecs-cicd-select"
-                  value={cicd}
-                  onChange={(e) =>
-                    dispatch(setCiCd(e.target.value as CiCdChoice))
-                  }
-                >
-                  <option value="codepipeline">CodePipeline</option>
-                  <option value="jenkins">Jenkins</option>
-                </select>
-              </div>
-              <div className="ecs-control-group">
-                <label htmlFor="ecs-orch-select">Orchestration</label>
-                <select
-                  id="ecs-orch-select"
-                  value={orchestration}
-                  onChange={(e) =>
-                    dispatch(
-                      setOrchestration(e.target.value as OrchestrationChoice),
-                    )
-                  }
-                >
-                  <option value="ecs">ECS (Fargate)</option>
-                  <option value="eks">EKS (Kubernetes)</option>
-                </select>
-              </div>
-            </div>
-          </SideCard>
+            </SideCard>
           </SidePanel>
         }
       />

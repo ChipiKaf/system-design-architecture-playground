@@ -23,7 +23,10 @@ const StatBadge: React.FC<StatBadgeProps> = ({
 }) => (
   <div className={`vc-stat-badge${className ? ` ${className}` : ""}`}>
     <span className="vc-stat-badge__label">{label}</span>
-    <span className="vc-stat-badge__value" style={color ? { color } : undefined}>
+    <span
+      className="vc-stat-badge__value"
+      style={color ? { color } : undefined}
+    >
       {value}
     </span>
   </div>

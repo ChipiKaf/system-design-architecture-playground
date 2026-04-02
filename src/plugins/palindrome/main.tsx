@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useDispatch } from "react-redux";
 import { viz, type PanZoomController } from "vizcraft";
 import { usePalindromeAnimation } from "./usePalindromeAnimation";
@@ -125,7 +131,13 @@ const PalindromeVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
         .fill(fill)
         .stroke(stroke, strokeW)
         .label(ch.toUpperCase(), {
-          fill: isMismatch ? "#fca5a5" : isActive ? "#93c5fd" : isChecked ? "#86efac" : "#e2e8f0",
+          fill: isMismatch
+            ? "#fca5a5"
+            : isActive
+              ? "#93c5fd"
+              : isChecked
+                ? "#86efac"
+                : "#e2e8f0",
           fontSize: 20,
           fontWeight: "bold",
         });
@@ -294,20 +306,25 @@ const PalindromeVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
               />
               {currentStep === 0 && (
                 <div className="pal-presets">
-                  {["racecar", "hello", "A man a plan a canal Panama", "madam", "civic", "javascript"].map(
-                    (word) => (
-                      <button
-                        key={word}
-                        className="pal-preset-btn"
-                        onClick={() => {
-                          setDraft(word);
-                          dispatch(setInput(word));
-                        }}
-                      >
-                        {word}
-                      </button>
-                    ),
-                  )}
+                  {[
+                    "racecar",
+                    "hello",
+                    "A man a plan a canal Panama",
+                    "madam",
+                    "civic",
+                    "javascript",
+                  ].map((word) => (
+                    <button
+                      key={word}
+                      className="pal-preset-btn"
+                      onClick={() => {
+                        setDraft(word);
+                        dispatch(setInput(word));
+                      }}
+                    >
+                      {word}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -388,7 +405,8 @@ const PalindromeVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
             <p className="pal-card__text">
               Instead of reversing the string (O(n) space), we compare from both
               ends inward. If every pair matches, it's a palindrome. First
-              mismatch → not a palindrome. <strong>O(n) time, O(1) space.</strong>
+              mismatch → not a palindrome.{" "}
+              <strong>O(n) time, O(1) space.</strong>
             </p>
           </div>
         </aside>

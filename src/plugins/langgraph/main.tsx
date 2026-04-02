@@ -1,15 +1,8 @@
-import React, {
-  useRef,
-  useLayoutEffect,
-  useEffect,
-} from "react";
+import React, { useRef, useLayoutEffect, useEffect } from "react";
 import "./main.scss";
 import { useLanggraphAnimation } from "./useLanggraphAnimation";
 import { viz, type SignalOverlayParams } from "vizcraft";
-import {
-  useConceptModal,
-  ConceptPills,
-} from "../../components/plugin-kit";
+import { useConceptModal, ConceptPills } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 
 import { setChannelMode, type NodePatch } from "./langgraphSlice";
@@ -728,13 +721,33 @@ const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   ];
 
   const lgPills = [
-    { key: "state-graph", label: "StateGraph", color: "#c4b5fd", borderColor: "#7c3aed" },
+    {
+      key: "state-graph",
+      label: "StateGraph",
+      color: "#c4b5fd",
+      borderColor: "#7c3aed",
+    },
     { key: "nodes", label: "Nodes", color: "#a5b4fc", borderColor: "#6366f1" },
     { key: "edges", label: "Edges", color: "#fde68a", borderColor: "#f59e0b" },
-    { key: "state-annotation", label: "State & Annotations", color: "#86efac", borderColor: "#22c55e" },
-    { key: "channels", label: "Channels", color: "#67e8f9", borderColor: "#06b6d4" },
+    {
+      key: "state-annotation",
+      label: "State & Annotations",
+      color: "#86efac",
+      borderColor: "#22c55e",
+    },
+    {
+      key: "channels",
+      label: "Channels",
+      color: "#67e8f9",
+      borderColor: "#06b6d4",
+    },
     { key: "send", label: "Send()", color: "#fda4af", borderColor: "#f43f5e" },
-    { key: "interrupt", label: "Interrupt", color: "#fdba74", borderColor: "#f97316" },
+    {
+      key: "interrupt",
+      label: "Interrupt",
+      color: "#fdba74",
+      borderColor: "#f97316",
+    },
   ];
 
   /* ── Render ─────────────────────────────────────────────── */
