@@ -1,6 +1,6 @@
 ---
 name: vizcraft-sandbox-plugin
-description: "Build sandbox-style VizCraft plugins where users dynamically add/remove components and the step narrative adapts. USE WHEN: the user wants an interactive architecture builder, dynamic step generation, togglable infrastructure components, or a Controls panel. USE FOR: creating sandbox plugins with dynamic scenes, TaggedStep/StepKey patterns, component prerequisite/cascade systems, capacity models, Controls slot wiring, client scaling, and step-key-based animation hooks. DO NOT USE FOR: linear fixed-step plugins (use vizcraft-playground skill), non-VizCraft projects."
+description: "Build sandbox-style VizCraft plugins where users dynamically add/remove components and the step narrative adapts. USE WHEN: the user wants an interactive architecture builder, dynamic step generation, togglable infrastructure components, or a Controls panel. USE FOR: creating sandbox plugins with declarative flow engines, dynamic scenes, TaggedStep/StepKey patterns, component prerequisite/cascade systems, capacity models, Controls slot wiring, client scaling, and configuration-driven animation hooks. DO NOT USE FOR: linear fixed-step plugins (use vizcraft-playground skill), non-VizCraft projects."
 ---
 
 # VizCraft Sandbox Plugin Skill
@@ -17,163 +17,304 @@ This extends the base `vizcraft-playground` skill. Read that skill first for fou
 - User wants metrics that react to composition (capacity, throughput, CPU)
 - The scene layout must adapt dynamically to component presence
 
+## Scaffolding
+
+Use the generator with the `--sandbox` flag:
+
+```bash
+npm run generate my-plugin --sandbox --category "My Category"
+```
+
+This generates 8 files with the declarative flow engine, Controls panel, component-aware slice, and a generic animation hook. See the "Sandbox plugin anatomy" section below for details.
+
 ## Sandbox plugin anatomy
 
-A sandbox plugin has **7 files** (one more than standard):
+A sandbox plugin has **8 files** (two more than standard):
 
-| File | Purpose |
-|------|---------|
-| `index.ts` | Plugin registration + **dynamic** `buildSteps(state)` + `StepKey` / `TaggedStep` |
-| `{name}Slice.ts` | State with togglable components, prerequisites, cascade, capacity model |
-| `use{Name}Animation.ts` | **Step-key–based** animation orchestration (not index-based) |
-| `main.tsx` | **Dynamic scene builder** — layout adapts to component state |
-| `controls.tsx` | **Controls component** — rendered in Shell's Controls slot |
-| `concepts.tsx` | Concept definitions (same as standard) |
-| `main.scss` | Plugin styles + controls styles |
+| File                    | Purpose                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| `flow-engine.ts`        | **Single source of truth** — declarative STEPS config, FlowBeat, token expansion     |
+| `index.ts`              | Plugin registration — re-exports from flow-engine, uses `buildSteps(state)`          |
+| `{name}Slice.ts`        | State with togglable components, prerequisites, cascade, capacity model              |
+| `use{Name}Animation.ts` | **Generic executor** — reads STEPS config, no per-step imperative code               |
+| `main.tsx`              | **Dynamic scene builder** — layout adapts to component state                         |
+| `controls.tsx`          | **Controls component** — rendered in Shell's Controls slot                           |
+| `concepts.tsx`          | Concept definitions (same as standard)                                               |
+| `main.scss`             | Plugin styles + controls styles                                                      |
 
-## Core pattern: TaggedStep with StepKey
+## Declarative Flow Engine (flow-engine.ts)
 
-### Problem
+The flow engine is the **core innovation** of sandbox plugins. Instead of writing imperative animation code per step (which leads to repeated signal paths, out-of-sync animations, and fragile switch statements), you define steps and their animation flows as **data**.
 
-In a sandbox plugin, the step list changes when components are toggled. Using numeric `currentStep` indices to drive animations is fragile — adding a step shifts all subsequent indices.
+### Why declarative?
 
-### Solution: StepKey
+Imperative animation code breaks in sandbox plugins because:
+- Adding a component changes the step list and shifts indices
+- Multiple steps end up animating the same signal path (e.g. "send-traffic" sends from clients→server→DB, then "db-flow" repeats server→DB)
+- Bug fixes in one step can break another
 
-Give every step a stable string key. The animation hook resolves the current step's key and switches on it.
+The declarative approach solves this:
+- Each step has a **unique flow** — no two steps share signal paths
+- The engine handles token expansion, signal routing, and hot-zone derivation
+- Adding a new step = adding an entry to the STEPS array. Zero animation code needed.
+
+### Token expansion
+
+Use `$`-prefixed tokens as shorthand for dynamic node sets. The engine expands them at runtime:
 
 ```typescript
-// index.ts
-export type StepKey =
-  | "overview"
-  | "send-traffic"
-  | "observe-metrics"
-  | "db-flow"
-  | "lb-distribute"
-  | "scale-out"
-  | "cache-hits"
-  | "summary";
-
-export interface TaggedStep extends DemoStep {
-  key: StepKey;
+export function expandToken(token: string, state: MyState): string[] {
+  if (token === "$clients") return state.clients.map((c) => c.id);
+  if (token === "$servers") {
+    const count = 1 + state.components.extraServers;
+    return Array.from({ length: count }, (_, i) => `server-${i}`);
+  }
+  return [token]; // literal node ID
 }
 ```
 
-### Dynamic step builder
+### FlowBeat — one animation segment
 
-`buildSteps(state)` reads the current component state and conditionally includes steps:
+```typescript
+export interface FlowBeat {
+  from: string;    // node ID or $token
+  to: string;      // node ID or $token
+  when?: (c: InfraComponents) => boolean;  // conditional
+  duration?: number;      // ms, default 600
+  explain?: string;       // shown during this beat
+}
+```
+
+Tokens expand to parallel signals via cartesian product: `$clients → cloud` with 3 clients produces 3 parallel signals.
+
+### StepDef — declarative step config
+
+```typescript
+export interface StepDef {
+  key: StepKey;
+  label: string;
+  when?: (c: InfraComponents) => boolean;     // only include when true
+  nextButton?: string | ((c: InfraComponents) => string);
+  nextButtonColor?: string;
+  processingText?: string;
+  phase?: string | ((s: MyState) => string);  // dispatched at start
+  flow?: FlowBeat[];          // animation beats (unique to this step!)
+  delay?: number;             // pause after flow (ms)
+  recalcMetrics?: boolean;    // recompute derived metrics
+  finalHotZones?: string[];   // hot zones after flow completes
+  explain?: string | ((s: MyState) => string);  // shown after flow
+  action?: "reset";           // special actions
+}
+```
+
+### STEPS config — the single source of truth
+
+**Critical rule: each step owns a unique signal path. Never animate the same from→to in two different steps.**
+
+```typescript
+export const STEPS: StepDef[] = [
+  // 1. Overview — reset, no animation
+  {
+    key: "overview",
+    label: "Architecture Overview",
+    nextButton: "Send Traffic",
+    action: "reset",
+  },
+
+  // 2. Send Traffic — ONLY delivers to server layer
+  //    Does NOT include DB, LB, or cache flows
+  {
+    key: "send-traffic",
+    label: "Send Traffic",
+    phase: "traffic",
+    flow: [
+      { from: "$clients", to: "cloud", duration: 700,
+        explain: "Clients send requests through the internet." },
+      { from: "cloud", to: "server-0", duration: 600,
+        explain: "Requests arrive at the server." },
+    ],
+    recalcMetrics: true,
+    explain: (s) => `Traffic: ${s.requestsPerSecond} rps demand, ${s.maxCapacity} capacity.`,
+  },
+
+  // 3. Observe Metrics — no animation, just read numbers
+  {
+    key: "observe-metrics",
+    label: "Observe Metrics",
+    recalcMetrics: true,
+    delay: 500,
+    phase: (s) => (s.droppedRequests > 0 ? "overloaded" : "stable"),
+    finalHotZones: ["server-0"],
+    explain: (s) => s.droppedRequests > 0
+      ? `Overloaded! ${s.droppedRequests} dropped.`
+      : `Stable at ${s.throughput} rps.`,
+  },
+
+  // 4. LB Distributes — unique: cloud → LB → servers
+  {
+    key: "lb-distribute",
+    label: "Load Balancer Distributes",
+    when: (c) => c.loadBalancer,
+    phase: "lb-distribute",
+    flow: [
+      { from: "cloud", to: "lb", duration: 500 },
+      { from: "lb", to: "$servers", duration: 700,
+        explain: "LB fans out across all servers." },
+    ],
+  },
+
+  // 5. DB Flow — unique: servers ↔ DB
+  {
+    key: "db-flow",
+    label: "Server ↔ Database",
+    when: (c) => c.database,
+    phase: "db-flow",
+    flow: [
+      { from: "$servers", to: "database", duration: 700 },
+      { from: "database", to: "$servers", duration: 700 },
+    ],
+  },
+
+  // 6. Summary
+  { key: "summary", label: "Summary", phase: "summary",
+    explain: (s) => `Max capacity: ~${s.maxCapacity} rps.` },
+];
+```
+
+### buildSteps — auto-derives step list from config
 
 ```typescript
 export function buildSteps(state: MyState): TaggedStep[] {
   const { components: c } = state;
+  const active = STEPS.filter((s) => !s.when || s.when(c));
 
-  const steps: TaggedStep[] = [
-    { key: "overview", label: "Overview", nextButtonText: "Send Traffic" },
-    { key: "send-traffic", label: "Send Traffic", nextButtonText: "Observe" },
-    {
-      key: "observe-metrics",
-      label: "Observe Metrics",
-      // Dynamic next button — depends on what's enabled
-      nextButtonText: c.database ? "Show DB Flow" : "Summary",
-    },
-  ];
+  return active.map((step, i) => {
+    const nextStep = active[i + 1];
+    // Auto-derive nextButtonText from next step's label if not explicit
+    let nextButtonText: string | undefined;
+    if (typeof step.nextButton === "function") nextButtonText = step.nextButton(c);
+    else if (typeof step.nextButton === "string") nextButtonText = step.nextButton;
+    else if (nextStep) nextButtonText = nextStep.label;
 
-  if (c.database) {
-    steps.push({
-      key: "db-flow",
-      label: "Server ↔ Database",
-      nextButtonText: c.loadBalancer ? "Distribute Traffic" : "Summary",
-    });
-  }
-
-  if (c.loadBalancer) {
-    steps.push({
-      key: "lb-distribute",
-      label: "Load Balancer Distributes",
-      nextButtonText: c.extraServers > 0 ? "Scale Out" : "Summary",
-    });
-  }
-
-  // ... more conditional steps ...
-
-  steps.push({ key: "summary", label: "Summary" });
-  return steps;
+    return { key: step.key, label: step.label, nextButtonText, ... };
+  });
 }
 ```
 
-**Key rules:**
-- `nextButtonText` must be dynamic — it should point to the next _existing_ step.
-- Always end with a terminal step (e.g. "summary").
-- Export `buildSteps` so the animation hook can call it.
+### executeFlow — generic flow executor
 
-### Plugin registration with dynamic getSteps
+Walks beats, expands tokens, builds cartesian product signal pairs, auto-derives hot zones:
 
 ```typescript
-const MyPlugin: DemoPlugin<...> = {
-  // ...
-  Controls: MyControls,                                     // ← new slot
-  getSteps: (state) => buildSteps(state),                   // ← dynamic
-  // ...
-};
+export async function executeFlow(
+  beats: FlowBeat[],
+  deps: FlowExecutorDeps,
+): Promise<void> {
+  const components = deps.getState().components;
+  const activeBeats = beats.filter((b) => !b.when || b.when(components));
+
+  for (const beat of activeBeats) {
+    if (deps.cancelled()) return;
+
+    const state = deps.getState();
+    const froms = expandToken(beat.from, state);
+    const tos = expandToken(beat.to, state);
+
+    // Cartesian product → parallel signal pairs
+    const pairs: { from: string; to: string }[] = [];
+    for (const f of froms) {
+      for (const t of tos) {
+        pairs.push({ from: f, to: t });
+      }
+    }
+
+    // Auto-derive hot zones from participants
+    const hotZones = [...new Set([...froms, ...tos])];
+    const update: Partial<MyState> = { hotZones };
+    if (beat.explain) update.explanation = beat.explain;
+    deps.patch(update);
+
+    await deps.animateParallel(pairs, beat.duration ?? 600);
+  }
+}
 ```
 
-The Shell calls `getSteps(modelState)` on every render, so the step indicator updates live.
+## Generic Animation Hook (no switch statement)
 
-## Step-key–based animation hook
+The animation hook is **fully generic** — it reads config from `STEPS` and follows a fixed 9-step sequence. No per-step imperative code needed.
 
 ```typescript
 export const useMyAnimation = (onAnimationComplete?: () => void) => {
-  const dispatch = useDispatch();
-  const { currentStep } = useSelector((s: RootState) => s.simulation);
-  const runtime = useSelector((s: RootState) => s.myPlugin) as MyState;
-  const [signals, setSignals] = useState<Signal[]>([]);
-  const runtimeRef = useRef(runtime);
-  runtimeRef.current = runtime;
+  // ... standard setup (dispatch, selector, signals, refs) ...
 
-  // ... cleanup, sleep, animateSignal, animateParallel helpers ...
-
-  // Resolve current step KEY (not index)
   const steps = buildSteps(runtime);
   const currentKey: StepKey | undefined = steps[currentStep]?.key;
 
   useEffect(() => {
     let cancelled = false;
     cleanup();
-    const finish = () => { if (!cancelled) setTimeout(() => onCompleteRef.current?.(), 0); };
-    const rt = () => runtimeRef.current;    // always-fresh state
+
+    const stepDef = STEPS.find((s) => s.key === currentKey);
+    if (!stepDef) { finish(); return cleanup; }
 
     const run = async () => {
-      switch (currentKey) {                 // ← switch on KEY, not index
-        case "overview":
-          dispatch(reset());
-          finish();
-          return;
+      // 1. Special actions (e.g. reset)
+      if (stepDef.action === "reset") { dispatch(reset()); finish(); return; }
 
-        case "send-traffic":
-          // Animate ALL clients, not a hardcoded subset
-          await animateParallel(
-            rt().clients.map(c => ({ from: c.id, to: "cloud" })),
-            700,
-          );
-          // ...
-          finish();
-          return;
+      // 2. Recalc metrics early (for non-flow steps that read derived state)
+      if (stepDef.recalcMetrics && !stepDef.flow) dispatch(recalcMetrics());
 
-        // ... other cases keyed by StepKey ...
+      // 3. Set phase
+      if (stepDef.phase) {
+        const phase = typeof stepDef.phase === "function"
+          ? stepDef.phase(rt()) : stepDef.phase;
+        doPatch({ phase });
       }
+
+      // 4. Set initial hot zones for non-flow steps
+      if (stepDef.finalHotZones !== undefined && !stepDef.flow)
+        doPatch({ hotZones: stepDef.finalHotZones });
+
+      // 5. Execute flow beats
+      if (stepDef.flow) {
+        await executeFlow(stepDef.flow, {
+          animateParallel, patch: doPatch, getState: rt,
+          cancelled: () => cancelled,
+        });
+        if (cancelled) return;
+      }
+
+      // 6. Recalc after flow
+      if (stepDef.recalcMetrics && stepDef.flow) dispatch(recalcMetrics());
+
+      // 7. Delay
+      if (stepDef.delay) { await sleep(stepDef.delay); if (cancelled) return; }
+
+      // 8. Final hot zones
+      if (stepDef.finalHotZones !== undefined) doPatch({ hotZones: stepDef.finalHotZones });
+      else if (!stepDef.flow) doPatch({ hotZones: [] });
+
+      // 9. Final explanation
+      if (stepDef.explain) {
+        const explanation = typeof stepDef.explain === "function"
+          ? stepDef.explain(rt()) : stepDef.explain;
+        doPatch({ explanation });
+      }
+
+      finish();
     };
 
     run();
     return () => { cancelled = true; cleanup(); };
-  }, [currentStep, currentKey, /* stable deps */]);
+  }, [currentStep, currentKey, cleanup, dispatch, sleep, animateParallel]);
 
   return { runtime, signals };
 };
 ```
 
-**Critical rules:**
+**Key rules:**
 - Switch on `currentKey`, never on `currentStep` number.
-- Use `runtimeRef.current` (not closed-over `runtime`) inside async animation sequences to get fresh state.
-- Animate **all** dynamic entities (e.g. ALL clients), never hardcode `.slice(0, N)`. Entities are added/removed dynamically and must all behave identically.
+- Use `runtimeRef.current` (not closed-over `runtime`) inside async sequences.
 - Include `currentKey` in the `useEffect` dependency array.
 
 ## Component state with prerequisites and cascades
@@ -185,7 +326,7 @@ export interface InfraComponents {
   database: boolean;
   loadBalancer: boolean;
   cache: boolean;
-  extraServers: number;    // numeric for multi-instance components
+  extraServers: number; // numeric for multi-instance components
 }
 
 export type ComponentName = keyof InfraComponents;
@@ -193,92 +334,40 @@ export type ComponentName = keyof InfraComponents;
 
 ### Prerequisite system
 
-Some components require others to exist first:
-
 ```typescript
 const PREREQUISITES: Partial<Record<ComponentName, ComponentName[]>> = {
-  cache: ["database"],           // can't add cache without DB
-  extraServers: ["loadBalancer"], // can't add servers without LB
+  cache: ["database"],
+  extraServers: ["loadBalancer"],
 };
 ```
 
-In the `addComponent` reducer, check prerequisites before allowing the add:
-
-```typescript
-addComponent(state, action: PayloadAction<ComponentName>) {
-  const name = action.payload;
-  const prereqs = PREREQUISITES[name];
-  if (prereqs?.some(p => !state.components[p])) return; // blocked
-
-  if (name === "extraServers") {
-    if (state.components.extraServers >= 4) return;     // cap
-    state.components.extraServers += 1;
-  } else {
-    if (state.components[name]) return;                 // already active
-    (state.components[name] as boolean) = true;
-  }
-  computeMetrics(state);
-},
-```
+In the `addComponent` reducer, check prerequisites before allowing the add.
 
 ### Cascade removal system
-
-Removing a component must remove its dependents:
 
 ```typescript
 const CASCADE_REMOVE: Partial<Record<ComponentName, ComponentName[]>> = {
   database: ["cache"],
   loadBalancer: ["extraServers"],
 };
-
-removeComponent(state, action: PayloadAction<ComponentName>) {
-  const name = action.payload;
-  // ... remove the component ...
-
-  // Cascade
-  const cascades = CASCADE_REMOVE[name];
-  if (cascades) {
-    for (const dep of cascades) {
-      if (dep === "extraServers") state.components.extraServers = 0;
-      else (state.components[dep] as boolean) = false;
-    }
-  }
-  computeMetrics(state);
-},
 ```
+
+Removing a component auto-removes its dependents.
 
 ### Capacity model
 
-Define a pure function that computes max capacity from component state:
-
 ```typescript
 function getMaxCapacity(c: InfraComponents): number {
-  let cap = 60;                              // base solo server
-  if (c.database) cap = 100;                 // DB frees server CPU
-  if (c.loadBalancer) cap += 40;             // LB enables distribution
-  cap += c.extraServers * 50;               // each server adds throughput
-  if (c.cache) cap = Math.round(cap * 1.3); // cache multiplier
+  let cap = 60;
+  if (c.database) cap = 100;
+  if (c.loadBalancer) cap += 40;
+  cap += c.extraServers * 50;
+  if (c.cache) cap = Math.round(cap * 1.3);
   return cap;
 }
 ```
 
-### Metrics computation
-
-Always recompute derived metrics from source-of-truth fields:
-
-```typescript
-export function computeMetrics(state: MyState) {
-  const rps = state.clients.length * 10;      // demand = clients × rate
-  state.requestsPerSecond = rps;
-  state.maxCapacity = getMaxCapacity(state.components);
-  state.throughput = Math.min(rps, state.maxCapacity);
-  state.droppedRequests = Math.max(0, rps - state.maxCapacity);
-  state.serverCpuPercent = Math.min(99, Math.round((rps / state.maxCapacity) * 100));
-  state.serverHealthy = state.serverCpuPercent < 95;
-}
-```
-
-**Important:** Display `requestsPerSecond` / `maxCapacity` in the throughput badge (demand vs capacity), not `throughput` / `maxCapacity` (which would cap at max and hide overload).
+**Important:** Display `requestsPerSecond / maxCapacity` in the throughput badge (demand vs capacity), not `throughput / maxCapacity` (which caps at max, hiding overload).
 
 ## Controls component and Shell slot
 
@@ -287,7 +376,6 @@ export function computeMetrics(state: MyState) {
 The Shell renders `plugin.Controls` when defined:
 
 ```tsx
-// Shell.tsx — inside .visualization-container
 {plugin.Controls && (
   <div className="plugin-controls">
     <plugin.Controls />
@@ -295,83 +383,22 @@ The Shell renders `plugin.Controls` when defined:
 )}
 ```
 
-With CSS:
-
-```scss
-.plugin-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-}
-```
-
 ### Controls component pattern
 
 ```tsx
 const TOGGLES: Toggle[] = [
-  { name: "database",     label: "Database",      addLabel: "+ Database",      removeLabel: "− Database",      color: "#22c55e" },
-  { name: "loadBalancer", label: "Load Balancer",  addLabel: "+ Load Balancer", removeLabel: "− Load Balancer", color: "#8b5cf6" },
-  { name: "extraServers", label: "Servers",        addLabel: "+ Server",        removeLabel: "− Server",        color: "#14b8a6", requires: ["loadBalancer"], multi: true },
-  { name: "cache",        label: "Cache",          addLabel: "+ Cache",         removeLabel: "− Cache",         color: "#f97316", requires: ["database"] },
+  { name: "database", addLabel: "+ Database", removeLabel: "− Database",
+    color: "#22c55e" },
+  { name: "loadBalancer", addLabel: "+ Load Balancer", removeLabel: "− Load Balancer",
+    color: "#8b5cf6" },
+  { name: "extraServers", addLabel: "+ Server", removeLabel: "− Server",
+    color: "#14b8a6", requires: ["loadBalancer"], multi: true },
+  { name: "cache", addLabel: "+ Cache", removeLabel: "− Cache",
+    color: "#f97316", requires: ["database"] },
 ];
-
-const MyControls: React.FC = () => {
-  const dispatch = useDispatch();
-  const { components, clients } = useSelector((s: RootState) => s.myPlugin);
-
-  const handleAdd = (name: ComponentName) => {
-    dispatch(addComponent(name));
-    dispatch(resetSimulation());    // ← CRITICAL: reset step index when story changes
-  };
-
-  const handleRemove = (name: ComponentName) => {
-    dispatch(removeComponent(name));
-    dispatch(resetSimulation());    // ← reset here too
-  };
-
-  return (
-    <div className="my-controls">
-      {/* Client +/- buttons */}
-      <div className="my-controls__group">
-        <span className="my-controls__label">Clients: {clients.length}</span>
-        <button onClick={() => dispatch(removeClient())}>−</button>
-        <button onClick={() => dispatch(addClient())}>+</button>
-      </div>
-
-      {/* Component toggles — data-driven from TOGGLES array */}
-      {TOGGLES.map(toggle => {
-        const isActive = toggle.multi
-          ? components[toggle.name] > 0
-          : !!components[toggle.name];
-        const prereqsMet = !toggle.requires || toggle.requires.every(r => !!components[r]);
-
-        return (
-          <div key={toggle.name} className="my-controls__group">
-            {isActive && (
-              <button style={{ borderColor: toggle.color }} onClick={() => handleRemove(toggle.name)}>
-                {toggle.removeLabel}
-              </button>
-            )}
-            <button
-              style={{ borderColor: toggle.color }}
-              disabled={!prereqsMet}
-              onClick={() => handleAdd(toggle.name)}
-            >
-              {toggle.addLabel}
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
 ```
 
-**Critical:** Always dispatch `resetSimulation()` after toggling a component. This resets `currentStep` to 0, because the step list has changed and the old index may point to a removed step.
+**Critical:** Always dispatch `resetSimulation()` after toggling a component. This resets `currentStep` to 0 because the step list has changed.
 
 ## Dynamic scene builder
 
@@ -382,70 +409,29 @@ const scene = (() => {
   const b = viz().view(W, H);
   let nextY = 40;
 
-  // ── Always-present: Clients row ──────────────────
-  const clientStartX = Math.max(80, W / 2 - (clients.length * 72) / 2);
+  // Always-present: Clients row
+  const rowWidth = (clients.length - 1) * 72 + 56;
+  const clientStartX = W / 2 - rowWidth / 2;
   clients.forEach((client, i) => {
-    b.node(client.id)
-      .at(clientStartX + i * 72, nextY)
-      .rect(56, 40, 8)
-      .fill(hot("clients") ? "#1e3a8a" : "#0f172a")
-      .stroke(hot("clients") ? "#60a5fa" : "#334155", 1.4)
+    b.node(client.id).at(clientStartX + i * 72, nextY).rect(56, 40, 8)
       .image("/mobile.svg", 20, 20, { dy: -5, position: "center" });
   });
   nextY += 75;
 
-  // ── Always-present: Internet ─────────────────────
-  b.node("cloud").at(W/2 - 70, nextY).rect(140, 55, 14)
-    .label("☁ Internet", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
-  nextY += 80;
-
-  // ── Conditional: Load Balancer ───────────────────
+  // Conditional: Load Balancer
   if (components.loadBalancer) {
     b.node("lb").at(W/2 - 80, nextY).rect(160, 52, 12)
-      .label("Load Balancer", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+      .label("Load Balancer", { ... });
     nextY += 75;
   }
 
-  // ── Dynamic: Servers (1 + extraServers) ──────────
-  const totalServers = 1 + components.extraServers;
-  for (let i = 0; i < totalServers; i++) {
-    b.node(`server-${i}`).at(...).rect(150, 56, 12)
-      .image("/server.svg", 20, 20, { dx: -50, dy: -6, position: "center" })
-      .label(i === 0 ? "HTTP Server" : `Server ${i + 1}`, { ... });
-  }
-  nextY += 80;
-
-  // ── Conditional: Cache ───────────────────────────
-  if (components.cache) {
-    b.node("cache").at(W/2 - 65, nextY).rect(130, 48, 12)
-      .label("Cache", { ... });
-    nextY += 70;
-  }
-
-  // ── Conditional: Database ────────────────────────
-  if (components.database) {
-    b.node("database").at(W/2 - 70, nextY).rect(140, 52, 12)
-      .image("/db.svg", 20, 20, { dx: -42, position: "center" })
-      .label("Database", { ... });
-  }
-
-  // ── Edges adapt to topology ──────────────────────
-  clients.forEach(client => {
-    b.edge(client.id, "cloud", `e-${client.id}-cloud`).arrow(true);
-  });
-
+  // Edges adapt to topology
   if (components.loadBalancer) {
-    b.edge("cloud", "lb", "e-cloud-lb").arrow(true);
-    for (let i = 0; i < totalServers; i++) {
-      b.edge("lb", `server-${i}`, `e-lb-server-${i}`).arrow(true);
-    }
+    b.edge("cloud", "lb").arrow(true);
+    for (let i = 0; i < totalServers; i++)
+      b.edge("lb", `server-${i}`).arrow(true);
   } else {
-    b.edge("cloud", "server-0", "e-cloud-server").arrow(true);
-  }
-
-  const dbSource = components.cache ? "cache" : "server-0";
-  if (components.database) {
-    b.edge(dbSource, "database", "e-to-db").arrow(true);
+    b.edge("cloud", "server-0").arrow(true);
   }
 
   return b;
@@ -454,110 +440,47 @@ const scene = (() => {
 
 **Key rules:**
 - Use `nextY` tracker — never hardcode absolute Y for conditional nodes.
-- All entity loops (clients, servers) must iterate the full dynamic collection.
-- Edge topology adapts: cloud→LB→servers when LB present, cloud→server-0 otherwise.
-- Use `.image()` with `position: "center"` and `dx`/`dy` offsets to place icons **inside** nodes. Never use `position: "left"` or `"right"` — they place icons outside the node bounds.
+- All entity loops must iterate the full dynamic collection.
+- Edge topology adapts to component presence.
+- Client row centering: use `(clients.length - 1) * gap + nodeWidth` for actual row width.
 
 ## Using icons with `.image()`
-
-VizCraft supports embedding images inside nodes:
 
 ```typescript
 .image(href, width, height, { dx?, dy?, position? })
 ```
 
-- `href`: path to SVG/PNG (use `/filename.svg` for files in `public/`)
-- `position`: `"center"` | `"above"` | `"below"` | `"left"` | `"right"`
 - **Always use `"center"`** and offset with `dx`/`dy` to position inside the node
 - `"left"` and `"right"` place the image **outside** the node boundary — avoid these
-
-Example:
-
-```typescript
-b.node("server-0")
-  .rect(150, 56, 12)
-  .image("/server.svg", 20, 20, { dx: -50, dy: -6, position: "center" })
-  .label("HTTP Server", { fill: "#fff", fontSize: 13, dx: 8, dy: -6 });
-```
-
-When using an icon + label together, offset the label with a positive `dx` to avoid overlap.
-
-## Animation: treating entities as reusable units
-
-**Critical pattern:** When animating collections (clients sending traffic, servers responding), always iterate the full dynamic collection. Never hardcode counts.
-
-```typescript
-// WRONG — only first 3 clients animate
-await animateParallel(
-  rt().clients.slice(0, 3).map(c => ({ from: c.id, to: "cloud" })),
-  700,
-);
-
-// CORRECT — all clients animate
-await animateParallel(
-  rt().clients.map(c => ({ from: c.id, to: "cloud" })),
-  700,
-);
-```
-
-Entities added dynamically (via `addClient`, `addComponent`) are instantiated identically to their counterparts. The scene builder, edge wiring, and animation logic must treat them uniformly.
-
-## Signal routing adapts to topology
-
-When the architecture changes, signal destinations change:
-
-```typescript
-// In "send-traffic" step:
-const target = rt().components.loadBalancer ? "lb" : "server-0";
-await animateSignal("cloud", target, 600);
-
-// In "db-flow" step:
-const dbSource = rt().components.cache ? "cache" : "server-0";
-await animateSignal(dbSource, "database", 700);
-```
-
-## Overlay: conditional annotations
-
-Show warnings/annotations only when relevant:
-
-```typescript
-if (!components.database && droppedRequests > 0) {
-  b.overlay((o) => {
-    o.add("text", {
-      x: W / 2 + 120, y: nextY - 30,
-      text: "Single point of failure!",
-      fill: "#ef4444", fontSize: 14, fontWeight: 700,
-    }, { key: "spof-label" });
-  });
-}
-```
+- When using icon + label together, offset the label with a positive `dx` to avoid overlap
 
 ## Common sandbox-specific mistakes
 
-1. **Switching on step index instead of StepKey** — animations break when steps are conditionally included/removed.
-2. **Hardcoding `.slice(0, N)` on dynamic collections** — new entities won't animate. Iterate the full collection.
-3. **Forgetting `resetSimulation()` after component toggle** — step index points to a now-invalid position.
-4. **Forgetting cascade removals** — removing DB should also remove cache; removing LB should remove extra servers.
-5. **Using `position: "left"` for `.image()`** — places icon outside node. Use `"center"` with `dx` offset.
-6. **Displaying `throughput/maxCapacity` instead of `requestsPerSecond/maxCapacity`** — throughput is capped at max, hiding overload. Show demand vs capacity.
-7. **Not using `runtimeRef.current` in async animation code** — the closure captures stale state. Always access fresh state via ref.
-8. **Hardcoding edge topology** — edges must adapt. Cloud→LB→servers when LB exists, cloud→server-0 otherwise.
-9. **Not bumping `nextY` for conditional nodes** — scene layout collapses or overlaps.
+1. **Repeating signal paths across steps** — "send-traffic" animates the full path including DB, then "db-flow" repeats server→DB. Each step must own a unique flow.
+2. **Switching on step index instead of StepKey** — animations break when steps are conditionally included/removed.
+3. **Writing imperative animation code per step** — use the declarative STEPS config and the generic executor instead.
+4. **Hardcoding `.slice(0, N)` on dynamic collections** — new entities won't animate. Iterate the full collection. Use `$tokens` for this.
+5. **Forgetting `resetSimulation()` after component toggle** — step index points to a now-invalid position.
+6. **Forgetting cascade removals** — removing DB should also remove cache; removing LB should remove extra servers.
+7. **Using `position: "left"` for `.image()`** — places icon outside node. Use `"center"` with `dx` offset.
+8. **Displaying `throughput/maxCapacity` instead of `requestsPerSecond/maxCapacity`** — throughput is capped at max, hiding overload.
+9. **Not using `runtimeRef.current` in async animation code** — the closure captures stale state.
+10. **Hardcoding edge topology** — edges must adapt. Cloud→LB→servers when LB exists, cloud→server-0 otherwise.
 
 ## Execution checklist
 
 When creating a new sandbox plugin:
 
-1. [ ] Define `ComponentName`, `InfraComponents` interface, `PREREQUISITES`, `CASCADE_REMOVE`
-2. [ ] Write capacity model (`getMaxCapacity`) and `computeMetrics`
-3. [ ] Create slice with `addComponent`/`removeComponent` + prerequisite/cascade logic
-4. [ ] Define `StepKey` union and `TaggedStep extends DemoStep`
-5. [ ] Write `buildSteps(state)` with conditional steps and dynamic `nextButtonText`
-6. [ ] Create Controls component with TOGGLES array + `resetSimulation()` on every toggle
-7. [ ] Write step-key–based animation hook using `buildSteps(runtime)[currentStep]?.key`
-8. [ ] Build dynamic scene with `nextY` tracker, conditional nodes, adaptive edges
-9. [ ] Use `.image()` with `position: "center"` for node icons
-10. [ ] Register plugin with `Controls: MyControls` in DemoPlugin
-11. [ ] Verify animations iterate ALL dynamic entities (clients, servers)
-12. [ ] Test: add component → step list updates → animation matches new steps
+1. [ ] Run `npm run generate my-plugin --sandbox --category "Category"`
+2. [ ] Define `InfraComponents` interface with your togglable components
+3. [ ] Set up `PREREQUISITES` and `CASCADE_REMOVE` maps
+4. [ ] Write capacity model (`getMaxCapacity`) and `computeMetrics`
+5. [ ] Add `StepKey` entries for each component-specific step
+6. [ ] Define `expandToken` mappings for your `$token` names
+7. [ ] Configure `STEPS` array — each step with a **unique** flow (no overlap)
+8. [ ] Add component TOGGLES in `controls.tsx` with `resetSimulation()` on every toggle
+9. [ ] Build dynamic scene with `nextY` tracker, conditional nodes, adaptive edges
+10. [ ] Use `.image()` with `position: "center"` for node icons
+11. [ ] Verify each step's flow is unique — no two steps animate the same from→to
+12. [ ] Test: add component → step list updates → animation matches
 13. [ ] Test: remove component → cascaded deps removed → step list shrinks → no crash
