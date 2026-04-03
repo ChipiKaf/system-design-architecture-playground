@@ -6,6 +6,7 @@ import BigOPlugin from "./plugins/big-o";
 import EventLoopPlugin from "./plugins/event-loop";
 import EcsAutoscalingPlugin from "./plugins/ecs-autoscaling";
 import PalindromePlugin from "./plugins/palindrome";
+import ScalabilityPlugin from "./plugins/scalability";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -41,7 +42,12 @@ export const categories: PluginCategory[] = [
     description:
       "Core infrastructure components — load balancers, message brokers, caching layers, and more.",
     accent: "#3b82f6",
-    plugins: [LoadBalancerPlugin, EventStreamingPlugin, EcsAutoscalingPlugin],
+    plugins: [
+      LoadBalancerPlugin,
+      EventStreamingPlugin,
+      EcsAutoscalingPlugin,
+      ScalabilityPlugin,
+    ],
   },
   {
     id: "architecture",

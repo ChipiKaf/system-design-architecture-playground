@@ -134,6 +134,11 @@ const Shell: React.FC<ShellProps> = ({ plugin, category }) => {
         />
 
         <div className="visualization-container">
+          {plugin.Controls && (
+            <div className="plugin-controls">
+              <plugin.Controls />
+            </div>
+          )}
           <plugin.Component onAnimationComplete={handleAnimationComplete} />
         </div>
       </div>
