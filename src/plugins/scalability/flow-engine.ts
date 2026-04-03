@@ -168,8 +168,33 @@ export const STEPS: StepDef[] = [
     explain: (s) =>
       `Load balanced across ${1 + s.components.extraServers} server(s). Max capacity: ~${s.maxCapacity} rps.`,
   },
-
-  /* ─── 5. Server ↔ Database ────────────────────────────
+  /* ─── 5. Cache Hits ───────────────────────────────────
+     Unique flow: servers ↔ cache.
+     NOT shown in send-traffic.                           */
+  {
+    key: "cache-hits",
+    label: "Cache Boosts Throughput",
+    when: (c) => c.cache,
+    nextButtonColor: "#f97316",
+    phase: "cache-hits",
+    flow: [
+      {
+        from: "$servers",
+        to: "cache",
+        duration: 500,
+        explain: "Servers check the cache for recent data.",
+      },
+      {
+        from: "cache",
+        to: "$servers",
+        duration: 400,
+        explain: "Cache hit — fast response, no DB round-trip needed.",
+      },
+    ],
+    explain: (s) =>
+      `Cache boosted throughput to ~${s.maxCapacity} rps. Response time: ${s.responseTimeMs}ms.`,
+  },
+  /* ─── 6. Server ↔ Database ────────────────────────────
      Unique flow: servers ↔ DB.
      NOT shown in send-traffic.                           */
   {
@@ -196,33 +221,6 @@ export const STEPS: StepDef[] = [
     ],
     explain: (s) =>
       `Database responds to ${1 + s.components.extraServers} server(s). Max capacity: ~${s.maxCapacity} rps.`,
-  },
-
-  /* ─── 6. Cache Hits ───────────────────────────────────
-     Unique flow: servers ↔ cache.
-     NOT shown in send-traffic.                           */
-  {
-    key: "cache-hits",
-    label: "Cache Boosts Throughput",
-    when: (c) => c.cache,
-    nextButtonColor: "#f97316",
-    phase: "cache-hits",
-    flow: [
-      {
-        from: "$servers",
-        to: "cache",
-        duration: 500,
-        explain: "Servers check the cache for recent data.",
-      },
-      {
-        from: "cache",
-        to: "$servers",
-        duration: 400,
-        explain: "Cache hit — fast response, no DB round-trip needed.",
-      },
-    ],
-    explain: (s) =>
-      `Cache boosted throughput to ~${s.maxCapacity} rps. Response time: ${s.responseTimeMs}ms.`,
   },
 
   /* ─── 7. Horizontal Scale-Out ─────────────────────────
