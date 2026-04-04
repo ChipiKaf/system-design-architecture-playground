@@ -1,12 +1,14 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { type RootState } from "../../store/store";
-import { dispatchRequest } from "./loadBalancerSlice";
+import { dispatchRequest, type LoadBalancerState } from "./loadBalancerSlice";
 
 export const useLoadBalancerAnimation = (onAnimationComplete?: () => void) => {
   const dispatch = useDispatch();
   const { currentStep } = useSelector((state: RootState) => state.simulation);
-  const loadBalancer = useSelector((state: RootState) => state.loadBalancer);
+  const loadBalancer = useSelector(
+    (state: RootState) => state.loadBalancer,
+  ) as LoadBalancerState;
 
   useEffect(() => {
     if (currentStep === 0) {

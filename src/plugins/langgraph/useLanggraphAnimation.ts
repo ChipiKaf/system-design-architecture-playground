@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import type { SignalOverlayParams } from "vizcraft";
 import { type RootState } from "../../store/store";
 import {
-  setPhase,
   activateNode,
   completeNode,
   updateGraphData,
@@ -19,7 +18,9 @@ export type Signal = { id: string } & SignalOverlayParams;
 export const useLanggraphAnimation = (onAnimationComplete?: () => void) => {
   const dispatch = useDispatch();
   const { currentStep } = useSelector((state: RootState) => state.simulation);
-  const lgState = useSelector((state: RootState) => state.langgraph);
+  const lgState = useSelector(
+    (state: RootState) => state.langgraph,
+  ) as LanggraphState;
   const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
   const [signals, setSignals] = useState<Signal[]>([]);
   const rafRef = useRef<number>(0);

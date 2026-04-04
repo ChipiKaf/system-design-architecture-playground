@@ -16,10 +16,7 @@ import {
   CanvasStage,
 } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
-import {
-  useEcsAutoscalingAnimation,
-  type Signal,
-} from "./useEcsAutoscalingAnimation";
+import { useEcsAutoscalingAnimation } from "./useEcsAutoscalingAnimation";
 import {
   adjustClients,
   setDatabase,
@@ -57,7 +54,7 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
   onAnimationComplete,
 }) => {
   const dispatch = useDispatch();
-  const { runtime, currentStep, signals, phase } =
+  const { runtime, signals, phase } =
     useEcsAutoscalingAnimation(onAnimationComplete);
   const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
   const containerRef = useRef<HTMLDivElement>(null!);
@@ -211,7 +208,6 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
         x: 430 + (i % 2) * 160,
         y: 70 + Math.floor(i / 2) * 90,
       };
-      const isRunning = task.status === "running";
       const isProvisioning = task.status === "provisioning";
       const isDraining = task.status === "draining";
 

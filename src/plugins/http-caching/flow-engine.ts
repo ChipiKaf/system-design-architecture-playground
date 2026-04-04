@@ -91,14 +91,20 @@ export const STEPS: StepDef[] = [
         from: "$clients",
         to: "internet",
         when: (s) =>
-          !(s.components.browserCache && !s.cacheExpired && s.cachePolicy === "max-age"),
+          !(
+            s.components.browserCache &&
+            !s.cacheExpired &&
+            s.cachePolicy === "max-age"
+          ),
         duration: 600,
         explain:
           "Browser sends GET /app.js over HTTPS. The TLS handshake secures the connection.",
       },
     ],
     explain: (s) =>
-      s.components.browserCache && !s.cacheExpired && s.cachePolicy === "max-age"
+      s.components.browserCache &&
+      !s.cacheExpired &&
+      s.cachePolicy === "max-age"
         ? "Cache is still fresh — the request went straight to browser cache. No network!"
         : "Request sent. Now checking the caching layers…",
   },
@@ -111,7 +117,9 @@ export const STEPS: StepDef[] = [
     processingText: "Checking…",
     nextButtonColor: "#22c55e",
     phase: (s) =>
-      !s.cacheExpired && s.cachePolicy === "max-age" ? "browser-hit" : "browser-validate",
+      !s.cacheExpired && s.cachePolicy === "max-age"
+        ? "browser-hit"
+        : "browser-validate",
     flow: [
       {
         // Fresh max-age: cache hit — response returns from browser cache directly
@@ -145,7 +153,8 @@ export const STEPS: StepDef[] = [
         to: "$clients",
         when: (s) => s.cachePolicy === "no-cache" && !s.cacheExpired,
         duration: 350,
-        explain: "304 Not Modified — cached content confirmed valid. Served with minimal bandwidth.",
+        explain:
+          "304 Not Modified — cached content confirmed valid. Served with minimal bandwidth.",
       },
     ],
     recalcMetrics: true,
@@ -182,7 +191,7 @@ export const STEPS: StepDef[] = [
         duration: 400,
         explain:
           "CDN cache HIT — response returns from the edge. No origin needed.",
-        when: (c) => c.cdn,
+        when: (c) => c.components.cdn,
       },
     ],
     recalcMetrics: true,
@@ -202,7 +211,9 @@ export const STEPS: StepDef[] = [
     // Show origin whenever the browser ISN'T serving a fresh max-age hit AND there's no CDN
     when: (s) => {
       const browserServesFresh =
-        s.components.browserCache && !s.cacheExpired && s.cachePolicy === "max-age";
+        s.components.browserCache &&
+        !s.cacheExpired &&
+        s.cachePolicy === "max-age";
       return !browserServesFresh && !s.components.cdn;
     },
     phase: "origin",

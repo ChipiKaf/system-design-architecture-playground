@@ -8,6 +8,7 @@ import {
   consumeAllStoreWorkers,
   consumeBroadcast,
   catchUpBroadcast,
+  type EventStreamingState,
 } from "./eventStreamingSlice";
 
 const KEYS = ["user-1", "user-2", "user-3", "order-A", "order-B", "session-X"];
@@ -37,7 +38,9 @@ export const useEventStreamingAnimation = (
 ) => {
   const dispatch = useDispatch();
   const { currentStep } = useSelector((state: RootState) => state.simulation);
-  const streaming = useSelector((state: RootState) => state.eventStreaming);
+  const streaming = useSelector(
+    (state: RootState) => state.eventStreaming,
+  ) as EventStreamingState;
   const [animPhase, setAnimPhase] = useState<AnimPhase>("idle");
   const [signals, setSignals] = useState<Signal[]>([]);
   const rafRef = useRef<number>(undefined!);

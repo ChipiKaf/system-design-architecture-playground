@@ -7,6 +7,7 @@ import {
   pushConsoleOutput,
   reset,
   type EventLoopPhase,
+  type EventLoopState,
 } from "./eventLoopSlice";
 
 export type Signal = { id: string } & SignalOverlayParams;
@@ -22,7 +23,9 @@ export type Signal = { id: string } & SignalOverlayParams;
 export const useEventLoopAnimation = (onAnimationComplete?: () => void) => {
   const dispatch = useDispatch();
   const { currentStep } = useSelector((state: RootState) => state.simulation);
-  const runtime = useSelector((state: RootState) => state.eventLoop);
+  const runtime = useSelector(
+    (state: RootState) => state.eventLoop,
+  ) as EventLoopState;
   const [signals, setSignals] = useState<Signal[]>([]);
   const rafRef = useRef<number>(0);
   const timeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);

@@ -9,6 +9,7 @@ import {
   setLinearChecks,
   setPhase,
   setQuadraticPreviewCount,
+  type BigOState,
 } from "./bigOSlice";
 
 const buildBinaryFrames = (size: number, target: number) => {
@@ -45,7 +46,7 @@ const buildBinaryFrames = (size: number, target: number) => {
 export const useBigOAnimation = (onAnimationComplete?: () => void) => {
   const dispatch = useDispatch();
   const { currentStep } = useSelector((state: RootState) => state.simulation);
-  const bigO = useSelector((state: RootState) => state.bigO);
+  const bigO = useSelector((state: RootState) => state.bigO) as BigOState;
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined!);
   const onCompleteRef = useRef(onAnimationComplete);
 

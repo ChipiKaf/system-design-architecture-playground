@@ -5,7 +5,7 @@ import { viz, type SignalOverlayParams } from "vizcraft";
 import { useConceptModal, ConceptPills } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 
-import { setChannelMode, type NodePatch } from "./langgraphSlice";
+import { setChannelMode } from "./langgraphSlice";
 import { useDispatch } from "react-redux";
 
 interface Props {
@@ -32,7 +32,7 @@ const NODES = {
 } as const;
 
 const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
-  const { lgState, currentStep, animPhase, signals } =
+  const { lgState, animPhase, signals } =
     useLanggraphAnimation(onAnimationComplete);
 
   const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
@@ -69,14 +69,6 @@ const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     if (s === "active") return active;
     if (s === "completed") return active;
     return idle;
-  };
-
-  const opacity = (id: string) => {
-    // Dim the "simple" branch when complex is chosen
-    if (id === "simple" && graphData.route === "complex") return 0.35;
-    if (id === "simple" && graphData.route === null && currentStep > 1)
-      return 0.35;
-    return 1;
   };
 
   /* ── Build VizCraft scene ───────────────────────────────── */
@@ -532,7 +524,7 @@ const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     if (animPhase === "planning") e5.animate("flow", { duration: "1s" });
 
     // Planner → Tasks (Send edges)
-    (["task-0", "task-1", "task-2"] as const).forEach((t, i) => {
+    (["task-0", "task-1", "task-2"] as const).forEach((t) => {
       const e = b
         .edge("planner", t, `e-planner-${t}`)
         .arrow(true)
@@ -553,8 +545,7 @@ const LanggraphVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     });
 
     // Merge → Review
-    const e6 = b
-      .edge("merge", "review", "e-merge-review")
+    b.edge("merge", "review", "e-merge-review")
       .arrow(true)
       .stroke(isInterrupted ? "#ef4444" : "#334155", isInterrupted ? 1.5 : 1);
 

@@ -17,10 +17,7 @@ import {
 } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 import { tickCacheAge } from "./httpCachingSlice";
-import {
-  useHttpCachingAnimation,
-  type Signal,
-} from "./useHttpCachingAnimation";
+import { useHttpCachingAnimation } from "./useHttpCachingAnimation";
 import "./main.scss";
 
 interface Props {

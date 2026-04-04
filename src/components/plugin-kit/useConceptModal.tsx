@@ -28,7 +28,10 @@ export function useConceptModal<K extends string>(
 ) {
   const [activeConcept, setActiveConcept] = useState<K | null>(null);
 
-  const openConcept = useCallback((key: K) => setActiveConcept(key), []);
+  const openConcept = useCallback(
+    (key: string) => setActiveConcept(key as K),
+    [],
+  );
   const closeConcept = useCallback(() => setActiveConcept(null), []);
 
   const ConceptModal: React.FC = () => {
