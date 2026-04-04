@@ -7,6 +7,7 @@ import EventLoopPlugin from "./plugins/event-loop";
 import EcsAutoscalingPlugin from "./plugins/ecs-autoscaling";
 import PalindromePlugin from "./plugins/palindrome";
 import ScalabilityPlugin from "./plugins/scalability";
+import HttpCachingPlugin from "./plugins/http-caching";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -47,6 +48,7 @@ export const categories: PluginCategory[] = [
       EventStreamingPlugin,
       EcsAutoscalingPlugin,
       ScalabilityPlugin,
+      HttpCachingPlugin,
     ],
   },
   {

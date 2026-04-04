@@ -124,23 +124,6 @@ export const STEPS: StepDef[] = [
       `Traffic flowing. ${s.requestsPerSecond} rps demand, ${s.maxCapacity} capacity. CPU at ${s.serverCpuPercent}%.`,
   },
 
-  /* ─── 3. Observe Metrics ──────────────────────────────
-     No animation — pause and read the numbers.           */
-  {
-    key: "observe-metrics",
-    label: "Observe Metrics",
-    // when: (c) => !c.loadBalancer,
-    nextButtonColor: "#2563eb",
-    recalcMetrics: true,
-    delay: 500,
-    phase: (s) => (s.droppedRequests > 0 ? "overloaded" : "stable"),
-    finalHotZones: ["server-0"],
-    explain: (s) =>
-      s.droppedRequests > 0
-        ? `Overloaded! ${s.droppedRequests} requests dropped. CPU at ${s.serverCpuPercent}%. This server is a single point of failure.`
-        : `Stable at ${s.throughput} rps, CPU ${s.serverCpuPercent}%. Try adding more clients or components to test limits.`,
-  },
-
   /* ─── 4. Load Balancer Distributes ────────────────────
      Unique flow: cloud → LB → all servers.
      NOT shown in send-traffic (which only hit server-0). */
@@ -167,6 +150,22 @@ export const STEPS: StepDef[] = [
     ],
     explain: (s) =>
       `Load balanced across ${1 + s.components.extraServers} server(s). Max capacity: ~${s.maxCapacity} rps.`,
+  },
+  /* ─── 3. Observe Metrics ──────────────────────────────
+     No animation — pause and read the numbers.           */
+  {
+    key: "observe-metrics",
+    label: "Observe Metrics",
+    // when: (c) => !c.loadBalancer,
+    nextButtonColor: "#2563eb",
+    recalcMetrics: true,
+    delay: 500,
+    phase: (s) => (s.droppedRequests > 0 ? "overloaded" : "stable"),
+    finalHotZones: ["server-0"],
+    explain: (s) =>
+      s.droppedRequests > 0
+        ? `Overloaded! ${s.droppedRequests} requests dropped. CPU at ${s.serverCpuPercent}%. This server is a single point of failure.`
+        : `Stable at ${s.throughput} rps, CPU ${s.serverCpuPercent}%. Try adding more clients or components to test limits.`,
   },
   /* ─── 5. Cache Hits ───────────────────────────────────
      Unique flow: servers ↔ cache.
