@@ -172,7 +172,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
 
   subsequence: {
     title: "Subsequence vs Substring",
-    subtitle: "Order matters, but gaps are allowed — and this changes the algorithm",
+    subtitle:
+      "Order matters, but gaps are allowed — and this changes the algorithm",
     accentColor: "#14b8a6",
     sections: [
       {
@@ -204,25 +205,26 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <div>
             <p>
-              When <code style={{ color: "#fbbf24" }}>text1[i-1] ≠ text2[j-1]</code>,
-              at least one character can't be in the LCS at this position.
-              Since a <strong>subsequence allows gaps</strong>, we can skip
-              either character and keep going:
+              When{" "}
+              <code style={{ color: "#fbbf24" }}>text1[i-1] ≠ text2[j-1]</code>,
+              at least one character can't be in the LCS at this position. Since
+              a <strong>subsequence allows gaps</strong>, we can skip either
+              character and keep going:
             </p>
             <ul style={{ color: "#e2e8f0", paddingLeft: 20, lineHeight: 1.8 }}>
               <li>
-                <strong>↑ Skip from text1</strong>: maybe the LCS doesn't
-                use text1[i-1] → check dp[i-1][j]
+                <strong>↑ Skip from text1</strong>: maybe the LCS doesn't use
+                text1[i-1] → check dp[i-1][j]
               </li>
               <li>
-                <strong>← Skip from text2</strong>: maybe the LCS doesn't
-                use text2[j-1] → check dp[i][j-1]
+                <strong>← Skip from text2</strong>: maybe the LCS doesn't use
+                text2[j-1] → check dp[i][j-1]
               </li>
             </ul>
             <p>
-              We take <code style={{ color: "#fbbf24" }}>max()</code> because
-              we want the <em>longest</em> result. The subsequence we've
-              built so far survives — we just skip past this mismatch.
+              We take <code style={{ color: "#fbbf24" }}>max()</code> because we
+              want the <em>longest</em> result. The subsequence we've built so
+              far survives — we just skip past this mismatch.
             </p>
           </div>
         ),
@@ -248,7 +250,7 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
                   border: "1px solid #166534",
                 }}
               >
-{`// Sub-SEQUENCE (this viz)
+                {`// Sub-SEQUENCE (this viz)
 if match:
   dp[i][j] = dp[i-1][j-1]+1
 else:
@@ -266,7 +268,7 @@ else:
                   border: "1px solid #78350f",
                 }}
               >
-{`// Sub-STRING (contiguous)
+                {`// Sub-STRING (contiguous)
 if match:
   dp[i][j] = dp[i-1][j-1]+1
 else:
@@ -275,14 +277,15 @@ else:
               </pre>
             </div>
             <p style={{ marginTop: 10 }}>
-              The critical difference: on a <strong>mismatch</strong>,
-              substring resets to <strong>0</strong> because any gap breaks
-              the streak. Subsequence takes the <code style={{ color: "#fbbf24" }}>max</code> because
-              gaps are allowed — the best result so far survives.
+              The critical difference: on a <strong>mismatch</strong>, substring
+              resets to <strong>0</strong> because any gap breaks the streak.
+              Subsequence takes the{" "}
+              <code style={{ color: "#fbbf24" }}>max</code> because gaps are
+              allowed — the best result so far survives.
             </p>
             <p style={{ color: "#94a3b8", marginTop: 6, fontStyle: "italic" }}>
-              This is why subsequence ≥ substring for the same inputs.
-              "ace" is a subsequence of "abcde" but not a substring.
+              This is why subsequence ≥ substring for the same inputs. "ace" is
+              a subsequence of "abcde" but not a substring.
             </p>
           </div>
         ),
@@ -334,15 +337,17 @@ else:
         content: (
           <div>
             <p>
-              The recurrence reaches back to <code style={{ color: "#fbbf24" }}>dp[i-1][j-1]</code>,{" "}
+              The recurrence reaches back to{" "}
+              <code style={{ color: "#fbbf24" }}>dp[i-1][j-1]</code>,{" "}
               <code style={{ color: "#fbbf24" }}>dp[i-1][j]</code>, and{" "}
-              <code style={{ color: "#fbbf24" }}>dp[i][j-1]</code>.
-              When <strong>i=1</strong> or <strong>j=1</strong>, that reaches row 0 or column 0.
+              <code style={{ color: "#fbbf24" }}>dp[i][j-1]</code>. When{" "}
+              <strong>i=1</strong> or <strong>j=1</strong>, that reaches row 0
+              or column 0.
             </p>
             <p>
-              If those didn't exist, every cell on the first real row/column would
-              need a special <code style={{ color: "#fbbf24" }}>if</code> check
-              to avoid going out of bounds.
+              If those didn't exist, every cell on the first real row/column
+              would need a special <code style={{ color: "#fbbf24" }}>if</code>{" "}
+              check to avoid going out of bounds.
             </p>
           </div>
         ),
@@ -353,14 +358,15 @@ else:
         content: (
           <div>
             <p>
-              Row 0 means <em>"0 characters used from text1"</em> — i.e. the empty
-              string <code style={{ color: "#fbbf24" }}>""</code>. Column 0 means
-              the same for text2.
+              Row 0 means <em>"0 characters used from text1"</em> — i.e. the
+              empty string <code style={{ color: "#fbbf24" }}>""</code>. Column
+              0 means the same for text2.
             </p>
             <p>
-              The LCS of <strong>anything</strong> vs <code style={{ color: "#fbbf24" }}>""</code> is
-              trivially <strong>0</strong>. That's why the entire first row and
-              first column are filled with 0.
+              The LCS of <strong>anything</strong> vs{" "}
+              <code style={{ color: "#fbbf24" }}>""</code> is trivially{" "}
+              <strong>0</strong>. That's why the entire first row and first
+              column are filled with 0.
             </p>
           </div>
         ),
@@ -380,15 +386,16 @@ else:
                 border: "1px solid #831843",
               }}
             >
-{`Array(m + 1)  // not m!
+              {`Array(m + 1)  // not m!
      ^
      extra slot for ""`}
             </pre>
             <p>
               The <code style={{ color: "#fbbf24" }}>+1</code> in{" "}
-              <code style={{ color: "#fbbf24" }}>Array(m+1)</code> isn’t arbitrary —
-              it creates space for the <code style={{ color: "#fbbf24" }}>""</code> base
-              case so the recurrence can <strong>always</strong> safely look at{" "}
+              <code style={{ color: "#fbbf24" }}>Array(m+1)</code> isn’t
+              arbitrary — it creates space for the{" "}
+              <code style={{ color: "#fbbf24" }}>""</code> base case so the
+              recurrence can <strong>always</strong> safely look at{" "}
               <code style={{ color: "#fbbf24" }}>[i-1]</code> and{" "}
               <code style={{ color: "#fbbf24" }}>[j-1]</code> without bounds
               checking.

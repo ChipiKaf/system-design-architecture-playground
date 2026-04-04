@@ -168,11 +168,16 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   // ── Build VizCraft scene ────────────────────────────────
   const nullPhaseW = GRID_X + rows * (CELL + GAP) + 60;
   const zeroPhaseW = GRID_X + cols * (CELL + GAP) + 220;
+  const fillPhaseW = GRID_X + cols * (CELL + GAP) + 180;
   const gridPhaseW = GRID_X + cols * (CELL + GAP) + 40;
-  const W = phase === "init-zero"
-    ? Math.max(zeroPhaseW, gridPhaseW)
-    : Math.max(nullPhaseW, gridPhaseW);
-  const H = GRID_Y + rows * (CELL + GAP) + 30;
+  const W =
+    phase === "init-zero"
+      ? Math.max(zeroPhaseW, gridPhaseW)
+      : isFillPhase(phase)
+        ? Math.max(fillPhaseW, gridPhaseW)
+        : Math.max(nullPhaseW, gridPhaseW);
+  const fillAnnotationH = isFillPhase(phase) ? 50 : 0;
+  const H = GRID_Y + rows * (CELL + GAP) + 30 + fillAnnotationH;
 
   const scene = (() => {
     const b = viz().view(W, H);
@@ -741,114 +746,322 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       const toCx = GRID_X + currentCol * (CELL + GAP) + (CELL + GAP) / 2;
       const toCy = GRID_Y + currentRow * (CELL + GAP) + (CELL + GAP) / 2;
 
-      // During "filling" phase (compare), show all 3 candidate source cells
-      // During "match"/"noMatch" phase (resolve), show only the chosen one
-      const sources: {
-        r: number;
-        c: number;
-        label: string;
-        color: string;
-        chosen: boolean;
-      }[] = [];
+      const char1 = text1[currentRow - 1];
+      const char2 = text2[currentCol - 1];
+      const diagVal = dp[currentRow - 1]?.[currentCol - 1] ?? 0;
+      const upVal = dp[currentRow - 1]?.[currentCol] ?? 0;
+      const leftVal = dp[currentRow]?.[currentCol - 1] ?? 0;
+      const t1Before = text1.slice(0, currentRow - 1);
+      const t2Before = text2.slice(0, currentCol - 1);
+      const t1Full = text1.slice(0, currentRow);
+      const t2Full = text2.slice(0, currentCol);
 
       if (phase === "filling") {
-        // Show all three source cells as candidates
-        sources.push({
-          r: currentRow - 1,
-          c: currentCol - 1,
-          label: "↖",
-          color: "#a78bfa",
-          chosen: false,
-        });
-        sources.push({
-          r: currentRow - 1,
-          c: currentCol,
-          label: "↑",
-          color: "#60a5fa",
-          chosen: false,
-        });
-        sources.push({
-          r: currentRow,
-          c: currentCol - 1,
-          label: "←",
-          color: "#60a5fa",
-          chosen: false,
-        });
-      } else if (phase === "match" && currentStepData.isMatch) {
-        sources.push({
-          r: currentRow - 1,
-          c: currentCol - 1,
-          label: "↖ +1",
-          color: "#a78bfa",
-          chosen: true,
-        });
-      } else if (phase === "noMatch") {
-        if (currentStepData.from === "up") {
-          sources.push({
-            r: currentRow - 1,
-            c: currentCol,
-            label: "↑ max",
-            color: "#60a5fa",
-            chosen: true,
+        // ── Compare phase: show all 3 candidates with faint dashes ──
+        const candidates = [
+          { r: currentRow - 1, c: currentCol - 1, color: "#a78bfa" },
+          { r: currentRow - 1, c: currentCol, color: "#60a5fa" },
+          { r: currentRow, c: currentCol - 1, color: "#60a5fa" },
+        ];
+        b.overlay((o) => {
+          candidates.forEach((src, idx) => {
+            const fx = GRID_X + src.c * (CELL + GAP) + (CELL + GAP) / 2;
+            const fy = GRID_Y + src.r * (CELL + GAP) + (CELL + GAP) / 2;
+            o.add(
+              "line",
+              {
+                x1: fx,
+                y1: fy,
+                x2: toCx,
+                y2: toCy,
+                stroke: src.color,
+                strokeWidth: 1.2,
+                opacity: 0.3,
+                strokeDasharray: "4,3",
+              },
+              { key: `cand-line-${idx}` },
+            );
           });
-        } else {
-          sources.push({
-            r: currentRow,
-            c: currentCol - 1,
-            label: "← max",
-            color: "#60a5fa",
-            chosen: true,
-          });
-        }
-      }
+        });
+      } else if (phase === "match") {
+        // ── Match: diagonal arrow + annotation ──
+        const diagCx =
+          GRID_X + (currentCol - 1) * (CELL + GAP) + (CELL + GAP) / 2;
+        const diagCy =
+          GRID_Y + (currentRow - 1) * (CELL + GAP) + (CELL + GAP) / 2;
 
-      b.overlay((o) => {
-        sources.forEach((src, idx) => {
-          const fromCx = GRID_X + src.c * (CELL + GAP) + (CELL + GAP) / 2;
-          const fromCy = GRID_Y + src.r * (CELL + GAP) + (CELL + GAP) / 2;
-
-          // Draw a line from source to current cell
+        b.overlay((o) => {
+          // Arrow line from diagonal → current
           o.add(
             "line",
             {
-              x1: fromCx,
-              y1: fromCy,
+              x1: diagCx,
+              y1: diagCy,
               x2: toCx,
               y2: toCy,
-              stroke: src.color,
-              strokeWidth: src.chosen ? 2.5 : 1.2,
-              opacity: src.chosen ? 0.9 : 0.35,
-              strokeDasharray: src.chosen ? "none" : "4,3",
+              stroke: "#a78bfa",
+              strokeWidth: 2.5,
+              opacity: 0.9,
             },
-            { key: `arrow-line-${idx}` },
+            { key: "match-line" },
+          );
+          // Arrow label
+          const midX = (diagCx + toCx) / 2 - 8;
+          const midY = (diagCy + toCy) / 2 - 8;
+          o.add(
+            "text",
+            {
+              x: midX,
+              y: midY,
+              text: "↖ +1",
+              fill: "#a78bfa",
+              fontSize: 13,
+              fontWeight: 700,
+              textAnchor: "middle",
+            },
+            { key: "match-arrow" },
           );
 
-          // Arrow label at source
-          if (src.chosen) {
-            const midX = (fromCx + toCx) / 2;
-            const midY = (fromCy + toCy) / 2;
-            o.add(
-              "text",
-              {
-                x:
-                  midX +
-                  (src.label.includes("←")
-                    ? -10
-                    : src.label.includes("↑")
-                      ? 10
-                      : -8),
-                y: midY + (src.label.includes("↑") ? 0 : -8),
-                text: src.label,
-                fill: src.color,
-                fontSize: 12,
-                fontWeight: 700,
-                textAnchor: "middle",
-              },
-              { key: `arrow-lbl-${idx}` },
-            );
-          }
+          // Annotation below grid
+          const noteY = GRID_Y + rows * (CELL + GAP) + 14;
+          o.add(
+            "text",
+            {
+              x: GRID_X,
+              y: noteY,
+              text: `"${char1}" === "${char2}" → use both! Look ↖ before either char:`,
+              fill: "#c4b5fd",
+              fontSize: 10,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "match-n1" },
+          );
+          o.add(
+            "text",
+            {
+              x: GRID_X,
+              y: noteY + 14,
+              text: `↖ LCS("${t1Before}","${t2Before}") = ${diagVal}  →  ${diagVal} + 1 = ${diagVal + 1}`,
+              fill: "#a78bfa",
+              fontSize: 10,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "match-n2" },
+          );
         });
-      });
+      } else if (phase === "noMatch") {
+        // ── No match: two options with arrows + intuitive labels ──
+        const upCx = GRID_X + currentCol * (CELL + GAP) + (CELL + GAP) / 2;
+        const upCy =
+          GRID_Y + (currentRow - 1) * (CELL + GAP) + (CELL + GAP) / 2;
+        const leftCx =
+          GRID_X + (currentCol - 1) * (CELL + GAP) + (CELL + GAP) / 2;
+        const leftCy = GRID_Y + currentRow * (CELL + GAP) + (CELL + GAP) / 2;
+
+        const upWins = upVal >= leftVal;
+        const leftWins = leftVal > upVal;
+        const tie = upVal === leftVal;
+
+        b.overlay((o) => {
+          // ── Arrow from ↑ to current ──
+          o.add(
+            "line",
+            {
+              x1: upCx,
+              y1: upCy,
+              x2: toCx,
+              y2: toCy,
+              stroke: "#60a5fa",
+              strokeWidth: upWins || tie ? 2.5 : 1.2,
+              opacity: upWins || tie ? 0.9 : 0.3,
+              strokeDasharray: upWins || tie ? "none" : "4,3",
+            },
+            { key: "nm-up-line" },
+          );
+          // ↑ arrow label
+          o.add(
+            "text",
+            {
+              x: (upCx + toCx) / 2 + 8,
+              y: (upCy + toCy) / 2,
+              text: "↑",
+              fill: upWins || tie ? "#60a5fa" : "#334155",
+              fontSize: 14,
+              fontWeight: 700,
+              textAnchor: "middle",
+            },
+            { key: "nm-up-arrow" },
+          );
+
+          // ── Arrow from ← to current ──
+          o.add(
+            "line",
+            {
+              x1: leftCx,
+              y1: leftCy,
+              x2: toCx,
+              y2: toCy,
+              stroke: "#60a5fa",
+              strokeWidth: leftWins || tie ? 2.5 : 1.2,
+              opacity: leftWins || tie ? 0.9 : 0.3,
+              strokeDasharray: leftWins || tie ? "none" : "4,3",
+            },
+            { key: "nm-left-line" },
+          );
+          // ← arrow label
+          o.add(
+            "text",
+            {
+              x: (leftCx + toCx) / 2,
+              y: (leftCy + toCy) / 2 - 8,
+              text: "←",
+              fill: leftWins || tie ? "#60a5fa" : "#334155",
+              fontSize: 14,
+              fontWeight: 700,
+              textAnchor: "middle",
+            },
+            { key: "nm-left-arrow" },
+          );
+
+          // ── ↑ annotation: drop text1 char, keep all text2 ──
+          const upLabelX = upCx + CELL / 2 + 6;
+          o.add(
+            "text",
+            {
+              x: upLabelX,
+              y: upCy - 6,
+              text: `↑ Drop "${char1}" from text1`,
+              fill: upWins || tie ? "#93c5fd" : "#475569",
+              fontSize: 9,
+              fontWeight: 700,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "nm-up-drop" },
+          );
+          o.add(
+            "text",
+            {
+              x: upLabelX,
+              y: upCy + 6,
+              text: `Keep all of "${t2Full}"`,
+              fill: upWins || tie ? "#60a5fa88" : "#334155",
+              fontSize: 8,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "nm-up-keep" },
+          );
+          o.add(
+            "text",
+            {
+              x: upLabelX,
+              y: upCy + 17,
+              text: `= LCS("${t1Before}","${t2Full}") = ${upVal}`,
+              fill: upWins || tie ? "#60a5fa" : "#334155",
+              fontSize: 8,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "nm-up-val" },
+          );
+
+          // ── ← annotation: drop text2 char, keep all text1 ──
+          const leftLabelY = leftCy + CELL / 2 + 12;
+          o.add(
+            "text",
+            {
+              x: leftCx,
+              y: leftLabelY,
+              text: `← Drop "${char2}" from text2`,
+              fill: leftWins || tie ? "#93c5fd" : "#475569",
+              fontSize: 9,
+              fontWeight: 700,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "middle",
+            },
+            { key: "nm-left-drop" },
+          );
+          o.add(
+            "text",
+            {
+              x: leftCx,
+              y: leftLabelY + 12,
+              text: `Keep all of "${t1Full}"`,
+              fill: leftWins || tie ? "#60a5fa88" : "#334155",
+              fontSize: 8,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "middle",
+            },
+            { key: "nm-left-keep" },
+          );
+          o.add(
+            "text",
+            {
+              x: leftCx,
+              y: leftLabelY + 23,
+              text: `= LCS("${t1Full}","${t2Before}") = ${leftVal}`,
+              fill: leftWins || tie ? "#60a5fa" : "#334155",
+              fontSize: 8,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "middle",
+            },
+            { key: "nm-left-val" },
+          );
+
+          // ── Winner annotation below grid ──
+          const noteY = GRID_Y + rows * (CELL + GAP) + 14;
+          o.add(
+            "text",
+            {
+              x: GRID_X,
+              y: noteY,
+              text: `"${char1}" ≠ "${char2}" → can't use both. Which char do we drop?`,
+              fill: "#94a3b8",
+              fontSize: 10,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "nm-q" },
+          );
+
+          const winnerDir = tie ? "↑" : upWins ? "↑" : "←";
+          const winnerDrop = tie || upWins ? char1 : char2;
+          const winnerKeep = tie || upWins ? `"${t2Full}"` : `"${t1Full}"`;
+          const winnerVal = Math.max(upVal, leftVal);
+
+          o.add(
+            "text",
+            {
+              x: GRID_X,
+              y: noteY + 14,
+              text: `${winnerDir} Drop "${winnerDrop}", keep ${winnerKeep} → ${winnerVal} is better`,
+              fill: "#fbbf24",
+              fontSize: 10,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "nm-winner" },
+          );
+
+          o.add(
+            "text",
+            {
+              x: GRID_X,
+              y: noteY + 28,
+              text: `dp[${currentRow}][${currentCol}] = max(${upVal}, ${leftVal}) = ${winnerVal}`,
+              fill: "#60a5fa",
+              fontSize: 10,
+              fontWeight: 700,
+              fontFamily: '"JetBrains Mono", monospace',
+              textAnchor: "start",
+            },
+            { key: "nm-result" },
+          );
+        });
+      }
     }
 
     // ── Result: trace path highlight on answer ────────────
@@ -1035,33 +1248,41 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                 <div className="lcs-ij-grid">
                   <div className="lcs-ij-row">
                     <code className="lcs-ij-var">i</code>
-                    <span>= how many characters of <strong>text1</strong> we're considering</span>
+                    <span>
+                      = how many characters of <strong>text1</strong> we're
+                      considering
+                    </span>
                   </div>
                   <div className="lcs-ij-row">
                     <code className="lcs-ij-var">j</code>
-                    <span>= how many characters of <strong>text2</strong> we're considering</span>
+                    <span>
+                      = how many characters of <strong>text2</strong> we're
+                      considering
+                    </span>
                   </div>
                   <div className="lcs-ij-row">
                     <code className="lcs-ij-var">dp[i][j]</code>
                     <span>
-                      = LCS length of{" "}
-                      <code>text1[0..{"{i-1}"}]</code> and{" "}
+                      = LCS length of <code>text1[0..{"{i-1}"}]</code> and{" "}
                       <code>text2[0..{"{j-1}"}]</code>
                     </span>
                   </div>
                 </div>
                 {isFillPhase(phase) && currentRow > 0 && currentCol > 0 && (
                   <div className="lcs-ij-current">
-                    Right now: <code>dp[{currentRow}][{currentCol}]</code>
-                    {" "}= LCS(<code>"{text1.slice(0, currentRow)}"</code>,{" "}
+                    Right now:{" "}
+                    <code>
+                      dp[{currentRow}][{currentCol}]
+                    </code>{" "}
+                    = LCS(<code>"{text1.slice(0, currentRow)}"</code>,{" "}
                     <code>"{text2.slice(0, currentCol)}"</code>)
                   </div>
                 )}
                 <p className="lcs-ij-compare">
-                  <em>Compare with Coin Change</em>: there, <code>dp[i]</code> meant
-                  "min coins to make amount <strong>i</strong>." Here we have{" "}
-                  <strong>two strings</strong>, so we need <strong>two indices</strong> →
-                  a 2D table.
+                  <em>Compare with Coin Change</em>: there, <code>dp[i]</code>{" "}
+                  meant "min coins to make amount <strong>i</strong>." Here we
+                  have <strong>two strings</strong>, so we need{" "}
+                  <strong>two indices</strong> → a 2D table.
                 </p>
               </div>
             </div>
@@ -1078,8 +1299,8 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                   row 0 — which represents the empty string <code>""</code>.
                 </p>
                 <p style={{ marginTop: 6 }}>
-                  LCS of anything vs <code>""</code> = <strong>0</strong>.{" "}
-                  So <code>.fill(0)</code> <em>is</em> the base case. The{" "}
+                  LCS of anything vs <code>""</code> = <strong>0</strong>. So{" "}
+                  <code>.fill(0)</code> <em>is</em> the base case. The{" "}
                   <code>+1</code> in <code>Array(m+1)</code> creates space for
                   it — no bounds checking needed.
                 </p>
@@ -1105,29 +1326,35 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                 </p>
                 <div className="lcs-cell-examples">
                   <div className="lcs-cell-example">
-                    <strong>Row 0</strong> (highlighted):{" "}
-                    <code>dp[0][j]</code> = LCS(<code>""</code>, text2[0..j])
+                    <strong>Row 0</strong> (highlighted): <code>dp[0][j]</code>{" "}
+                    = LCS(<code>""</code>, text2[0..j])
                     <br />
                     <span style={{ color: "#f472b6" }}>
                       Empty string vs anything → always <strong>0</strong>
                     </span>
                   </div>
                   <div className="lcs-cell-example">
-                    <strong>Col 0</strong> (highlighted):{" "}
-                    <code>dp[i][0]</code> = LCS(text1[0..i], <code>""</code>)
+                    <strong>Col 0</strong> (highlighted): <code>dp[i][0]</code>{" "}
+                    = LCS(text1[0..i], <code>""</code>)
                     <br />
                     <span style={{ color: "#f472b6" }}>
                       Anything vs empty string → always <strong>0</strong>
                     </span>
                   </div>
                   <div className="lcs-cell-example">
-                    <strong>Inner cells</strong>:{" "}
-                    e.g. <code>dp[2][1]</code> = LCS("{text1.slice(0, 2)}", "{text2.slice(0, 1)}")
+                    <strong>Inner cells</strong>: e.g. <code>dp[2][1]</code> =
+                    LCS("{text1.slice(0, 2)}", "{text2.slice(0, 1)}")
                   </div>
                 </div>
-                <p style={{ marginTop: 6, fontStyle: "italic", color: "#64748b" }}>
-                  The <code>.fill(0)</code> sets every cell to 0. Row 0 and col 0
-                  stay 0 forever — that's the base case. Inner cells get
+                <p
+                  style={{
+                    marginTop: 6,
+                    fontStyle: "italic",
+                    color: "#64748b",
+                  }}
+                >
+                  The <code>.fill(0)</code> sets every cell to 0. Row 0 and col
+                  0 stay 0 forever — that's the base case. Inner cells get
                   overwritten during filling.
                 </p>
                 <button
@@ -1186,15 +1413,22 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                           had before both of them."
                         </p>
                         <div className="lcs-decision__why">
-                          <div className="lcs-decision__why-label">Why diagonal?</div>
+                          <div className="lcs-decision__why-label">
+                            Why diagonal?
+                          </div>
                           <p>
                             Since "{char1}" === "{char2}", we want to use both.
-                            Where was the LCS <em>before</em> we had either of them?
+                            Where was the LCS <em>before</em> we had either of
+                            them?
                           </p>
                           <ul>
                             <li>
-                              <strong>↖ dp[{currentRow - 1}][{currentCol - 1}]</strong> = {diagVal}
-                              — the LCS of "{text1.slice(0, currentRow - 1)}" and "{text2.slice(0, currentCol - 1)}"
+                              <strong>
+                                ↖ dp[{currentRow - 1}][{currentCol - 1}]
+                              </strong>{" "}
+                              = {diagVal}— the LCS of "
+                              {text1.slice(0, currentRow - 1)}" and "
+                              {text2.slice(0, currentCol - 1)}"
                             </li>
                           </ul>
                           <p>
@@ -1231,25 +1465,29 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                           character from text1 (↑) or text2 (←)."
                         </p>
                         <div className="lcs-decision__why">
-                          <div className="lcs-decision__why-label">Why max?</div>
+                          <div className="lcs-decision__why-label">
+                            Why max?
+                          </div>
                           <p>
                             Since "{char1}" ≠ "{char2}", at least one of them
                             can't be in the LCS at this position. We try both:
                           </p>
                           <ul>
                             <li>
-                              <strong>↑ Skip "{char1}"</strong>: pretend text1 is one
-                              char shorter → use dp[{currentRow - 1}][{currentCol}] = {upVal}
+                              <strong>↑ Skip "{char1}"</strong>: pretend text1
+                              is one char shorter → use dp[{currentRow - 1}][
+                              {currentCol}] = {upVal}
                             </li>
                             <li>
-                              <strong>← Skip "{char2}"</strong>: pretend text2 is one
-                              char shorter → use dp[{currentRow}][{currentCol - 1}] = {leftVal}
+                              <strong>← Skip "{char2}"</strong>: pretend text2
+                              is one char shorter → use dp[{currentRow}][
+                              {currentCol - 1}] = {leftVal}
                             </li>
                           </ul>
                           <p>
-                            We pick whichever gave a longer LCS. This works because
-                            a <em>subsequence</em> allows gaps — we can always skip
-                            characters.
+                            We pick whichever gave a longer LCS. This works
+                            because a <em>subsequence</em> allows gaps — we can
+                            always skip characters.
                           </p>
                           <button
                             className="lcs-base-case-link"
@@ -1316,8 +1554,8 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                     "Before <strong>both</strong> characters"
                   </div>
                   <div className="lcs-dir__when">
-                    Used when they <strong>match</strong> — we consumed both,
-                    so look back past both. Then <strong>+1</strong>.
+                    Used when they <strong>match</strong> — we consumed both, so
+                    look back past both. Then <strong>+1</strong>.
                   </div>
                 </div>
               </div>
@@ -1329,8 +1567,8 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                     "Before this <strong>text1</strong> character"
                   </div>
                   <div className="lcs-dir__when">
-                    Skip text1[i-1] — maybe it's not useful.
-                    Same j (text2 unchanged).
+                    Skip text1[i-1] — maybe it's not useful. Same j (text2
+                    unchanged).
                   </div>
                 </div>
               </div>
@@ -1342,14 +1580,15 @@ const LcsVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                     "Before this <strong>text2</strong> character"
                   </div>
                   <div className="lcs-dir__when">
-                    Skip text2[j-1] — maybe it's not useful.
-                    Same i (text1 unchanged).
+                    Skip text2[j-1] — maybe it's not useful. Same i (text1
+                    unchanged).
                   </div>
                 </div>
               </div>
             </div>
             <div className="lcs-dir-summary">
-              <strong>Match?</strong> → ↖ + 1 (use both chars)<br />
+              <strong>Match?</strong> → ↖ + 1 (use both chars)
+              <br />
               <strong>No match?</strong> → max(↑, ←) (skip the less useful one)
             </div>
           </div>
