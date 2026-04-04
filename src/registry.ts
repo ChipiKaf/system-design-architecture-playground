@@ -6,6 +6,7 @@ import BigOPlugin from "./plugins/big-o";
 import EventLoopPlugin from "./plugins/event-loop";
 import EcsAutoscalingPlugin from "./plugins/ecs-autoscaling";
 import PalindromePlugin from "./plugins/palindrome";
+import CoinChangePlugin from "./plugins/coin-change";
 import ScalabilityPlugin from "./plugins/scalability";
 import HttpCachingPlugin from "./plugins/http-caching";
 
@@ -65,7 +66,7 @@ export const categories: PluginCategory[] = [
     description:
       "Core algorithm ideas explained visually — time complexity, search strategies, growth curves, and more.",
     accent: "#f97316",
-    plugins: [BigOPlugin, PalindromePlugin],
+    plugins: [BigOPlugin, PalindromePlugin, CoinChangePlugin],
   },
   {
     id: "language-runtime",

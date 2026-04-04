@@ -1,0 +1,549 @@
+/* ── Coin Change DP Visualization ─────────────────────── */
+
+.cc-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.cc-pills {
+  padding: 8px 16px;
+  border-bottom: 1px solid #1e293b;
+  background: #0a0f1a;
+}
+
+.cc-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+}
+
+/* ── Stage (canvas area) ─────────────────────────────── */
+
+.cc-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cc-stage__head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #1e293b;
+  background: #0c1322;
+}
+
+.cc-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cc-input-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.cc-input {
+  flex: 1;
+  min-width: 120px;
+  max-width: 240px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #334155;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  letter-spacing: 0.5px;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: #f59e0b;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.cc-input--small {
+  max-width: 80px;
+  min-width: 60px;
+}
+
+.cc-apply-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  border: 1.5px solid #f59e0b;
+  background: #78350f;
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #92400e;
+    color: #fde68a;
+  }
+}
+
+.cc-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cc-preset-btn {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #334155;
+    color: #e2e8f0;
+    border-color: #f59e0b;
+  }
+}
+
+.cc-stage__stats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.cc-phase {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cc-phase__label,
+.cc-stat__label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #64748b;
+}
+
+.cc-phase__value {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.cc-phase--intro .cc-phase__value {
+  color: #94a3b8;
+}
+.cc-phase--filling .cc-phase__value {
+  color: #f59e0b;
+}
+.cc-phase--tryingCoin .cc-phase__value {
+  color: #a78bfa;
+}
+.cc-phase--chosen .cc-phase__value {
+  color: #22c55e;
+}
+.cc-phase--result .cc-phase__value {
+  color: #3b82f6;
+}
+
+.cc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cc-stat__value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.cc-stage__canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.cc-stage__canvas {
+  position: absolute;
+  inset: 0;
+
+  svg {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/* ── Sidebar ──────────────────────────────────────────── */
+
+.cc-sidebar {
+  width: 310px;
+  min-width: 260px;
+  border-left: 1px solid #1e293b;
+  background: #0a0f1a;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cc-card {
+  background: #111827;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #1e293b;
+}
+
+.cc-card--explanation {
+  border-color: #78350f;
+  background: #1a1000;
+}
+
+.cc-card--problem {
+  border-color: #1e40af;
+  background: #0c1a2e;
+
+  strong {
+    color: #fbbf24;
+  }
+}
+
+/* ── Glossary ─────────────────────────────────────────── */
+
+.cc-card--glossary {
+  border-color: #334155;
+  background: #0d1424;
+}
+
+.cc-glossary {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cc-glossary__row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.cc-glossary__term {
+  flex-shrink: 0;
+  min-width: 64px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #fbbf24;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.cc-glossary__def {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94a3b8;
+
+  strong {
+    color: #e2e8f0;
+  }
+
+  em {
+    color: #fbbf24;
+    font-style: normal;
+    font-weight: 600;
+  }
+}
+
+.cc-card--code {
+  border-color: #334155;
+}
+
+.cc-card--candidates {
+  border-color: #4c1d95;
+  background: #0f0a24;
+}
+
+.cc-card--trace {
+  border-color: #166534;
+  background: #052e16;
+}
+
+.cc-card__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #64748b;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.cc-card__text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin: 0;
+}
+
+/* ── Candidates ───────────────────────────────────────── */
+
+.cc-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-candidate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  transition: all 0.2s;
+}
+
+.cc-candidate--active {
+  background: #1a1a40;
+  color: #c4b5fd;
+  border-color: #7c3aed;
+}
+
+.cc-candidate--best .cc-candidate__calc {
+  color: #86efac;
+}
+
+.cc-candidate__coin {
+  min-width: 52px;
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.cc-candidate__calc {
+  flex: 1;
+}
+
+.cc-candidate__best {
+  font-size: 10px;
+  color: #22c55e;
+  font-weight: 700;
+}
+
+/* ── Condition breakdown ──────────────────────────────── */
+
+.cc-card--condition {
+  border-color: #854d0e;
+  background: #1a1400;
+}
+
+.cc-condition__code {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #f59e0b;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  margin-bottom: 10px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.cc-condition__story {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #0f172a;
+  border: 1px solid #1e3a5f;
+  border-left: 3px solid #60a5fa;
+
+  p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.65;
+    color: #cbd5e1;
+    font-style: italic;
+
+    strong {
+      color: #fbbf24;
+      font-style: normal;
+    }
+  }
+}
+
+.cc-condition__checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.cc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.cc-check--pass {
+  background: #052e16;
+  border: 1px solid #166534;
+  color: #86efac;
+}
+
+.cc-check--fail {
+  background: #450a0a;
+  border: 1px solid #7f1d1d;
+  color: #fca5a5;
+}
+
+.cc-check__icon {
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.cc-check__label {
+  flex: 1;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.cc-check__detail {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.cc-condition__verdict {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.cc-condition__verdict--pass {
+  background: #052e16;
+  border: 1.5px solid #22c55e;
+  color: #86efac;
+}
+
+.cc-condition__verdict--fail {
+  background: #450a0a;
+  border: 1.5px solid #ef4444;
+  color: #fca5a5;
+}
+
+/* ── Code block ───────────────────────────────────────── */
+
+.cc-code {
+  margin: 0;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.cc-code__line {
+  display: flex;
+  white-space: nowrap;
+  gap: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  transition:
+    background 0.2s,
+    color 0.2s;
+  color: #6b7280;
+}
+
+.cc-code__line--active {
+  background: #78350f;
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.cc-code__gutter {
+  width: 20px;
+  text-align: right;
+  color: #475569;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* ── Trace (coins used) ──────────────────────────────── */
+
+.cc-trace {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.cc-trace__coin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #1e3a5f;
+  border: 2px solid #3b82f6;
+  color: #93c5fd;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.cc-trace__sum {
+  margin-top: 4px;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  color: #86efac;
+}
+
+/* ── Formula ──────────────────────────────────────────── */
+
+.cc-formula {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #fbbf24;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
