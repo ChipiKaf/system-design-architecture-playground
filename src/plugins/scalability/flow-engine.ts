@@ -75,7 +75,7 @@ export interface StepDef {
   /** Explanation shown after flow completes. */
   explain?: string | ((s: ScalabilityState) => string);
   /** Special action instead of flow. */
-  action?: "reset";
+  action?: "reset" | "softReset";
 }
 
 /* ── Step Configuration ──────────────────────────────────
@@ -90,7 +90,7 @@ export const STEPS: StepDef[] = [
     key: "overview",
     label: "Architecture Overview",
     nextButton: "Send Traffic",
-    action: "reset",
+    action: "softReset",
   },
 
   /* ─── 2. Send Traffic ─────────────────────────────────

@@ -327,6 +327,13 @@ const scalabilitySlice = createSlice({
       computeMetrics(s);
       return s;
     },
+    /** Reset animation/UI state but keep user configuration */
+    softReset: (state) => {
+      state.hotZones = [];
+      state.explanation = initialState.explanation;
+      state.phase = "overview";
+      computeMetrics(state);
+    },
     patchState(state, action: PayloadAction<Partial<ScalabilityState>>) {
       Object.assign(state, action.payload);
     },
@@ -439,6 +446,7 @@ const scalabilitySlice = createSlice({
 
 export const {
   reset,
+  softReset,
   patchState,
   scaleServerUp,
   scaleServerDown,

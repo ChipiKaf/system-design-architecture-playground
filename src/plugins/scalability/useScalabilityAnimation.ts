@@ -5,6 +5,7 @@ import { type RootState } from "../../store/store";
 import {
   patchState,
   reset,
+  softReset,
   recalcMetrics,
   type ScalabilityState,
 } from "./scalabilitySlice";
@@ -105,6 +106,11 @@ export const useScalabilityAnimation = (onAnimationComplete?: () => void) => {
       // 1. Special actions (escape hatch)
       if (stepDef.action === "reset") {
         dispatch(reset());
+        finish();
+        return;
+      }
+      if (stepDef.action === "softReset") {
+        dispatch(softReset());
         finish();
         return;
       }
