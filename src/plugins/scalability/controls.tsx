@@ -7,8 +7,13 @@ import {
   removeClient,
   addComponent,
   removeComponent,
+  addServer,
+  removeServer,
+  scaleServerUp,
+  scaleServerDown,
   type ScalabilityState,
   type ComponentName,
+  INSTANCE_ORDER,
 } from "./scalabilitySlice";
 
 /* ── Component toggle descriptor ─────────────────────── */
@@ -18,10 +23,7 @@ interface Toggle {
   addLabel: string;
   removeLabel: string;
   color: string;
-  /** Prerequisites that must be active before this can be added. */
   requires?: ComponentName[];
-  /** True when extra-servers — supports count > 1. */
-  multi?: boolean;
 }
 
 const TOGGLES: Toggle[] = [
@@ -40,15 +42,6 @@ const TOGGLES: Toggle[] = [
     color: "#8b5cf6",
   },
   {
-    name: "extraServers",
-    label: "Servers",
-    addLabel: "+ Server",
-    removeLabel: "− Server",
-    color: "#14b8a6",
-    requires: ["loadBalancer"],
-    multi: true,
-  },
-  {
     name: "cache",
     label: "Cache",
     addLabel: "+ Cache",
@@ -60,13 +53,13 @@ const TOGGLES: Toggle[] = [
 
 const ScalabilityControls: React.FC = () => {
   const dispatch = useDispatch();
-  const { components, clients } = useSelector(
+  const { components, clients, servers } = useSelector(
     (state: RootState) => state.scalability,
   ) as ScalabilityState;
 
   const handleAdd = (name: ComponentName) => {
     dispatch(addComponent(name));
-    dispatch(resetSimulation()); // reset step index — story changes
+    dispatch(resetSimulation());
   };
 
   const handleRemove = (name: ComponentName) => {
@@ -99,22 +92,96 @@ const ScalabilityControls: React.FC = () => {
 
       <span className="scalability-controls__sep" />
 
+      {/* Vertical scaling — scale each server up/down */}
+      {servers.map((server, i) => {
+        const idx = INSTANCE_ORDER.indexOf(server.profile.instanceType);
+        const canUp = idx < INSTANCE_ORDER.length - 1;
+        const canDown = idx > 0;
+        return (
+          <div key={server.id} className="scalability-controls__group">
+            <button
+              className="scalability-controls__btn scalability-controls__btn--remove"
+              onClick={() => {
+                dispatch(scaleServerDown(server.id));
+                dispatch(resetSimulation());
+              }}
+              disabled={!canDown}
+              title="Scale down (vertical)"
+            >
+              ↓
+            </button>
+            <span className="scalability-controls__label scalability-controls__label--server">
+              {i === 0 ? "Server" : `S${i + 1}`}: {server.profile.instanceType}
+            </span>
+            <button
+              className="scalability-controls__btn scalability-controls__btn--add"
+              style={{ borderColor: "#f9731666", color: "#f97316" }}
+              onClick={() => {
+                dispatch(scaleServerUp(server.id));
+                dispatch(resetSimulation());
+              }}
+              disabled={!canUp}
+              title="Scale up (vertical)"
+            >
+              ↑
+            </button>
+          </div>
+        );
+      })}
+
+      <span className="scalability-controls__sep" />
+
+      {/* Horizontal scaling — add/remove servers */}
+      <div className="scalability-controls__group">
+        {servers.length > 1 && (
+          <button
+            className="scalability-controls__btn scalability-controls__btn--remove"
+            onClick={() => {
+              dispatch(removeServer());
+              dispatch(resetSimulation());
+            }}
+          >
+            − Server
+          </button>
+        )}
+        {components.loadBalancer && servers.length < 5 && (
+          <button
+            className="scalability-controls__btn scalability-controls__btn--add"
+            style={{ borderColor: "#14b8a666", color: "#14b8a6" }}
+            onClick={() => {
+              dispatch(addServer());
+              dispatch(resetSimulation());
+            }}
+          >
+            + Server
+          </button>
+        )}
+        {servers.length > 1 && (
+          <span
+            className="scalability-controls__badge"
+            style={{ background: "#14b8a6" }}
+          >
+            ×{servers.length}
+          </span>
+        )}
+      </div>
+
+      <span className="scalability-controls__sep" />
+
       {/* Infrastructure toggles */}
       {TOGGLES.map((t) => {
-        const isActive =
-          t.name === "extraServers"
-            ? components.extraServers > 0
-            : !!components[t.name];
+        const isActive = !!components[t.name as keyof typeof components];
         const prereqMet =
-          !t.requires || t.requires.every((r) => !!components[r]);
-        const canAdd =
-          t.name === "extraServers"
-            ? components.extraServers < 4 && prereqMet
-            : !isActive && prereqMet;
+          !t.requires ||
+          t.requires.every((r) =>
+            r === "server"
+              ? servers.length > 1
+              : !!components[r as keyof typeof components],
+          );
+        const canAdd = !isActive && prereqMet;
 
         return (
           <div key={t.name} className="scalability-controls__group">
-            {/* Remove */}
             {isActive && (
               <button
                 className="scalability-controls__btn scalability-controls__btn--remove"
@@ -124,29 +191,14 @@ const ScalabilityControls: React.FC = () => {
                 {t.removeLabel}
               </button>
             )}
-
-            {/* Add */}
             {canAdd && (
               <button
                 className="scalability-controls__btn scalability-controls__btn--add"
                 style={{ borderColor: `${t.color}66`, color: t.color }}
                 onClick={() => handleAdd(t.name)}
-                title={
-                  !prereqMet ? `Requires: ${t.requires?.join(", ")}` : undefined
-                }
               >
                 {t.addLabel}
               </button>
-            )}
-
-            {/* Extra-server count badge */}
-            {t.multi && components.extraServers > 0 && (
-              <span
-                className="scalability-controls__badge"
-                style={{ background: t.color }}
-              >
-                ×{components.extraServers}
-              </span>
             )}
           </div>
         );

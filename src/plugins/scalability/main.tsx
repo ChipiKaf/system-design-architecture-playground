@@ -46,10 +46,10 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const pzRef = useRef<PanZoomController | null>(null);
 
   const {
+    servers,
     components,
     clients,
     requestsPerSecond,
-    // throughput,
     droppedRequests,
     responseTimeMs,
     serverCpuPercent,
@@ -58,10 +58,11 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     explanation,
     hotZones,
     phase,
+    cost,
   } = runtime;
 
   const hot = (zone: string) => hotZones.includes(zone);
-  const totalServers = 1 + components.extraServers;
+  const totalServers = servers.length;
 
   // ── Build VizCraft scene ──────────────────────────────
   const scene = (() => {
@@ -147,7 +148,7 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
             { label: "Servers", value: String(totalServers) },
           ],
         });
-      nextY += 75;
+      nextY += 95;
 
       // Edge: cloud → LB
       const lbActive = hot("cloud") && hot("lb");
@@ -162,23 +163,46 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     const serverStartX =
       totalServers === 1 ? W / 2 - 75 : W / 2 - (totalServers * 170) / 2 + 10;
 
+    const showStatefulWarn =
+      totalServers > 1 && !components.database && !components.cache;
+    const serverH = showStatefulWarn ? 95 : 78;
+
     for (let i = 0; i < totalServers; i++) {
-      const sid = `server-${i}`;
+      const srv = servers[i];
+      const sid = srv.id;
       const x = serverStartX + i * 170;
-      const isOverloaded = !serverHealthy && i === 0;
+      const isOverloaded = !srv.healthy;
 
       b.node(sid)
         .at(x, nextY)
-        .rect(150, 68, 12)
+        .rect(150, serverH, 12)
         .fill(isOverloaded ? "#7f1d1d" : hot(sid) ? "#1e3a8a" : "#0f172a")
         .stroke(isOverloaded ? "#ef4444" : hot(sid) ? "#60a5fa" : "#334155", 2)
-        .image("/server2.svg", 20, 20, { dy: -8, position: "center" })
-        .label(i === 0 ? "HTTP Server" : `Server ${i + 1}`, {
-          fill: "#fff",
-          fontSize: 13,
-          fontWeight: "bold",
-          dy: 10,
-        })
+        .image("/server2.svg", 18, 18, { dy: -24, position: "center" })
+        .richLabel(
+          (l) => {
+            l.color(srv.profile.instanceType, "#94a3b8", { fontSize: 8 });
+            l.newline();
+            l.color(
+              `CPU ${srv.cpuPercent}%`,
+              srv.cpuPercent > 80 ? "#fca5a5" : "#86efac",
+              { fontSize: 9 },
+            );
+            if (showStatefulWarn) {
+              l.newline();
+              l.color("⚠ stateful", "#fbbf24", {
+                fontSize: 8,
+                bold: true,
+              });
+            }
+          },
+          {
+            fill: "#fff",
+            fontSize: 12,
+            dy: showStatefulWarn ? 14 : 10,
+            lineHeight: 1.6,
+          },
+        )
         .onClick(() =>
           openConcept(
             components.loadBalancer && !components.database
@@ -191,19 +215,18 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
         .tooltip({
           title: i === 0 ? "Primary Server" : `Server ${i + 1}`,
           sections: [
-            { label: "CPU", value: `${serverCpuPercent}%` },
+            { label: "Instance", value: srv.profile.instanceType },
+            { label: "vCPU", value: String(srv.profile.vcpu) },
+            { label: "RAM", value: `${srv.profile.ramGiB} GiB` },
+            { label: "Capacity", value: `~${srv.profile.baselineRps} rps` },
+            { label: "CPU", value: `${srv.cpuPercent}%` },
+            { label: "Cost", value: `$${srv.profile.hourlyUsd}/hr` },
             {
               label: "Status",
-              value: serverHealthy ? "Healthy" : "Overloaded",
+              value: srv.healthy ? "Healthy" : "Overloaded",
             },
           ],
         });
-
-      b.node(sid).label(`CPU ${serverCpuPercent}%`, {
-        fill: serverCpuPercent > 80 ? "#fca5a5" : "#86efac",
-        fontSize: 9,
-        dy: 22,
-      });
 
       // Edge: LB → server  OR  cloud → server (if no LB)
       if (components.loadBalancer) {
@@ -222,7 +245,7 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
         if (active) e.animate("flow", { duration: "0.6s" });
       }
     }
-    nextY += 80;
+    nextY += showStatefulWarn ? 107 : 90;
 
     /* ── Cache (optional) ────────────────────────────── */
     if (components.cache) {
@@ -404,10 +427,22 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       borderColor: "#8b5cf6",
     },
     {
+      key: "vertical-scaling" as ConceptKey,
+      label: "Vertical Scaling",
+      color: "#fdba74",
+      borderColor: "#f97316",
+    },
+    {
       key: "horizontal-scaling" as ConceptKey,
       label: "Horizontal Scaling",
       color: "#5eead4",
       borderColor: "#14b8a6",
+    },
+    {
+      key: "scaling-strategy" as ConceptKey,
+      label: "V vs H Scaling",
+      color: "#f0abfc",
+      borderColor: "#e879f9",
     },
     {
       key: "autoscaling-metrics" as ConceptKey,
@@ -433,15 +468,33 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       color: "#c4b5fd",
       borderColor: "#a78bfa",
     },
+    {
+      key: "vcpu" as ConceptKey,
+      label: "vCPU",
+      color: "#7dd3fc",
+      borderColor: "#38bdf8",
+    },
+    {
+      key: "ram-and-concurrency" as ConceptKey,
+      label: "RAM & Concurrency",
+      color: "#86efac",
+      borderColor: "#4ade80",
+    },
   ];
 
   // ── Describe architecture for sidebar ─────────────────
-  const archParts: string[] = ["HTTP Server"];
+  const archParts: string[] = [];
+  if (servers.length === 1) {
+    archParts.push(`Server (${servers[0].profile.instanceType})`);
+  } else {
+    archParts.push(`${servers.length} servers`);
+  }
+  if (components.loadBalancer) archParts.push("ALB");
   if (components.database) archParts.push("Database");
-  if (components.loadBalancer) archParts.push("Load Balancer");
-  if (components.extraServers > 0)
-    archParts.push(`+${components.extraServers} server(s)`);
   if (components.cache) archParts.push("Cache");
+
+  // ── Price formatter ───────────────────────────────────
+  const fmt = (v: number, dec = 4) => `$${v.toFixed(dec)}`;
 
   return (
     <div className="scalability-root">
@@ -485,6 +538,11 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                   color="#ef4444"
                 />
               )}
+              <StatBadge
+                label="Cost"
+                value={`${fmt(cost.totalHourly)}/hr`}
+                color="#fcd34d"
+              />
             </StageHeader>
             <CanvasStage canvasRef={containerRef} />
           </div>
@@ -503,11 +561,94 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                 <strong>Servers:</strong> {totalServers}
               </p>
             </SideCard>
+
+            {/* Per-server details */}
+            <SideCard label="Servers" variant="info">
+              <div className="scalability-server-list">
+                {servers.map((srv, i) => (
+                  <div key={srv.id} className="scalability-server-row">
+                    <span className="scalability-server-row__name">
+                      {i === 0 ? "Primary" : `Server ${i + 1}`}
+                    </span>
+                    <span className="scalability-server-row__type">
+                      {srv.profile.instanceType}
+                    </span>
+                    <span className="scalability-server-row__spec">
+                      {srv.profile.vcpu} vCPU · {srv.profile.ramGiB} GiB
+                    </span>
+                    <span className="scalability-server-row__cap">
+                      ~{srv.profile.baselineRps} rps
+                    </span>
+                    <span
+                      className="scalability-server-row__cpu"
+                      style={{
+                        color: srv.cpuPercent > 80 ? "#fca5a5" : "#86efac",
+                      }}
+                    >
+                      CPU {srv.cpuPercent}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </SideCard>
+
+            {/* Cost breakdown */}
+            <SideCard label="Estimated Cost" variant="info">
+              <div className="scalability-cost">
+                <div className="scalability-cost__header">
+                  <span>
+                    Region: <strong>us-east-1</strong>
+                  </span>
+                  <span>
+                    Pricing: <strong>On-Demand</strong>
+                  </span>
+                </div>
+                <div className="scalability-cost__rows">
+                  <div className="scalability-cost__row">
+                    <span>EC2 ({servers.length}×)</span>
+                    <span>{fmt(cost.ec2Hourly)}/hr</span>
+                  </div>
+                  {components.loadBalancer && (
+                    <div className="scalability-cost__row">
+                      <span>ALB</span>
+                      <span>{fmt(cost.albHourly)}/hr</span>
+                    </div>
+                  )}
+                  {components.database && (
+                    <div className="scalability-cost__row">
+                      <span>DB (db.t3.micro)</span>
+                      <span>{fmt(cost.dbHourly)}/hr</span>
+                    </div>
+                  )}
+                  {components.cache && (
+                    <div className="scalability-cost__row">
+                      <span>Cache (cache.t4g.micro)</span>
+                      <span>{fmt(cost.cacheHourly)}/hr</span>
+                    </div>
+                  )}
+                  <div className="scalability-cost__row scalability-cost__row--total">
+                    <span>Total hourly</span>
+                    <span>{fmt(cost.totalHourly)}/hr</span>
+                  </div>
+                  <div className="scalability-cost__row scalability-cost__row--total">
+                    <span>Monthly est.</span>
+                    <span>${cost.totalMonthly.toFixed(2)}/mo</span>
+                  </div>
+                </div>
+                <div className="scalability-cost__efficiency">
+                  <span>Cost per 100 rps: {fmt(cost.costPer100Rps)}/hr</span>
+                </div>
+                <div className="scalability-cost__disclaimer">
+                  Educational estimate · Linux On-Demand · us-east-1
+                </div>
+              </div>
+            </SideCard>
+
             {droppedRequests > 0 && (
               <SideCard label="Warning" variant="warning">
                 <p>
-                  {droppedRequests} requests dropped! Try adding a database,
-                  load balancer, or more servers.
+                  {droppedRequests} requests dropped! Try scaling up a server,
+                  adding more servers, or adding a database/cache.
                 </p>
               </SideCard>
             )}

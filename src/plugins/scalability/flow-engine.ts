@@ -1,4 +1,4 @@
-import type { InfraComponents, ScalabilityState } from "./scalabilitySlice";
+import type { ScalabilityState } from "./scalabilitySlice";
 
 /* ══════════════════════════════════════════════════════════
    Declarative Flow Engine for Sandbox Plugins
@@ -17,8 +17,7 @@ import type { InfraComponents, ScalabilityState } from "./scalabilitySlice";
 export function expandToken(token: string, state: ScalabilityState): string[] {
   if (token === "$clients") return state.clients.map((c) => c.id);
   if (token === "$servers") {
-    const count = 1 + state.components.extraServers;
-    return Array.from({ length: count }, (_, i) => `server-${i}`);
+    return state.servers.map((s) => s.id);
   }
   return [token];
 }
@@ -32,7 +31,7 @@ export interface FlowBeat {
   from: string;
   to: string;
   /** Only include this beat when the condition is true. */
-  when?: (c: InfraComponents) => boolean;
+  when?: (s: ScalabilityState) => boolean;
   /** Duration in ms (default: 600). */
   duration?: number;
   /** Explanation shown during this beat. */
@@ -57,9 +56,9 @@ export interface StepDef {
   key: StepKey;
   label: string;
   /** Only include this step when condition is true. */
-  when?: (c: InfraComponents) => boolean;
-  /** Button text — string, function of components, or auto-derived from next step label. */
-  nextButton?: string | ((c: InfraComponents) => string);
+  when?: (s: ScalabilityState) => boolean;
+  /** Button text — string, function of state, or auto-derived from next step label. */
+  nextButton?: string | ((s: ScalabilityState) => string);
   nextButtonColor?: string;
   processingText?: string;
 
@@ -103,7 +102,7 @@ export const STEPS: StepDef[] = [
     label: "Send Traffic",
     processingText: "Sending...",
     nextButtonColor: "#2563eb",
-    when: (c) => !c.loadBalancer,
+    when: (s) => !s.components.loadBalancer,
     phase: "traffic",
     flow: [
       {
@@ -130,7 +129,7 @@ export const STEPS: StepDef[] = [
   {
     key: "lb-distribute",
     label: "Load Balancer Distributes",
-    when: (c) => c.loadBalancer,
+    when: (s) => s.components.loadBalancer,
     processingText: "Routing...",
     nextButtonColor: "#8b5cf6",
     phase: "lb-distribute",
@@ -149,7 +148,7 @@ export const STEPS: StepDef[] = [
       },
     ],
     explain: (s) =>
-      `Load balanced across ${1 + s.components.extraServers} server(s). Max capacity: ~${s.maxCapacity} rps.`,
+      `Load balanced across ${s.servers.length} server(s). Max capacity: ~${s.maxCapacity} rps.`,
   },
   /* ─── 3. Observe Metrics ──────────────────────────────
      No animation — pause and read the numbers.           */
@@ -173,7 +172,7 @@ export const STEPS: StepDef[] = [
   {
     key: "cache-hits",
     label: "Cache Boosts Throughput",
-    when: (c) => c.cache,
+    when: (s) => s.components.cache,
     nextButtonColor: "#f97316",
     phase: "cache-hits",
     flow: [
@@ -199,7 +198,7 @@ export const STEPS: StepDef[] = [
   {
     key: "db-flow",
     label: "Server ↔ Database",
-    when: (c) => c.database,
+    when: (s) => s.components.database,
     processingText: "Querying...",
     nextButtonColor: "#22c55e",
     phase: "db-flow",
@@ -219,7 +218,7 @@ export const STEPS: StepDef[] = [
       },
     ],
     explain: (s) =>
-      `Database responds to ${1 + s.components.extraServers} server(s). Max capacity: ~${s.maxCapacity} rps.`,
+      `Database responds to ${s.servers.length} server(s). Max capacity: ~${s.maxCapacity} rps.`,
   },
 
   /* ─── 7. Horizontal Scale-Out ─────────────────────────
@@ -227,13 +226,13 @@ export const STEPS: StepDef[] = [
   {
     key: "scale-out",
     label: "Horizontal Scale-Out",
-    when: (c) => c.extraServers > 0,
+    when: (s) => s.servers.length > 1,
     nextButtonColor: "#14b8a6",
     phase: "scale-out",
     delay: 600,
     finalHotZones: ["lb", "server-0"],
     explain: (s) =>
-      `${s.components.extraServers} extra server(s) added. Each handles ~50 additional rps. Total capacity: ~${s.maxCapacity} rps.`,
+      `${s.servers.length} server(s) running (${s.servers.map((sv) => sv.profile.instanceType).join(", ")}). Total capacity: ~${s.maxCapacity} rps. Cost: $${s.cost.totalHourly.toFixed(4)}/hr.`,
   },
 
   /* ─── 8. Summary ──────────────────────────────────────
@@ -244,16 +243,13 @@ export const STEPS: StepDef[] = [
     phase: "summary",
     explain: (s) => {
       const parts: string[] = [];
-      if (s.components.database) parts.push("separated database");
+      parts.push(
+        `${s.servers.length} server(s) (${s.servers.map((sv) => sv.profile.instanceType).join(", ")})`,
+      );
+      if (s.components.database) parts.push("database");
       if (s.components.loadBalancer) parts.push("load balancer");
-      if (s.components.extraServers > 0)
-        parts.push(`${s.components.extraServers} extra server(s)`);
       if (s.components.cache) parts.push("cache");
-      const desc =
-        parts.length > 0
-          ? `With ${parts.join(", ")}, max capacity is ~${s.maxCapacity} rps.`
-          : "Solo server with no scaling. Max capacity: ~60 rps.";
-      return `${desc} Try adding or removing components and replaying.`;
+      return `Architecture: ${parts.join(" + ")}. Max capacity: ~${s.maxCapacity} rps. Monthly est: ~$${s.cost.totalMonthly.toFixed(0)}/mo. Try scaling up, adding servers, or replaying.`;
     },
   },
 ];
@@ -273,8 +269,7 @@ export interface TaggedStep {
 }
 
 export function buildSteps(state: ScalabilityState): TaggedStep[] {
-  const { components: c } = state;
-  const active = STEPS.filter((s) => !s.when || s.when(c));
+  const active = STEPS.filter((s) => !s.when || s.when(state));
 
   return active.map((step, i) => {
     const nextStep = active[i + 1];
@@ -282,7 +277,7 @@ export function buildSteps(state: ScalabilityState): TaggedStep[] {
     // Resolve nextButton: explicit string/function, or auto-derive from next step label
     let nextButtonText: string | undefined;
     if (typeof step.nextButton === "function") {
-      nextButtonText = step.nextButton(c);
+      nextButtonText = step.nextButton(state);
     } else if (typeof step.nextButton === "string") {
       nextButtonText = step.nextButton;
     } else if (nextStep) {
@@ -320,8 +315,8 @@ export async function executeFlow(
   beats: FlowBeat[],
   deps: FlowExecutorDeps,
 ): Promise<void> {
-  const components = deps.getState().components;
-  const activeBeats = beats.filter((b) => !b.when || b.when(components));
+  const currentState = deps.getState();
+  const activeBeats = beats.filter((b) => !b.when || b.when(currentState));
 
   for (const beat of activeBeats) {
     if (deps.cancelled()) return;

@@ -20,7 +20,7 @@ const ScalabilityPlugin: DemoPlugin<
   id: "scalability",
   name: "Scalability",
   description:
-    "Build a scalable architecture step by step — add a database, load balancer, extra servers, and cache to see how throughput changes.",
+    "Build a scalable architecture step by step — scale servers up or out, add a database, load balancer, and cache to compare performance and cost.",
   initialState,
   reducer: scalabilityReducer,
   Component: ScalabilityVisualization,
