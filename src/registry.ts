@@ -11,6 +11,7 @@ import LcsPlugin from "./plugins/lcs";
 import ScalabilityPlugin from "./plugins/scalability";
 import HttpCachingPlugin from "./plugins/http-caching";
 import FailoverPlugin from "./plugins/failover";
+import ShardingPlugin from "./plugins/sharding";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -51,7 +52,10 @@ export const categories: PluginCategory[] = [
       EventStreamingPlugin,
       EcsAutoscalingPlugin,
       ScalabilityPlugin,
-      HttpCachingPlugin, FailoverPlugin],
+      HttpCachingPlugin,
+      FailoverPlugin,
+      ShardingPlugin,
+    ],
   },
   {
     id: "architecture",

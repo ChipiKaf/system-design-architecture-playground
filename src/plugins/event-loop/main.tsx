@@ -85,6 +85,10 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
+  const viewportRef = useRef<{
+    zoom: number;
+    pan: { x: number; y: number };
+  } | null>(null);
 
   const {
     callStack,
@@ -531,8 +535,7 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   useLayoutEffect(() => {
     if (!containerRef.current) return;
 
-    // Save viewport from the live PanZoomController before destroying
-    const saved = pzRef.current?.getState() ?? null;
+    const saved = viewportRef.current;
 
     builderRef.current?.destroy();
     builderRef.current = scene;
@@ -544,6 +547,12 @@ const EventLoopVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
         initialZoom: saved?.zoom ?? 1,
         initialPan: saved?.pan ?? { x: 0, y: 0 },
       }) ?? null;
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => {
+      unsub?.();
+    };
   }, [scene]);
 
   useEffect(() => {

@@ -60,6 +60,10 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
+  const viewportRef = useRef<{
+    zoom: number;
+    pan: { x: number; y: number };
+  } | null>(null);
 
   const {
     tasks,
@@ -553,7 +557,7 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
   useLayoutEffect(() => {
     if (!containerRef.current) return;
 
-    const saved = pzRef.current?.getState() ?? null;
+    const saved = viewportRef.current;
 
     builderRef.current?.destroy();
     builderRef.current = scene;
@@ -564,6 +568,12 @@ const EcsAutoscalingVisualization: React.FC<Props> = ({
         initialZoom: saved?.zoom ?? 1,
         initialPan: saved?.pan ?? { x: 0, y: 0 },
       }) ?? null;
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => {
+      unsub?.();
+    };
   }, [scene]);
 
   useEffect(() => {

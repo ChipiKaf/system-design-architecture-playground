@@ -617,6 +617,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
+  const viewportRef = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
 
   const { explanation, hotZones } = runtime;
   const hot = (zone: string) => hotZones.includes(zone);
@@ -661,7 +662,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
   /* ── Mount / destroy VizCraft scene ─────────────────── */
   useLayoutEffect(() => {
     if (!containerRef.current) return;
-    const saved = pzRef.current?.getState() ?? null;
+    const saved = viewportRef.current;
     builderRef.current?.destroy();
     builderRef.current = scene;
     pzRef.current =
@@ -671,6 +672,10 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
         initialZoom: saved?.zoom ?? 1,
         initialPan: saved?.pan ?? { x: 0, y: 0 },
       }) ?? null;
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => { unsub?.(); };
   }, [scene]);
 
   useEffect(() => {
