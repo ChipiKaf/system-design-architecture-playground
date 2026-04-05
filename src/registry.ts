@@ -10,6 +10,7 @@ import CoinChangePlugin from "./plugins/coin-change";
 import LcsPlugin from "./plugins/lcs";
 import ScalabilityPlugin from "./plugins/scalability";
 import HttpCachingPlugin from "./plugins/http-caching";
+import FailoverPlugin from "./plugins/failover";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -50,8 +51,7 @@ export const categories: PluginCategory[] = [
       EventStreamingPlugin,
       EcsAutoscalingPlugin,
       ScalabilityPlugin,
-      HttpCachingPlugin,
-    ],
+      HttpCachingPlugin, FailoverPlugin],
   },
   {
     id: "architecture",
