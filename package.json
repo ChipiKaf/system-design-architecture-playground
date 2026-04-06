@@ -16,7 +16,7 @@
     "react-dom": "^19.2.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.10.1",
-    "vizcraft": "^1.15.0"
+    "vizcraft": "^1.16.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -5,9 +5,11 @@ import { resetSimulation } from "../../store/slices/simulationSlice";
 import {
   setStrategy,
   setSystemProfile,
+  setSelectedOp,
   toggleAutoFailover,
   type FailoverState,
   type FailoverStrategy,
+  type OperationType,
   type SystemProfileKey,
   STRATEGY_PROFILES,
   STRATEGY_ORDER,
@@ -33,7 +35,7 @@ const PROFILE_COLORS: Record<SystemProfileKey, string> = {
 
 const FailoverControls: React.FC = () => {
   const dispatch = useDispatch();
-  const { strategy, autoFailover, systemProfile } = useSelector(
+  const { strategy, autoFailover, systemProfile, selectedOp } = useSelector(
     (state: RootState) => state.failover,
   ) as FailoverState;
 
@@ -98,6 +100,35 @@ const FailoverControls: React.FC = () => {
             onClick={() => handleStrategy(s)}
           >
             {STRATEGY_PROFILES[s].label}
+          </button>
+        ))}
+      </div>
+
+      <span className="failover-controls__sep" />
+
+      {/* Operation type */}
+      <div className="failover-controls__group">
+        <span className="failover-controls__label failover-controls__label--dim">
+          Op:
+        </span>
+        {(["write", "read"] as OperationType[]).map((op) => (
+          <button
+            key={op}
+            className={`failover-controls__btn ${selectedOp === op ? "failover-controls__btn--active" : ""}`}
+            style={{
+              borderColor: op === "write" ? "#f97316" : "#38bdf8",
+              ...(selectedOp === op
+                ? {
+                    background: (op === "write" ? "#f97316" : "#38bdf8") + "22",
+                  }
+                : {}),
+            }}
+            onClick={() => {
+              dispatch(setSelectedOp(op));
+              dispatch(resetSimulation());
+            }}
+          >
+            {op === "write" ? "✏ Write" : "🔍 Read"}
           </button>
         ))}
       </div>

@@ -10,7 +10,7 @@ import {
 } from "./dbTradeoffSlice";
 import { STEPS, buildSteps, executeFlow, type StepKey } from "./flow-engine";
 
-export type Signal = { id: string; color?: string } & SignalOverlayParams;
+export type Signal = { id: string; colorClass?: string } & SignalOverlayParams;
 
 export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
   const dispatch = useDispatch();
@@ -45,15 +45,27 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
   );
 
   const animateParallel = useCallback(
-    (pairs: { from: string; to: string }[], duration: number) => {
+    (
+      pairs: { from: string; to: string }[],
+      duration: number,
+      color?: string,
+    ) => {
       return new Promise<void>((resolve) => {
         const start = performance.now();
+        const colorClass =
+          color === "#22c55e"
+            ? "viz-signal viz-signal-green"
+            : color === "#f59e0b"
+              ? "viz-signal viz-signal-amber"
+              : undefined;
         const sigs = pairs.map((p, i) => ({
           id: `sig-${Date.now()}-${i}`,
           from: p.from,
           to: p.to,
           progress: 0,
           magnitude: 0.85,
+          ...(color ? { color, glowColor: color } : {}),
+          ...(colorClass ? { colorClass } : {}),
         }));
 
         const tick = (now: number) => {
@@ -92,6 +104,12 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
       return cleanup;
     }
 
+    const getFhz = (): string[] | undefined => {
+      const f = stepDef.finalHotZones;
+      if (f === undefined) return undefined;
+      return typeof f === "function" ? f(rt()) : f;
+    };
+
     const run = async () => {
       if (stepDef.action === "resetRun") {
         dispatch(softResetRun());
@@ -111,8 +129,9 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
         doPatch({ phase });
       }
 
-      if (stepDef.finalHotZones !== undefined && !stepDef.flow) {
-        doPatch({ hotZones: stepDef.finalHotZones });
+      const fhzNoFlow = getFhz();
+      if (fhzNoFlow !== undefined && !stepDef.flow) {
+        doPatch({ hotZones: fhzNoFlow });
       }
 
       if (stepDef.flow) {
@@ -134,8 +153,9 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
         if (cancelled) return;
       }
 
-      if (stepDef.finalHotZones !== undefined) {
-        doPatch({ hotZones: stepDef.finalHotZones });
+      const fhz = getFhz();
+      if (fhz !== undefined) {
+        doPatch({ hotZones: fhz });
       } else if (!stepDef.flow) {
         doPatch({ hotZones: [] });
       }

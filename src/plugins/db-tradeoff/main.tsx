@@ -20,9 +20,193 @@ import {
   OPERATION_CATALOG,
   WORKLOAD_PROFILES,
   isTargetedOp,
+  type DbType,
+  type ReadPreference,
+  type WorkloadId,
+  type WriteConcern,
 } from "./dbTradeoffSlice";
 import { useDbTradeoffAnimation, type Signal } from "./useDbTradeoffAnimation";
 import "./main.scss";
+
+/* ── Needs checklist ─────────────────────────────────── */
+
+type CheckStatus = "pass" | "warn" | "fail";
+interface NeedCheck {
+  need: string;
+  status: CheckStatus;
+  note: string;
+}
+
+function buildNeedsChecklist(
+  workload: WorkloadId,
+  dbType: DbType,
+  writeConcern: WriteConcern,
+  readPreference: ReadPreference,
+): NeedCheck[] {
+  const isRelational = dbType === "relational";
+  const isMongo = dbType === "mongodb";
+  const mongoLevel = isMongo
+    ? writeConcern === "wmajority" && readPreference === "majority"
+      ? "strong"
+      : writeConcern === "w1" && readPreference === "secondary"
+        ? "eventual"
+        : "quorum"
+    : null;
+
+  if (workload === "banking") {
+    return [
+      {
+        need: "Strong consistency",
+        status: isRelational
+          ? "pass"
+          : isMongo
+            ? mongoLevel === "strong"
+              ? "pass"
+              : mongoLevel === "quorum"
+                ? "warn"
+                : "fail"
+            : "fail",
+        note: isRelational
+          ? "Full serialisable isolation via ACID guarantees"
+          : isMongo
+            ? mongoLevel === "strong"
+              ? "w:majority + Majority reads — quorum consensus achieved"
+              : mongoLevel === "quorum"
+                ? "Partial — enable Majority read mode to reach strong"
+                : "w:1 + secondary reads can return stale data"
+            : "Eventual-only — no strong consistency mode available",
+      },
+      {
+        need: "ACID transactions",
+        status: isRelational ? "pass" : isMongo ? "warn" : "fail",
+        note: isRelational
+          ? "Native multi-statement transactions across any tables"
+          : isMongo
+            ? "Multi-doc transactions exist but carry overhead and document-model semantics"
+            : "No cross-partition transactions — LWT is limited and slow",
+      },
+      {
+        need: "Correctness over speed",
+        status: isRelational
+          ? "pass"
+          : isMongo
+            ? writeConcern === "wmajority"
+              ? "warn"
+              : "fail"
+            : "fail",
+        note: isRelational
+          ? "Designed for correctness-first: constraints, triggers, referential integrity"
+          : isMongo
+            ? writeConcern === "wmajority"
+              ? "w:majority reduces loss risk but ledger semantics are weaker than relational"
+              : "w:1 prioritises speed — dangerous for financial ledger data"
+            : "AP system — availability is favoured over correctness",
+      },
+    ];
+  }
+
+  if (workload === "ecommerce") {
+    return [
+      {
+        need: "Flexible schema",
+        status: isMongo ? "pass" : "warn",
+        note: isMongo
+          ? "Document model natively supports evolving attributes per product"
+          : isRelational
+            ? "Possible via JSONB columns, but schema migrations add friction"
+            : "Wide-column allows adding columns; no nested structures",
+      },
+      {
+        need: "Nested product data",
+        status: isMongo ? "pass" : isRelational ? "warn" : "fail",
+        note: isMongo
+          ? "Embed variants, specs, and images directly in the document"
+          : isRelational
+            ? "Requires separate tables and JOINs per attribute type"
+            : "Flat rows only — nesting must be pre-denormalised",
+      },
+      {
+        need: "Read-heavy workload",
+        status: isRelational || isMongo ? "pass" : "warn",
+        note: isRelational
+          ? "Indexed reads, query planner, and caching handle most patterns well"
+          : isMongo
+            ? "Rich compound indexes and aggregation pipeline scale reads well"
+            : "Scales for reads only when the partition key matches — range queries require extra tables",
+      },
+    ];
+  }
+
+  // chat
+  return [
+    {
+      need: "Massive write throughput",
+      status: isRelational ? "fail" : isMongo ? "warn" : "pass",
+      note: isRelational
+        ? "Single-node write path is a bottleneck — sharding adds significant complexity"
+        : isMongo
+          ? "Good throughput but plateaus against Cassandra at millions of writes/sec"
+          : "Log-structured storage + distributed ring — built for exactly this",
+    },
+    {
+      need: "Partition-friendly reads",
+      status: isRelational ? "warn" : isMongo ? "warn" : "pass",
+      note: isRelational
+        ? "Works with careful indexing; large table JOINs degrade under scale"
+        : isMongo
+          ? "Shard key design is critical; less natural than Cassandra partition keys"
+          : "Partition key is first-class — every read is partition-scoped by design",
+    },
+    {
+      need: "High availability",
+      status: isRelational ? "warn" : isMongo ? "warn" : "pass",
+      note: isRelational
+        ? "Requires explicit replication and failover setup; single-region by default"
+        : isMongo
+          ? "Replica sets give HA but failover election takes 10–30 s"
+          : "Peer-to-peer, no primary — multi-DC replication and 99.99% HA out of the box",
+    },
+  ];
+}
+
+const STATUS_ICON: Record<CheckStatus, string> = {
+  pass: "✓",
+  warn: "⚠",
+  fail: "✗",
+};
+const STATUS_COLOR: Record<CheckStatus, string> = {
+  pass: "#22c55e",
+  warn: "#f59e0b",
+  fail: "#ef4444",
+};
+
+function NeedsChecklist({
+  title,
+  checks,
+}: {
+  title: string;
+  checks: NeedCheck[];
+}) {
+  return (
+    <div className="db-tradeoff-needs">
+      <p className="db-tradeoff-needs__title">{title} needs:</p>
+      {checks.map((c) => (
+        <div key={c.need} className="db-tradeoff-needs__row">
+          <span
+            className="db-tradeoff-needs__icon"
+            style={{ color: STATUS_COLOR[c.status] }}
+          >
+            {STATUS_ICON[c.status]}
+          </span>
+          <div className="db-tradeoff-needs__body">
+            <span className="db-tradeoff-needs__label">{c.need}</span>
+            <span className="db-tradeoff-needs__note">{c.note}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface Props {
   onAnimationComplete?: () => void;
@@ -76,9 +260,13 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     hotZones,
     phase,
     targetShardIdx,
+    writeConcern,
+    readPreference,
+    replicaAckCount,
   } = runtime;
 
   const hot = (zone: string) => hotZones.includes(zone);
+  const isReplicaAck = phase === "replica-ack";
   const profile = DB_PROFILES[dbType];
   const dbColors = DB_COLORS[dbType];
 
@@ -195,6 +383,24 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
             },
             { key: `shard-label-${s}` },
           );
+          // Majority verdict banner (replica-ack phase, target shard only)
+          if (isReplicaAck && isTarget) {
+            const gotNew = replicaAckCount >= 2;
+            o.add(
+              "text",
+              {
+                x: 580,
+                y: sy - 44,
+                text: gotNew
+                  ? `MAJORITY: NEW value ✓  (${replicaAckCount}/3 nodes)`
+                  : `MAJORITY: OLD value  (1/3 — not yet committed)`,
+                fill: gotNew ? "#22c55e" : "#f59e0b",
+                fontSize: 9,
+                fontWeight: "700",
+              },
+              { key: `shard-majority-${s}` },
+            );
+          }
         });
 
         /* Primary node */
@@ -226,24 +432,43 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
               (l) => {
                 l.color("PRIMARY", "#e2e8f0", { fontSize: 10, bold: true });
                 l.newline();
-                l.color(
-                  primary.status === "down" ? "OFFLINE" : `${primary.loadPct}%`,
-                  primary.status === "down" ? "#ef4444" : "#94a3b8",
-                  { fontSize: 8 },
-                );
+                if (isReplicaAck && isTarget) {
+                  // Primary always has the latest write
+                  l.color("v2  NEW", "#22c55e", { fontSize: 8 });
+                } else {
+                  l.color(
+                    primary.status === "down"
+                      ? "OFFLINE"
+                      : `${primary.loadPct}%`,
+                    primary.status === "down" ? "#ef4444" : "#94a3b8",
+                    { fontSize: 8 },
+                  );
+                }
               },
               { fill: "#fff", fontSize: 10, dy: 0, lineHeight: 1.6 },
             )
             .onClick(() => openConcept("mongodb"));
 
+          const isMajorityResponse =
+            phase === "db-response" &&
+            isTarget &&
+            readPreference === "majority" &&
+            isReadOp(selectedOp);
+          const majorityResponseColor = isMajorityResponse
+            ? replicaAckCount >= 2
+              ? "#22c55e"
+              : "#f59e0b"
+            : null;
+
           b.edge("query-layer", primary.id, `e-query-${primary.id}`)
             .stroke(
-              isHot
-                ? dbColors.stroke
-                : primary.status === "down"
-                  ? "#7f1d1d"
-                  : "#475569",
-              isHot ? 2.2 : 1.4,
+              majorityResponseColor ??
+                (isHot
+                  ? dbColors.stroke
+                  : primary.status === "down"
+                    ? "#7f1d1d"
+                    : "#475569"),
+              majorityResponseColor ? 2.5 : isHot ? 2.2 : 1.4,
             )
             .arrow(true);
         }
@@ -259,19 +484,27 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
             .at(sx, sy2)
             .rect(95, 44, 8)
             .fill(
-              isHot
-                ? dbColors.fill
-                : sec.status === "down"
-                  ? "#1c1917"
-                  : "#0f172a",
+              isReplicaAck && isTarget
+                ? replicaAckCount >= si + 2
+                  ? "#052e16" // has new value — green tint
+                  : "#1c0f00" // has old value — amber tint
+                : isHot
+                  ? dbColors.fill
+                  : sec.status === "down"
+                    ? "#1c1917"
+                    : "#0f172a",
             )
             .stroke(
-              sec.status === "down"
-                ? statusColors.stroke
-                : isHot
-                  ? dbColors.stroke
-                  : "#334155",
-              1.5,
+              isReplicaAck && isTarget
+                ? replicaAckCount >= si + 2
+                  ? "#22c55e"
+                  : "#b45309"
+                : sec.status === "down"
+                  ? statusColors.stroke
+                  : isHot
+                    ? dbColors.stroke
+                    : "#334155",
+              isReplicaAck && isTarget ? 1.8 : 1.5,
             )
             .richLabel(
               (l) => {
@@ -280,22 +513,32 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                   bold: true,
                 });
                 l.newline();
-                l.color(
-                  sec.status === "down"
-                    ? "OFF"
-                    : sec.status === "lagging"
-                      ? "LAG"
-                      : `${sec.loadPct}%`,
-                  sec.status === "down"
-                    ? "#ef4444"
-                    : sec.status === "lagging"
-                      ? "#f59e0b"
-                      : "#94a3b8",
-                  { fontSize: 8 },
-                );
+                if (isReplicaAck && isTarget) {
+                  const secHasNew = replicaAckCount >= si + 2;
+                  l.color(
+                    secHasNew ? "v2  NEW" : "v1  OLD",
+                    secHasNew ? "#22c55e" : "#f59e0b",
+                    { fontSize: 8 },
+                  );
+                } else {
+                  l.color(
+                    sec.status === "down"
+                      ? "OFF"
+                      : sec.status === "lagging"
+                        ? "LAG"
+                        : `${sec.loadPct}%`,
+                    sec.status === "down"
+                      ? "#ef4444"
+                      : sec.status === "lagging"
+                        ? "#f59e0b"
+                        : "#94a3b8",
+                    { fontSize: 8 },
+                  );
+                }
               },
               { fill: "#fff", fontSize: 9, dy: 0, lineHeight: 1.5 },
-            );
+            )
+            .onClick(() => openConcept("write-concern"));
 
           /* Primary → secondary replication edge */
           if (primary && sec.status !== "down" && primary.status !== "down") {
@@ -448,8 +691,11 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     if (signals.length > 0) {
       b.overlay((o) => {
         signals.forEach((sig) => {
-          const { id, ...params } = sig;
-          o.add("signal", params as SignalOverlayParams, { key: id });
+          const { id, colorClass, ...params } = sig;
+          o.add("signal", params as SignalOverlayParams, {
+            key: id,
+            ...(colorClass ? { className: colorClass } : {}),
+          });
         });
       });
     }
@@ -554,6 +800,18 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       color: "#6ee7b7",
       borderColor: "#10b981",
     },
+    {
+      key: "write-concern",
+      label: "Write Concern",
+      color: "#f9a8d4",
+      borderColor: "#f472b6",
+    },
+    {
+      key: "mixed-concern",
+      label: "Mixed Concern",
+      color: "#fed7aa",
+      borderColor: "#f97316",
+    },
   ];
 
   return (
@@ -598,6 +856,47 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                   color={result.shardsTouched === 1 ? "#22c55e" : "#f59e0b"}
                 />
               )}
+              {dbType === "mongodb" && (
+                <StatBadge
+                  label="RPO"
+                  value={
+                    result.rpoRisk === "high"
+                      ? "> 0"
+                      : result.rpoRisk === "low"
+                        ? "~low"
+                        : "≈ 0"
+                  }
+                  color={result.rpoRisk === "none" ? "#22c55e" : "#ef4444"}
+                />
+              )}
+              {result.rtoMs > 0 && (
+                <StatBadge
+                  label="RTO"
+                  value={`~${(result.rtoMs / 1000).toFixed(0)}s`}
+                  color="#f59e0b"
+                />
+              )}
+              {dbType === "mongodb" && (
+                <StatBadge
+                  label="Mode"
+                  value={
+                    writeConcern === "wmajority" &&
+                    readPreference === "majority"
+                      ? "Strong"
+                      : writeConcern === "w1" && readPreference === "secondary"
+                        ? "Eventual"
+                        : "Mixed"
+                  }
+                  color={
+                    writeConcern === "wmajority" &&
+                    readPreference === "majority"
+                      ? "#22c55e"
+                      : writeConcern === "w1" && readPreference === "secondary"
+                        ? "#ef4444"
+                        : "#f59e0b"
+                  }
+                />
+              )}
             </StageHeader>
             <CanvasStage canvasRef={containerRef} />
           </div>
@@ -605,7 +904,19 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
         sidebar={
           <SidePanel>
             <SideCard label="What's happening" variant="explanation">
-              <p>{explanation}</p>
+              {phase === "summary" ? (
+                <NeedsChecklist
+                  title={WORKLOAD_PROFILES[workload].label}
+                  checks={buildNeedsChecklist(
+                    workload,
+                    dbType,
+                    writeConcern,
+                    readPreference,
+                  )}
+                />
+              ) : (
+                <p>{explanation}</p>
+              )}
             </SideCard>
 
             <SideCard label="Why This DB?" variant="info">
@@ -657,6 +968,64 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                       }}
                     >
                       {result.shardsTouched}/{runtime.nodeCount}
+                    </strong>
+                  </div>
+                )}
+                {dbType === "mongodb" && (
+                  <div className="db-tradeoff-kpis__row">
+                    <span>Write concern</span>
+                    <strong
+                      style={{
+                        color: writeConcern === "w1" ? "#ef4444" : "#22c55e",
+                      }}
+                    >
+                      {writeConcern === "w1" ? "w:1 (fast)" : "w:majority"}
+                    </strong>
+                  </div>
+                )}
+                {dbType === "mongodb" && (
+                  <div className="db-tradeoff-kpis__row">
+                    <span>Read mode</span>
+                    <strong
+                      style={{
+                        color:
+                          readPreference === "secondary"
+                            ? "#f59e0b"
+                            : readPreference === "majority"
+                              ? "#22c55e"
+                              : "#3b82f6",
+                      }}
+                    >
+                      {readPreference === "secondary"
+                        ? "Secondary (may be stale)"
+                        : readPreference === "majority"
+                          ? "Majority (consistent)"
+                          : "Primary (latest)"}
+                    </strong>
+                  </div>
+                )}
+                {dbType === "mongodb" && (
+                  <div className="db-tradeoff-kpis__row">
+                    <span>RPO risk</span>
+                    <strong
+                      style={{
+                        color:
+                          result.rpoRisk === "none" ? "#22c55e" : "#ef4444",
+                      }}
+                    >
+                      {result.rpoRisk === "high"
+                        ? "Data loss possible"
+                        : result.rpoRisk === "low"
+                          ? "Low risk"
+                          : "Safe (≈ 0)"}
+                    </strong>
+                  </div>
+                )}
+                {result.rtoMs > 0 && (
+                  <div className="db-tradeoff-kpis__row">
+                    <span>RTO (recovery)</span>
+                    <strong style={{ color: "#f59e0b" }}>
+                      ~{(result.rtoMs / 1000).toFixed(0)}s election
                     </strong>
                   </div>
                 )}

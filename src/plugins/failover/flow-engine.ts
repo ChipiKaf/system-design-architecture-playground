@@ -133,7 +133,7 @@ export const STEPS: StepDef[] = [
     key: "replication",
     label: "Replication",
     phase: "replication",
-    when: (s) => s.replicationMode !== "backup",
+    when: (s) => s.replicationMode !== "backup" && s.selectedOp === "write",
     flow: [{ from: "primary-db", to: "secondary-db", duration: 900 }],
     finalHotZones: ["primary-db", "secondary-db"],
     explain: (s) =>

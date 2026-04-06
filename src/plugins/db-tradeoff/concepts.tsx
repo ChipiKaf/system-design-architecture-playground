@@ -12,7 +12,9 @@ export type ConceptKey =
   | "replication"
   | "denormalization"
   | "ledger-critical"
-  | "acid";
+  | "acid"
+  | "write-concern"
+  | "mixed-concern";
 
 interface ConceptDefinition {
   title: string;
@@ -466,6 +468,326 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             transactions must coordinate. Most systems use read-committed or
             snapshot isolation as a practical middle ground, reserving
             serializable for critical paths like balance transfers.
+          </p>
+        ),
+      },
+    ],
+  },
+  "write-concern": {
+    title: "Write Concern & Failover",
+    subtitle: "How MongoDB balances write speed vs. durability",
+    accentColor: "#f472b6",
+    sections: [
+      {
+        title: "w:1 — Fast but risky",
+        accent: "#ef4444",
+        content: (
+          <ul>
+            <li>
+              The primary acknowledges the write <em>before</em> replicating to
+              secondaries
+            </li>
+            <li>
+              If the primary crashes right after the ack, the write is{" "}
+              <strong>lost</strong> — secondaries never received it
+            </li>
+            <li>
+              <strong>RPO &gt; 0</strong> — you can lose the most recent writes
+              (the replication lag window)
+            </li>
+            <li>Lowest write latency; good for non-critical telemetry data</li>
+          </ul>
+        ),
+      },
+      {
+        title: "w:majority — Safe but slower",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>
+              The primary waits until a <strong>majority</strong> of replica-set
+              members (including itself) confirm the write
+            </li>
+            <li>
+              Even if the primary dies, the write survives on the other members
+            </li>
+            <li>
+              <strong>RPO ≈ 0</strong> — committed writes are durable across the
+              replica set
+            </li>
+            <li>
+              Adds ~3-8 ms of latency per write (network round-trip to
+              secondaries)
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Election & RTO",
+        accent: "#f59e0b",
+        content: (
+          <ul>
+            <li>
+              When a primary fails, secondaries hold an{" "}
+              <strong>election</strong> (~5-10 seconds)
+            </li>
+            <li>
+              During the election the shard is <em>read-only</em> — no writes
+              accepted
+            </li>
+            <li>
+              <strong>RTO ≈ 5-10 s</strong> — time until a new primary is
+              elected and writes resume
+            </li>
+            <li>
+              Other shards are <em>unaffected</em> — only the shard that lost
+              its primary pauses writes
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Choosing the right write concern",
+        accent: "#f472b6",
+        content: (
+          <p>
+            Use <code>w:majority</code> for any data you can't afford to lose
+            (payments, orders, user accounts). Use <code>w:1</code> for
+            high-volume, low-value writes where speed matters more than
+            durability (logs, metrics, session pings). Many production systems
+            use <code>w:majority</code> + <code>j:true</code> (journal) as the
+            default safety net.
+          </p>
+        ),
+      },
+    ],
+  },
+  "mixed-concern": {
+    title: "Mixed Concern (w:1 + Primary Reads)",
+    subtitle: "Looks consistent — but durability is an illusion",
+    accentColor: "#f97316",
+    sections: [
+      {
+        title: "What your setup does",
+        accent: "#f97316",
+        content: (
+          <ul>
+            <li>
+              <strong>Write concern w:1</strong> — primary acknowledges
+              immediately, replication is async
+            </li>
+            <li>
+              <strong>Read preference: primary</strong> — every read goes to the
+              same node that just accepted the write
+            </li>
+            <li>
+              Result: you always read the freshest value — that part feels like
+              strong consistency
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Why it feels strongly consistent",
+        accent: "#22c55e",
+        content: (
+          <>
+            <p>
+              Because reads and writes hit the <em>same primary</em>, you always
+              get read-your-writes consistency:
+            </p>
+            <pre
+              style={{
+                background: "#0f172a",
+                borderRadius: 6,
+                padding: "10px 14px",
+                fontSize: 11,
+                color: "#86efac",
+                marginTop: 8,
+              }}
+            >{`Primary:     NEW VALUE  ✅
+Secondary A: OLD VALUE
+Secondary B: OLD VALUE
+
+Your read → goes to Primary → returns NEW VALUE`}</pre>
+            <p style={{ marginTop: 8 }}>
+              From the client's perspective this is indistinguishable from
+              strong consistency.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "The hidden danger — durability is weak",
+        accent: "#ef4444",
+        content: (
+          <>
+            <p>
+              That write is <strong>not durable yet</strong>. The secondaries
+              haven't received it:
+            </p>
+            <pre
+              style={{
+                background: "#0f172a",
+                borderRadius: 6,
+                padding: "10px 14px",
+                fontSize: 11,
+                color: "#fca5a5",
+                marginTop: 8,
+              }}
+            >{`Step 1  Primary writes → ACK  ✅
+Step 2  Primary crashes    ❌
+Step 3  Secondaries elect a new primary
+Step 4  New primary only has the OLD value
+Step 5  Your data is gone  ❗`}</pre>
+            <p style={{ marginTop: 8 }}>
+              You saw data that <strong>later disappears</strong>. This is
+              called a <em>rollback</em> — the write was never committed to a
+              majority, so it simply vanishes after failover.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: 'Why it\'s called "mixed"',
+        accent: "#f97316",
+        content: (
+          <table
+            style={{
+              width: "100%",
+              fontSize: 12,
+              borderCollapse: "collapse",
+              color: "#e2e8f0",
+            }}
+          >
+            <thead>
+              <tr>
+                <th
+                  style={{
+                    textAlign: "left",
+                    padding: "4px 8px",
+                    color: "#94a3b8",
+                    borderBottom: "1px solid #334155",
+                  }}
+                >
+                  Property
+                </th>
+                <th
+                  style={{
+                    textAlign: "left",
+                    padding: "4px 8px",
+                    color: "#94a3b8",
+                    borderBottom: "1px solid #334155",
+                  }}
+                >
+                  Behavior
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Read consistency", "✅ Strong — you always see the latest"],
+                ["Durability", "❌ Weak — the latest write can disappear"],
+              ].map(([prop, beh]) => (
+                <tr key={prop}>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                    }}
+                  >
+                    {prop}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                    }}
+                  >
+                    {beh}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      },
+      {
+        title: "Comparison with other modes",
+        accent: "#94a3b8",
+        content: (
+          <table
+            style={{
+              width: "100%",
+              fontSize: 11,
+              borderCollapse: "collapse",
+              color: "#e2e8f0",
+            }}
+          >
+            <thead>
+              <tr>
+                {["Setting", "Read freshness", "Durability"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: "left",
+                      padding: "4px 8px",
+                      color: "#94a3b8",
+                      borderBottom: "1px solid #334155",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["w:1 + secondary", "❌ Stale reads", "❌ Weak"],
+                ["w:1 + primary  (this)", "✅ Fresh reads", "❌ Weak"],
+                ["w:majority + primary", "✅ Fresh reads", "✅ Strong"],
+              ].map(([setting, reads, dur]) => (
+                <tr key={setting}>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {setting}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                    }}
+                  >
+                    {reads}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                    }}
+                  >
+                    {dur}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      },
+      {
+        title: "Real intuition",
+        accent: "#f97316",
+        content: (
+          <p>
+            You are reading from the <strong>source of truth</strong>, but that
+            truth hasn't been safely replicated yet. It's the{" "}
+            <em>illusion of strong consistency</em> — it holds perfectly right
+            up until the primary crashes.
           </p>
         ),
       },

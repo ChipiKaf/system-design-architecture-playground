@@ -144,6 +144,15 @@
   overflow-y: auto;
   padding-right: 0.15rem;
   padding-bottom: 1.5rem;
+
+  // padding-bottom is swallowed by overflow-y:auto in most browsers;
+  // use an ::after spacer to guarantee the last card has breathing room
+  &::after {
+    content: "";
+    display: block;
+    min-height: 1.5rem;
+    flex-shrink: 0;
+  }
 }
 
 /* ── Side Card ──────────────────────────────────────── */

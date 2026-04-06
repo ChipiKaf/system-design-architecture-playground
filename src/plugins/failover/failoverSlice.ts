@@ -4,6 +4,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 export type FailoverStrategy = "cold" | "warm" | "hot" | "multiPrimary";
 export type ReplicationMode = "backup" | "async" | "sync";
+export type OperationType = "read" | "write";
 export type NodeRole = "primary" | "secondary";
 export type NodeStatus = "up" | "down" | "recovering" | "promoting";
 
@@ -29,6 +30,7 @@ export interface CostBreakdown {
 export interface FailoverState {
   strategy: FailoverStrategy;
   replicationMode: ReplicationMode;
+  selectedOp: OperationType;
   autoFailover: boolean;
   healthCheckIntervalSec: number;
   nodes: NodeState[];
@@ -409,6 +411,7 @@ function createNodes(strategy: FailoverStrategy): NodeState[] {
 export const initialState: FailoverState = {
   strategy: "cold",
   replicationMode: "backup",
+  selectedOp: "write" as OperationType,
   autoFailover: false,
   healthCheckIntervalSec: 30,
   nodes: createNodes("cold"),
@@ -493,6 +496,10 @@ const failoverSlice = createSlice({
     setReplicationMode(state, action: PayloadAction<ReplicationMode>) {
       state.replicationMode = action.payload;
       computeMetrics(state);
+    },
+
+    setSelectedOp(state, action: PayloadAction<OperationType>) {
+      state.selectedOp = action.payload;
     },
 
     toggleAutoFailover(state) {
@@ -589,6 +596,7 @@ export const {
   patchState,
   setStrategy,
   setReplicationMode,
+  setSelectedOp,
   toggleAutoFailover,
   failPrimary,
   promoteSecondary,

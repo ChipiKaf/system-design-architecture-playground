@@ -12,6 +12,8 @@ export type OperationId =
   | "burst-write"
   | "read-after-write";
 export type ConsistencyLevel = "strong" | "quorum" | "eventual";
+export type WriteConcern = "w1" | "wmajority";
+export type ReadPreference = "primary" | "secondary" | "majority";
 
 export interface DbNode {
   id: string;
@@ -37,6 +39,8 @@ export interface OperationResult {
   nodesTouched: number;
   shardsTouched: number; // MongoDB: how many shards the query hits
   staleReadRisk: boolean;
+  rpoRisk: "none" | "low" | "high"; // Risk of data loss on failure
+  rtoMs: number; // Recovery-time estimate in ms (0 = no downtime)
 }
 
 export interface DbTradeoffState {
@@ -44,6 +48,8 @@ export interface DbTradeoffState {
   workload: WorkloadId;
   selectedOp: OperationId;
   consistencyLevel: ConsistencyLevel;
+  writeConcern: WriteConcern; // MongoDB: w:1 or w:majority
+  readPreference: ReadPreference; // MongoDB: where reads are routed
   replicationFactor: number;
   nodeCount: number;
   failedNodeIndex: number | null;
@@ -56,6 +62,7 @@ export interface DbTradeoffState {
   whyThisDb: string;
 
   targetShardIdx: number; // MongoDB: which shard a targeted query hits
+  replicaAckCount: number; // MongoDB: how many nodes have the latest write (1 | 2 | 3)
   hotZones: string[];
   explanation: string;
   phase: string;
@@ -297,6 +304,25 @@ const WHY_DB: Record<DbType, Record<WorkloadId, string>> = {
 const clamp = (n: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, n));
 
+/**
+ * Map MongoDB's actual knobs (writeConcern + readPreference) to a
+ * canonical ConsistencyLevel so existing metric computations work correctly.
+ *
+ *  w:majority + majority  → strong   (quorum read + write)
+ *  w:majority + primary   → quorum   (safe writes, primary reads)
+ *  w:1        + majority  → quorum   (fast writes, but majority reads)
+ *  w:1        + secondary → eventual (fast writes, possibly stale reads)
+ *  w:1        + primary   → quorum   (fast writes, primary reads — mixed)
+ */
+function deriveMongoConsistency(
+  wc: WriteConcern,
+  rp: ReadPreference,
+): ConsistencyLevel {
+  if (wc === "wmajority" && rp === "majority") return "strong";
+  if (wc === "w1" && rp === "secondary") return "eventual";
+  return "quorum";
+}
+
 interface OpMetrics {
   readMs: number;
   writeMs: number;
@@ -515,6 +541,49 @@ export function computeMetrics(state: DbTradeoffState) {
     failedNode,
   );
 
+  // MongoDB write-concern latency adjustment
+  let writeMs = m.writeMs;
+  let readMs = m.readMs;
+  let staleReadRisk = m.staleReadRisk;
+
+  if (state.dbType === "mongodb") {
+    if (state.writeConcern === "wmajority") {
+      // w:majority waits for ack from majority of replica-set members
+      writeMs += 6;
+    }
+    // w:1 has no extra latency (fire-and-forget to secondaries)
+
+    // Read preference effects
+    if (state.readPreference === "secondary") {
+      readMs -= 1; // slightly lower because secondaries offload primary
+      // Stale risk: secondary may not have replicated yet
+      staleReadRisk = state.writeConcern === "w1" ? true : true;
+      // Even w:majority can have a tiny lag window on secondary reads
+    } else if (state.readPreference === "majority") {
+      readMs += 3; // majority read must confirm data is majority-committed
+      staleReadRisk = false; // reads only return majority-committed data
+    } else {
+      // primary — reads go to same node that writes, always current
+      staleReadRisk = false;
+    }
+  }
+
+  // RPO / RTO
+  let rpoRisk: "none" | "low" | "high" = "none";
+  let rtoMs = 0;
+
+  if (state.dbType === "mongodb") {
+    rpoRisk = state.writeConcern === "w1" ? "high" : "none";
+    rtoMs = failedNode ? 7000 : 0; // ~5-10s election on primary failure
+  } else if (state.dbType === "relational") {
+    rpoRisk = failedNode && state.nodeCount < 2 ? "high" : "none";
+    rtoMs = failedNode ? 15000 : 0; // manual / slower failover
+  } else {
+    // Cassandra: peer-to-peer, very fast recovery
+    rpoRisk = state.consistencyLevel === "eventual" ? "low" : "none";
+    rtoMs = failedNode ? 1000 : 0;
+  }
+
   // Shards touched
   const shardsTouched =
     state.dbType === "mongodb"
@@ -524,8 +593,8 @@ export function computeMetrics(state: DbTradeoffState) {
       : 0;
 
   state.result = {
-    readLatencyMs: m.readMs,
-    writeLatencyMs: m.writeMs,
+    readLatencyMs: readMs,
+    writeLatencyMs: writeMs,
     throughputRps: m.throughput,
     consistency: state.consistencyLevel,
     availability: computeAvailability(
@@ -541,7 +610,9 @@ export function computeMetrics(state: DbTradeoffState) {
     fitScore: FIT_SCORES[state.dbType][state.workload],
     nodesTouched: m.nodesTouched,
     shardsTouched,
-    staleReadRisk: m.staleReadRisk,
+    staleReadRisk,
+    rpoRisk,
+    rtoMs,
   };
 
   // Data model
@@ -628,6 +699,8 @@ const baseState: DbTradeoffState = {
   workload: "banking",
   selectedOp: "write",
   consistencyLevel: "strong",
+  writeConcern: "wmajority" as WriteConcern,
+  readPreference: "primary" as ReadPreference,
   replicationFactor: 3,
   nodeCount: 3,
   failedNodeIndex: null,
@@ -644,9 +717,12 @@ const baseState: DbTradeoffState = {
     nodesTouched: 0,
     shardsTouched: 0,
     staleReadRisk: false,
+    rpoRisk: "none",
+    rtoMs: 0,
   },
 
   targetShardIdx: 0,
+  replicaAckCount: 2,
   dataModel: "",
   dataModelDetail: [],
   whyThisDb: "",
@@ -680,6 +756,9 @@ const dbTradeoffSlice = createSlice({
       // Randomize target shard each pass for MongoDB
       if (state.dbType === "mongodb" && state.nodeCount > 0) {
         state.targetShardIdx = Math.floor(Math.random() * state.nodeCount);
+        // 50/50: either only primary has new value (no majority yet)
+        // or primary + one secondary do (majority reached)
+        state.replicaAckCount = Math.random() < 0.5 ? 1 : 2;
       }
       computeMetrics(state);
     },
@@ -691,9 +770,14 @@ const dbTradeoffSlice = createSlice({
     },
     setDbType(state, action: PayloadAction<DbType>) {
       state.dbType = action.payload;
-      // Auto-set consistency to the DB's natural default
-      state.consistencyLevel = DB_PROFILES[action.payload].consistency;
+      state.writeConcern = "wmajority";
+      state.readPreference = "primary";
       state.failedNodeIndex = null;
+      // Derive consistency from knobs for MongoDB; use profile default for others
+      state.consistencyLevel =
+        action.payload === "mongodb"
+          ? deriveMongoConsistency("wmajority", "primary")
+          : DB_PROFILES[action.payload].consistency;
       // MongoDB: nodeCount = shard count, max 3
       if (action.payload === "mongodb" && state.nodeCount > 3) {
         state.nodeCount = 3;
@@ -711,6 +795,28 @@ const dbTradeoffSlice = createSlice({
     },
     setConsistencyLevel(state, action: PayloadAction<ConsistencyLevel>) {
       state.consistencyLevel = action.payload;
+      computeMetrics(state);
+    },
+    setWriteConcern(state, action: PayloadAction<WriteConcern>) {
+      state.writeConcern = action.payload;
+      // sync consistencyLevel so internal metrics stay accurate
+      if (state.dbType === "mongodb") {
+        state.consistencyLevel = deriveMongoConsistency(
+          action.payload,
+          state.readPreference,
+        );
+      }
+      computeMetrics(state);
+    },
+    setReadPreference(state, action: PayloadAction<ReadPreference>) {
+      state.readPreference = action.payload;
+      // sync consistencyLevel so internal metrics stay accurate
+      if (state.dbType === "mongodb") {
+        state.consistencyLevel = deriveMongoConsistency(
+          state.writeConcern,
+          action.payload,
+        );
+      }
       computeMetrics(state);
     },
     setNodeCount(state, action: PayloadAction<number>) {
@@ -750,6 +856,8 @@ export const {
   setWorkload,
   setSelectedOp,
   setConsistencyLevel,
+  setWriteConcern,
+  setReadPreference,
   setNodeCount,
   toggleNodeFailure,
 } = dbTradeoffSlice.actions;
