@@ -1,6 +1,14 @@
 import type { DbTradeoffState } from "./dbTradeoffSlice";
 import { isTargetedOp, WORKLOAD_PROFILES } from "./dbTradeoffSlice";
 import { getAdapter } from "./db-adapters";
+import {
+  buildSteps as genericBuildSteps,
+  executeFlow as genericExecuteFlow,
+  type FlowBeat as GenericFlowBeat,
+  type StepDef as GenericStepDef,
+  type TaggedStep as GenericTaggedStep,
+  type FlowExecutorDeps as GenericFlowExecutorDeps,
+} from "../../lib/lab-engine";
 
 /* ── helpers ───────────────────────────────────────────── */
 
@@ -9,6 +17,13 @@ const isReadOp = (op: string) =>
   op === "join-query" ||
   op === "aggregate" ||
   op === "read-after-write";
+
+/* ── Specialised type aliases ──────────────────────────── */
+
+export type FlowBeat = GenericFlowBeat<DbTradeoffState>;
+export type StepDef = GenericStepDef<DbTradeoffState, StepKey>;
+export type TaggedStep = GenericTaggedStep<StepKey>;
+export type FlowExecutorDeps = GenericFlowExecutorDeps<DbTradeoffState>;
 
 /* ── Token expansion ───────────────────────────────────── */
 
@@ -28,17 +43,6 @@ export function expandToken(token: string, state: DbTradeoffState): string[] {
   return [token];
 }
 
-/* ── FlowBeat ──────────────────────────────────────────── */
-
-export interface FlowBeat {
-  from: string;
-  to: string;
-  when?: (s: DbTradeoffState) => boolean;
-  color?: string | ((s: DbTradeoffState) => string);
-  duration?: number;
-  explain?: string;
-}
-
 /* ── Step definitions ──────────────────────────────────── */
 
 export type StepKey =
@@ -52,22 +56,6 @@ export type StepKey =
   | "replication"
   | "consistency-check"
   | "summary";
-
-export interface StepDef {
-  key: StepKey;
-  label: string;
-  when?: (s: DbTradeoffState) => boolean;
-  nextButton?: string | ((s: DbTradeoffState) => string);
-  nextButtonColor?: string;
-  processingText?: string;
-  phase?: string | ((s: DbTradeoffState) => string);
-  flow?: FlowBeat[] | ((s: DbTradeoffState) => FlowBeat[]);
-  delay?: number;
-  recalcMetrics?: boolean;
-  finalHotZones?: string[] | ((s: DbTradeoffState) => string[]);
-  explain?: string | ((s: DbTradeoffState) => string);
-  action?: "resetRun";
-}
 
 export const STEPS: StepDef[] = [
   {
@@ -197,93 +185,23 @@ export const STEPS: StepDef[] = [
   },
 ];
 
-/* ── buildSteps + TaggedStep ───────────────────────────── */
-
-export interface TaggedStep {
-  key: StepKey;
-  label: string;
-  autoAdvance?: boolean;
-  nextButtonText?: string;
-  nextButtonColor?: string;
-  processingText?: string;
-}
+/* ── Build active steps ────────────────────────────────── */
 
 export function buildSteps(state: DbTradeoffState): TaggedStep[] {
-  let active = STEPS.filter((s) => !s.when || s.when(state));
-
-  // Delegate step reordering to the current adapter
-  active = getAdapter(state.dbType).reorderSteps(active, state);
-
-  return active.map((step, i) => {
-    const nextStep = active[i + 1];
-    let nextButtonText: string | undefined;
-    if (typeof step.nextButton === "function") {
-      nextButtonText = step.nextButton(state);
-    } else if (typeof step.nextButton === "string") {
-      nextButtonText = step.nextButton;
-    } else if (nextStep) {
-      nextButtonText = nextStep.label;
-    }
-
-    // Cassandra: relabel "Replication" → "Write to Replicas"
-    const label =
-      step.key === "replication" && state.dbType === "cassandra"
+  return genericBuildSteps(STEPS, state, {
+    reorder: (steps, s) => getAdapter(s.dbType).reorderSteps(steps, s),
+    relabel: (step, s) =>
+      step.key === "replication" && s.dbType === "cassandra"
         ? "Write to Replicas"
-        : step.label;
-
-    return {
-      key: step.key,
-      label,
-      autoAdvance: false,
-      nextButtonText,
-      nextButtonColor: step.nextButtonColor,
-      processingText: step.processingText,
-    };
+        : step.label,
   });
 }
 
 /* ── Flow executor ─────────────────────────────────────── */
 
-export interface FlowExecutorDeps {
-  animateParallel: (
-    pairs: { from: string; to: string }[],
-    duration: number,
-    color?: string,
-  ) => Promise<void>;
-  patch: (p: Partial<DbTradeoffState>) => void;
-  getState: () => DbTradeoffState;
-  cancelled: () => boolean;
-}
-
-export async function executeFlow(
+export function executeFlow(
   beats: FlowBeat[],
   deps: FlowExecutorDeps,
 ): Promise<void> {
-  for (const beat of beats) {
-    if (deps.cancelled()) return;
-
-    const state = deps.getState();
-    if (beat.when && !beat.when(state)) continue;
-
-    const froms = expandToken(beat.from, state);
-    const tos = expandToken(beat.to, state);
-
-    // Skip self-referential pairs in all→all expansion
-    const pairs: { from: string; to: string }[] = [];
-    for (const f of froms) {
-      for (const t of tos) {
-        if (f !== t) pairs.push({ from: f, to: t });
-      }
-    }
-    if (pairs.length === 0) continue;
-
-    const hotZones = [...new Set([...froms, ...tos])];
-    const update: Partial<DbTradeoffState> = { hotZones };
-    if (beat.explain) update.explanation = beat.explain;
-    deps.patch(update);
-
-    const beatColor =
-      typeof beat.color === "function" ? beat.color(state) : beat.color;
-    await deps.animateParallel(pairs, beat.duration ?? 650, beatColor);
-  }
+  return genericExecuteFlow(beats, deps, expandToken);
 }

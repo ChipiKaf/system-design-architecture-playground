@@ -1,4 +1,12 @@
 import type { FailoverState } from "./failoverSlice";
+import {
+  buildSteps as genericBuildSteps,
+  executeFlow as genericExecuteFlow,
+  type FlowBeat as GenericFlowBeat,
+  type StepDef as GenericStepDef,
+  type TaggedStep as GenericTaggedStep,
+  type FlowExecutorDeps as GenericFlowExecutorDeps,
+} from "../../lib/lab-engine";
 
 /* ══════════════════════════════════════════════════════════
    Failover Lab — Declarative Flow Engine
@@ -8,23 +16,20 @@ import type { FailoverState } from "./failoverSlice";
    recovery, and a summary of tradeoffs.
    ══════════════════════════════════════════════════════════ */
 
+/* ── Specialised type aliases ──────────────────────────── */
+
+export type FlowBeat = GenericFlowBeat<FailoverState>;
+export type StepDef = GenericStepDef<FailoverState, StepKey>;
+export type TaggedStep = GenericTaggedStep<StepKey>;
+export type FlowExecutorDeps = GenericFlowExecutorDeps<FailoverState>;
+
 /* ── Token expansion ─────────────────────────────────── */
 
 export function expandToken(token: string, _state: FailoverState): string[] {
   return [token];
 }
 
-/* ── Flow Beat ───────────────────────────────────────── */
-
-export interface FlowBeat {
-  from: string;
-  to: string;
-  when?: (s: FailoverState) => boolean;
-  duration?: number;
-  explain?: string;
-}
-
-/* ── Step Definition ─────────────────────────────────── */
+/* ── Step keys ───────────────────────────────────────── */
 
 export type StepKey =
   | "overview"
@@ -39,27 +44,6 @@ export type StepKey =
   | "recovery-reroute"
   | "secondary-serves"
   | "summary";
-
-export interface StepDef {
-  key: StepKey;
-  label: string;
-  when?: (s: FailoverState) => boolean;
-  nextButton?: string | ((s: FailoverState) => string);
-  nextButtonColor?: string;
-  processingText?: string;
-  phase?: string | ((s: FailoverState) => string);
-  flow?: FlowBeat[];
-  delay?: number;
-  recalcMetrics?: boolean;
-  finalHotZones?: string[];
-  explain?: string | ((s: FailoverState) => string);
-  action?:
-    | "reset"
-    | "softReset"
-    | "failPrimary"
-    | "promoteSecondary"
-    | "completeFailover";
-}
 
 /* ── Step Configuration ──────────────────────────────── */
 
@@ -253,80 +237,17 @@ export const STEPS: StepDef[] = [
   },
 ];
 
-/* ── Build active steps from config ──────────────────── */
-
-export interface TaggedStep {
-  key: StepKey;
-  label: string;
-  autoAdvance?: boolean;
-  nextButtonText?: string;
-  nextButtonColor?: string;
-  processingText?: string;
-}
+/* ── Build active steps ──────────────────────────────── */
 
 export function buildSteps(state: FailoverState): TaggedStep[] {
-  const active = STEPS.filter((s) => !s.when || s.when(state));
-
-  return active.map((step, i) => {
-    const nextStep = active[i + 1];
-    let nextButtonText: string | undefined;
-    if (typeof step.nextButton === "function") {
-      nextButtonText = step.nextButton(state);
-    } else if (typeof step.nextButton === "string") {
-      nextButtonText = step.nextButton;
-    } else if (nextStep) {
-      nextButtonText = nextStep.label;
-    }
-
-    return {
-      key: step.key,
-      label: step.label,
-      autoAdvance: false,
-      nextButtonText,
-      nextButtonColor: step.nextButtonColor,
-      processingText: step.processingText,
-    };
-  });
+  return genericBuildSteps(STEPS, state);
 }
 
-/* ── Flow Executor ───────────────────────────────────── */
+/* ── Flow executor ───────────────────────────────────── */
 
-export interface FlowExecutorDeps {
-  animateParallel: (
-    pairs: { from: string; to: string }[],
-    duration: number,
-  ) => Promise<void>;
-  patch: (p: Partial<FailoverState>) => void;
-  getState: () => FailoverState;
-  cancelled: () => boolean;
-}
-
-export async function executeFlow(
+export function executeFlow(
   beats: FlowBeat[],
   deps: FlowExecutorDeps,
 ): Promise<void> {
-  const state = deps.getState();
-  const activeBeats = beats.filter((b) => !b.when || b.when(state));
-
-  for (const beat of activeBeats) {
-    if (deps.cancelled()) return;
-
-    const st = deps.getState();
-    const froms = expandToken(beat.from, st);
-    const tos = expandToken(beat.to, st);
-
-    const pairs: { from: string; to: string }[] = [];
-    for (const f of froms) {
-      for (const t of tos) {
-        pairs.push({ from: f, to: t });
-      }
-    }
-
-    const hotZones = [...new Set([...froms, ...tos])];
-    const update: Partial<FailoverState> = { hotZones };
-    if (beat.explain) update.explanation = beat.explain;
-    deps.patch(update);
-
-    await deps.animateParallel(pairs, beat.duration ?? 600);
-  }
+  return genericExecuteFlow(beats, deps, expandToken);
 }
