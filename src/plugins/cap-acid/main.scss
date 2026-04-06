@@ -1,0 +1,152 @@
+/* ── CAP-ACID Plugin ──────────────────────────────── */
+.cap-acid-root {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Phase accent colours ───────────────────────────── */
+.cap-acid-phase--overview {
+  --phase-accent: #60a5fa;
+}
+.cap-acid-phase--write {
+  --phase-accent: #818cf8;
+}
+.cap-acid-phase--read {
+  --phase-accent: #38bdf8;
+}
+.cap-acid-phase--partition {
+  --phase-accent: #ef4444;
+}
+.cap-acid-phase--partition-write {
+  --phase-accent: #f97316;
+}
+.cap-acid-phase--partition-read {
+  --phase-accent: #f59e0b;
+}
+.cap-acid-phase--acid-check {
+  --phase-accent: #a78bfa;
+}
+.cap-acid-phase--summary {
+  --phase-accent: #22c55e;
+}
+
+/* ── Stage chrome ───────────────────────────────────── */
+.cap-acid-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── CAP sidebar grid ───────────────────────────────── */
+.cap-acid-cap-grid,
+.cap-acid-acid-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ── Stat badges ────────────────────────────────────── */
+.cap-acid-phase {
+  border-color: var(--phase-accent, #60a5fa);
+  color: var(--phase-accent, #60a5fa);
+}
+
+/* ── Controls bar ───────────────────────────────────── */
+.cap-acid-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: center;
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  &__legend {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 0.15rem;
+    white-space: nowrap;
+  }
+
+  &__sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(148, 163, 184, 0.14);
+    margin: 0 0.15rem;
+  }
+
+  &__btn {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    background: rgba(15, 23, 42, 0.9);
+    color: #94a3b8;
+    font-size: 0.66rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      transform 0.12s ease,
+      background 0.12s ease,
+      border-color 0.12s ease,
+      color 0.12s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(59, 130, 246, 0.1);
+      transform: translateY(-1px);
+    }
+
+    &--active {
+      background: rgba(59, 130, 246, 0.14);
+      border-color: currentColor;
+      color: #e2e8f0;
+      box-shadow: 0 0 0 1px currentColor inset;
+    }
+
+    &--danger {
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.25);
+
+      &:hover:not(:disabled) {
+        background: rgba(239, 68, 68, 0.1);
+      }
+
+      &.cap-acid-controls__btn--active {
+        background: rgba(239, 68, 68, 0.15);
+        border-color: #ef4444;
+        color: #fca5a5;
+      }
+    }
+
+    &--disabled {
+      opacity: 0.28;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+  }
+
+  &__cap-tag {
+    display: inline-block;
+    font-size: 0.52rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    background: rgba(148, 163, 184, 0.1);
+    border-radius: 3px;
+    padding: 0.05rem 0.25rem;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+    color: inherit;
+    opacity: 0.7;
+  }
+}
