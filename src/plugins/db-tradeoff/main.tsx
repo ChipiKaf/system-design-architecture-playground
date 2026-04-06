@@ -52,15 +52,25 @@ function buildNeedsChecklist(
   dbType: DbType,
   writeConcern: WriteConcern,
   readPreference: ReadPreference,
+  cassandraConsistency?: string,
 ): NeedCheck[] {
   const isRelational = dbType === "relational";
   const isMongo = dbType === "mongodb";
+  const isCassandra = dbType === "cassandra";
   const mongoLevel = isMongo
     ? writeConcern === "wmajority" && readPreference === "majority"
       ? "strong"
       : writeConcern === "w1" && readPreference === "secondary"
         ? "eventual"
         : "quorum"
+    : null;
+  // Cassandra: CL=ALL → strong, CL=QUORUM → quorum, CL=ONE → eventual
+  const cassLevel = isCassandra
+    ? cassandraConsistency === "strong"
+      ? "strong"
+      : cassandraConsistency === "quorum"
+        ? "quorum"
+        : "eventual"
     : null;
 
   if (workload === "banking") {
@@ -73,7 +83,13 @@ function buildNeedsChecklist(
             ? mongoLevel === "strong" || mongoLevel === "quorum"
               ? "warn"
               : "fail"
-            : "fail",
+            : isCassandra
+              ? cassLevel === "strong"
+                ? "warn"
+                : cassLevel === "quorum"
+                  ? "warn"
+                  : "fail"
+              : "fail",
         note: isRelational
           ? "Full serialisable isolation via ACID guarantees"
           : isMongo
@@ -82,7 +98,13 @@ function buildNeedsChecklist(
               : mongoLevel === "quorum"
                 ? "Partial — enable Majority read mode; still needs atomic ops to prevent double-spend"
                 : "w:1 + secondary reads can return stale data"
-            : "Eventual-only — no strong consistency mode available",
+            : isCassandra
+              ? cassLevel === "strong"
+                ? "CL=ALL — coordinator waits for ALL replicas to ack. Reads all replicas. Strong per-partition, but no cross-partition ACID."
+                : cassLevel === "quorum"
+                  ? "CL=QUORUM — majority of replicas must ack. Overlapping write+read quorums guarantee you read the latest write."
+                  : "CL=ONE — only 1 replica acks the write. Other replicas may lag. Reads may return stale data."
+              : "Eventual-only — no strong consistency mode available",
       },
       {
         need: "ACID transactions",
@@ -101,14 +123,24 @@ function buildNeedsChecklist(
             ? writeConcern === "wmajority"
               ? "warn"
               : "fail"
-            : "fail",
+            : isCassandra
+              ? cassLevel === "strong" || cassLevel === "quorum"
+                ? "warn"
+                : "fail"
+              : "fail",
         note: isRelational
           ? "Designed for correctness-first: constraints, triggers, referential integrity"
           : isMongo
             ? writeConcern === "wmajority"
               ? "w:majority reduces loss risk but ledger semantics are weaker than relational"
               : "w:1 prioritises speed — dangerous for financial ledger data"
-            : "AP system — availability is favoured over correctness",
+            : isCassandra
+              ? cassLevel === "strong"
+                ? "CL=ALL gives durability guarantees per-partition, but lacks multi-row atomicity"
+                : cassLevel === "quorum"
+                  ? "CL=QUORUM balances speed and safety — not sufficient for strict ledger guarantees"
+                  : "CL=ONE — writes return before all replicas confirm. Data loss risk on node failure."
+              : "AP system — availability is favoured over correctness",
       },
     ];
   }
@@ -1437,16 +1469,6 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                     : "#94a3b8",
                 { fontSize: 9 },
               );
-              l.newline();
-              l.color(
-                `own: ${ownedRangeLabel(i)}`,
-                revealKo
-                  ? "#f97316"
-                  : revealRf
-                    ? "rgba(245,158,11,0.55)"
-                    : "#475569",
-                { fontSize: 8 },
-              );
             },
             { fill: "#fff", fontSize: 10, dy: 0, lineHeight: 1.5 },
           )
@@ -1863,6 +1885,18 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       color: "#fed7aa",
       borderColor: "#f97316",
     },
+    {
+      key: "coordinator",
+      label: "Coordinator",
+      color: "#fef3c7",
+      borderColor: "#fbbf24",
+    },
+    {
+      key: "key-owner",
+      label: "Key Owner",
+      color: "#ffedd5",
+      borderColor: "#f97316",
+    },
   ];
 
   return (
@@ -1974,25 +2008,35 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                   color="#fbbf24"
                 />
               )}
-              {dbType === "cassandra" && (
-                <StatBadge
-                  label="CL"
-                  value={
+              {dbType === "cassandra" &&
+                (() => {
+                  const _rf = Math.min(
+                    runtime.replicationFactor,
+                    runtime.nodeCount,
+                  );
+                  const _acks =
                     consistencyLevel === "strong"
-                      ? "ALL"
+                      ? _rf
                       : consistencyLevel === "quorum"
-                        ? "QUORUM"
-                        : "ONE"
-                  }
-                  color={
-                    consistencyLevel === "strong"
+                        ? Math.floor(_rf / 2) + 1
+                        : 1;
+                  const _rPlusW = _acks * 2;
+                  const _mode =
+                    _rPlusW > _rf
+                      ? "Strong"
+                      : _rPlusW === _rf
+                        ? "Mixed"
+                        : "Eventual";
+                  const _color =
+                    _mode === "Strong"
                       ? "#22c55e"
-                      : consistencyLevel === "quorum"
+                      : _mode === "Mixed"
                         ? "#f59e0b"
-                        : "#ef4444"
-                  }
-                />
-              )}
+                        : "#ef4444";
+                  return (
+                    <StatBadge label="MODE" value={_mode} color={_color} />
+                  );
+                })()}
               {dbType === "cassandra" && (
                 <StatBadge
                   label="Coord"
@@ -2015,6 +2059,7 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                     dbType,
                     writeConcern,
                     readPreference,
+                    consistencyLevel,
                   )}
                   onNeedClick={openNeedConcept}
                 />

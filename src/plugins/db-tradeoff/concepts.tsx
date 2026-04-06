@@ -16,7 +16,9 @@ export type ConceptKey =
   | "write-concern"
   | "mixed-concern"
   | "mongo-joins"
-  | "token-ring";
+  | "token-ring"
+  | "coordinator"
+  | "key-owner";
 
 interface ConceptDefinition {
   title: string;
@@ -155,38 +157,80 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
   },
   consistency: {
     title: "Consistency Levels",
-    subtitle: "How fresh the data is when you read it",
+    subtitle:
+      "Cassandra is tunable — you pick where on the spectrum each op lands",
     accentColor: "#ef4444",
     sections: [
       {
-        title: "Strong consistency",
+        title: "Strong consistency (effectively)",
         accent: "#ef4444",
         content: (
-          <p>
-            Every read returns the latest written value. Writes are confirmed
-            only after all replicas agree. Safest, but slowest.
-          </p>
-        ),
-      },
-      {
-        title: "Quorum consistency",
-        accent: "#f59e0b",
-        content: (
-          <p>
-            A majority of replicas must agree on both reads and writes. Balances
-            freshness with speed. If you write to a quorum and read from a
-            quorum, you always see the latest value.
-          </p>
+          <>
+            <p>
+              When <strong>R + W &gt; RF</strong>, read and write quorums
+              overlap — you always read the latest write.
+            </p>
+            <p>
+              Example: RF=3 → <strong>QUORUM reads + QUORUM writes</strong>
+            </p>
+            <p>👉 Guarantees you read the latest write</p>
+          </>
         ),
       },
       {
         title: "Eventual consistency",
         accent: "#22c55e",
         content: (
-          <p>
-            Writes succeed immediately on one replica. Other nodes catch up
-            later. Fastest writes, but reads may return stale data.
-          </p>
+          <>
+            <p>
+              When <strong>R + W ≤ RF</strong>, read and write sets may not
+              overlap — a read can return a stale replica.
+            </p>
+            <p>Example: ONE write + ONE read</p>
+            <p>👉 You might read stale data</p>
+          </>
+        ),
+      },
+      {
+        title: "Mixed (tunable consistency)",
+        accent: "#f59e0b",
+        content: (
+          <>
+            <p>
+              Cassandra lets you choose <strong>per operation</strong>.
+            </p>
+            <ul>
+              <li>Fast writes (CL=ONE)</li>
+              <li>Strong reads (CL=QUORUM)</li>
+            </ul>
+            <p>
+              This is unique — most databases force a single global consistency
+              setting.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Summary",
+        accent: "#ef4444",
+        content: (
+          <>
+            <p>
+              Cassandra is <strong>tunable consistency</strong>. You control
+              where it sits on the speed ↔ consistency spectrum.
+            </p>
+            <ul>
+              <li>
+                <strong>CL=ALL:</strong> all RF nodes must ack — slowest, safest
+              </li>
+              <li>
+                <strong>CL=QUORUM:</strong> majority acks — balanced
+              </li>
+              <li>
+                <strong>CL=ONE:</strong> 1 ack — fastest, stalest
+              </li>
+            </ul>
+          </>
         ),
       },
     ],
@@ -1167,6 +1211,197 @@ Step 5  Your data is gone  ❗`}</pre>
               ))}
             </tbody>
           </table>
+        ),
+      },
+    ],
+  },
+  coordinator: {
+    title: "Coordinator Node",
+    subtitle: "The traffic controller — a temporary, per-request role",
+    accentColor: "#fbbf24",
+    sections: [
+      {
+        title: "What it does",
+        accent: "#fbbf24",
+        content: (
+          <ul>
+            <li>
+              The coordinator is whichever node the{" "}
+              <strong>client connects to</strong> for a given request.
+            </li>
+            <li>
+              It <strong>hashes the partition key</strong>, locates the
+              responsible replicas on the ring, and forwards the read or write
+              to them.
+            </li>
+            <li>
+              It collects <strong>CL-required acknowledgements</strong> and
+              returns the result to the client.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Key characteristics",
+        accent: "#fbbf24",
+        content: (
+          <ul>
+            <li>
+              <strong>Temporary role</strong> — any node can be coordinator for
+              any request.
+            </li>
+            <li>
+              Does <em>not</em> necessarily store the data it is routing.
+            </li>
+            <li>
+              Selected by the client driver (usually round-robin or
+              token-aware).
+            </li>
+            <li>
+              If the coordinator is also a replica for that key, it participates
+              in both roles simultaneously.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Coordinator vs Key Owner",
+        accent: "#f97316",
+        content: (
+          <table
+            style={{
+              width: "100%",
+              fontSize: 11,
+              borderCollapse: "collapse",
+              color: "#e2e8f0",
+            }}
+          >
+            <thead>
+              <tr>
+                {["", "Coordinator", "Key Owner"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: "left",
+                      padding: "4px 8px",
+                      color: "#94a3b8",
+                      borderBottom: "1px solid #334155",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  ["Role", "Traffic controller", "Data holder"],
+                  ["Duration", "Per-request", "Permanent (ring position)"],
+                  [
+                    "Stores data?",
+                    "Not necessarily",
+                    "Yes — owns the token range",
+                  ],
+                  ["Same node?", "Sometimes", "Sometimes"],
+                ] as [string, string, string][]
+              ).map(([row, coord, ko]) => (
+                <tr key={row}>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {row}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                      color: "#fbbf24",
+                    }}
+                  >
+                    {coord}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                      color: "#f97316",
+                    }}
+                  >
+                    {ko}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      },
+    ],
+  },
+  "key-owner": {
+    title: "Key Owner (Primary Replica)",
+    subtitle: "The node whose token range contains hash(key)",
+    accentColor: "#f97316",
+    sections: [
+      {
+        title: "What it does",
+        accent: "#f97316",
+        content: (
+          <ul>
+            <li>
+              When a partition key is hashed, the result falls within one node's{" "}
+              <strong>token range</strong> on the consistent hash ring.
+            </li>
+            <li>
+              That node is the <strong>key owner</strong> — the first replica
+              responsible for storing that partition.
+            </li>
+            <li>
+              The next <strong>RF − 1</strong> nodes clockwise on the ring also
+              store replicas of the same data.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Key characteristics",
+        accent: "#f97316",
+        content: (
+          <ul>
+            <li>
+              <strong>Permanent role</strong> — determined by ring position, not
+              by the current request.
+            </li>
+            <li>
+              Owns a specific <em>token range</em> (e.g., T:250–500).
+            </li>
+            <li>
+              Also stores <strong>replicas of adjacent ranges</strong> (because
+              other nodes' data replicates clockwise through it).
+            </li>
+            <li>
+              All replicas are equal peers — the key owner is not a "primary" in
+              the Mongo/Postgres sense.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Why it matters",
+        accent: "#f97316",
+        content: (
+          <p>
+            Understanding the key owner is critical for{" "}
+            <strong>data locality</strong>. Cassandra drivers can use{" "}
+            <em>token-aware routing</em> to send requests directly to the key
+            owner, making it act as both coordinator and key owner — eliminating
+            one network hop.
+          </p>
         ),
       },
     ],

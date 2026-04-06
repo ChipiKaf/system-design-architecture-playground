@@ -583,8 +583,13 @@ export function computeMetrics(state: DbTradeoffState) {
     rpoRisk = failedNode && state.nodeCount < 2 ? "high" : "none";
     rtoMs = failedNode ? 15000 : 0; // manual / slower failover
   } else {
-    // Cassandra: peer-to-peer, very fast recovery
-    rpoRisk = state.consistencyLevel === "eventual" ? "low" : "none";
+    // Cassandra: rpoRisk depends on CL, not just "eventual"
+    rpoRisk =
+      state.consistencyLevel === "eventual"
+        ? "high"
+        : state.consistencyLevel === "quorum"
+          ? "low"
+          : "none";
     rtoMs = failedNode ? 1000 : 0;
   }
 
@@ -633,7 +638,11 @@ export function computeMetrics(state: DbTradeoffState) {
     readLatencyMs: readMs,
     writeLatencyMs: writeMs,
     throughputRps: m.throughput,
-    consistency: state.consistencyLevel,
+    // Cassandra: map CL to effective consistency label
+    consistency:
+      state.dbType === "cassandra"
+        ? state.consistencyLevel
+        : state.consistencyLevel,
     availability: computeAvailability(
       state.dbType,
       state.nodeCount,
