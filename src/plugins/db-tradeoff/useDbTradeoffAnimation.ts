@@ -117,7 +117,10 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
         return;
       }
 
-      if (stepDef.recalcMetrics && !stepDef.flow) {
+      const resolvedFlow =
+        typeof stepDef.flow === "function" ? stepDef.flow(rt()) : stepDef.flow;
+
+      if (stepDef.recalcMetrics && !resolvedFlow) {
         dispatch(recalcMetrics());
       }
 
@@ -130,12 +133,12 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
       }
 
       const fhzNoFlow = getFhz();
-      if (fhzNoFlow !== undefined && !stepDef.flow) {
+      if (fhzNoFlow !== undefined && !resolvedFlow) {
         doPatch({ hotZones: fhzNoFlow });
       }
 
-      if (stepDef.flow) {
-        await executeFlow(stepDef.flow, {
+      if (resolvedFlow && resolvedFlow.length > 0) {
+        await executeFlow(resolvedFlow, {
           animateParallel,
           patch: doPatch,
           getState: rt,
@@ -144,7 +147,7 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
         if (cancelled) return;
       }
 
-      if (stepDef.recalcMetrics && stepDef.flow) {
+      if (stepDef.recalcMetrics && resolvedFlow) {
         dispatch(recalcMetrics());
       }
 
@@ -156,7 +159,7 @@ export const useDbTradeoffAnimation = (onAnimationComplete?: () => void) => {
       const fhz = getFhz();
       if (fhz !== undefined) {
         doPatch({ hotZones: fhz });
-      } else if (!stepDef.flow) {
+      } else if (!resolvedFlow) {
         doPatch({ hotZones: [] });
       }
 
