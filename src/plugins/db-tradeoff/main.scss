@@ -147,6 +147,9 @@
   &--route {
     --phase-accent: #f59e0b;
   }
+  &--partition-route {
+    --phase-accent: #fbbf24;
+  }
   &--response {
     --phase-accent: #22c55e;
   }
@@ -180,6 +183,32 @@
     display: flex;
     align-items: flex-start;
     gap: 10px;
+
+    &--btn {
+      all: unset;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      border-radius: 6px;
+      padding: 4px 6px;
+      margin: 0 -6px;
+      transition: background 0.15s ease;
+
+      &:hover {
+        background: rgba(148, 163, 184, 0.08);
+
+        .db-tradeoff-needs__label {
+          text-decoration: underline;
+          text-decoration-color: rgba(226, 232, 240, 0.35);
+        }
+      }
+
+      &:focus-visible {
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
+      }
+    }
   }
 
   &__icon {

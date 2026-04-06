@@ -14,6 +14,7 @@ import {
   StatBadge,
   useConceptModal,
 } from "../../components/plugin-kit";
+import type { ConceptDefinition } from "../../components/plugin-kit/useConceptModal";
 import { concepts, type ConceptKey } from "./concepts";
 import {
   DB_PROFILES,
@@ -21,12 +22,21 @@ import {
   WORKLOAD_PROFILES,
   isTargetedOp,
   type DbType,
+  type JoinMode,
   type ReadPreference,
   type WorkloadId,
   type WriteConcern,
 } from "./dbTradeoffSlice";
 import { useDbTradeoffAnimation, type Signal } from "./useDbTradeoffAnimation";
 import "./main.scss";
+
+/* ── Helpers ──────────────────────────────────────────── */
+
+const isReadOp = (op: string) =>
+  op === "point-read" ||
+  op === "join-query" ||
+  op === "aggregate" ||
+  op === "read-after-write";
 
 /* ── Needs checklist ─────────────────────────────────── */
 
@@ -60,19 +70,17 @@ function buildNeedsChecklist(
         status: isRelational
           ? "pass"
           : isMongo
-            ? mongoLevel === "strong"
-              ? "pass"
-              : mongoLevel === "quorum"
-                ? "warn"
-                : "fail"
+            ? mongoLevel === "strong" || mongoLevel === "quorum"
+              ? "warn"
+              : "fail"
             : "fail",
         note: isRelational
           ? "Full serialisable isolation via ACID guarantees"
           : isMongo
             ? mongoLevel === "strong"
-              ? "w:majority + Majority reads — quorum consensus achieved"
+              ? "w:majority + Majority reads — replication safe, but race conditions need atomic ops"
               : mongoLevel === "quorum"
-                ? "Partial — enable Majority read mode to reach strong"
+                ? "Partial — enable Majority read mode; still needs atomic ops to prevent double-spend"
                 : "w:1 + secondary reads can return stale data"
             : "Eventual-only — no strong consistency mode available",
       },
@@ -180,18 +188,660 @@ const STATUS_COLOR: Record<CheckStatus, string> = {
   fail: "#ef4444",
 };
 
+/* ── Per-need modal content ──────────────────────────── */
+
+function buildNeedConcepts(
+  workload: WorkloadId,
+  dbType: DbType,
+  writeConcern: WriteConcern,
+  readPreference: ReadPreference,
+): Record<string, ConceptDefinition> {
+  const isRelational = dbType === "relational";
+  const isMongo = dbType === "mongodb";
+  const dbLabel = isRelational
+    ? "PostgreSQL"
+    : isMongo
+      ? "MongoDB"
+      : "Cassandra";
+  const mongoLevel = isMongo
+    ? writeConcern === "wmajority" && readPreference === "majority"
+      ? "strong"
+      : writeConcern === "w1" && readPreference === "secondary"
+        ? "eventual"
+        : "quorum"
+    : null;
+
+  const workloadLabels: Record<WorkloadId, string> = {
+    banking: "Banking / Ledger",
+    ecommerce: "E-Commerce Catalog",
+    chat: "Chat / Messaging",
+  };
+  const wl = workloadLabels[workload];
+
+  const dbSection = (
+    content: React.ReactNode,
+  ): ConceptDefinition["sections"][0] => ({
+    title: `How ${dbLabel} handles it`,
+    accent: isRelational ? "#3b82f6" : isMongo ? "#22c55e" : "#f59e0b",
+    content,
+  });
+
+  /* ── Banking needs ─────────────────────────────────── */
+  if (workload === "banking") {
+    return {
+      "Strong consistency": {
+        title: "Strong Consistency",
+        subtitle: `Why ${wl} needs it — and how ${dbLabel} delivers it`,
+        accentColor: "#ef4444",
+        sections: [
+          {
+            title: `Why ${wl} needs Strong consistency`,
+            accent: "#ef4444",
+            content: (
+              <>
+                <p>
+                  Two concurrent transfers from the same account both read a
+                  balance of £500. Without strong consistency, both see £500 and
+                  both succeed — you just paid out £1,000 from a £500 account.
+                </p>
+                <p style={{ marginTop: 8 }}>
+                  Strong consistency guarantees every read reflects the most
+                  recent committed write. There is no window where two
+                  transactions can disagree on the account balance.
+                </p>
+              </>
+            ),
+          },
+          dbSection(
+            isRelational ? (
+              <p>
+                <strong>✓ Full serialisable isolation.</strong> PostgreSQL's
+                MVCC engine ensures reads see only committed data. You can use{" "}
+                <code>SERIALIZABLE</code> isolation level to prevent any phantom
+                read or write skew — the gold standard for financial systems.
+              </p>
+            ) : isMongo ? (
+              mongoLevel === "strong" ? (
+                <>
+                  <p>
+                    <strong>
+                      ⚠ Replication is safe — but double-spend is still
+                      possible.
+                    </strong>
+                  </p>
+                  <p style={{ marginTop: 6 }}>
+                    <code>w:majority + readConcern:majority</code> means every
+                    write is replicated to a quorum before the ACK, and every
+                    read only returns majority-committed data.{" "}
+                    <strong>No node will serve a stale value.</strong>
+                  </p>
+                  <p style={{ marginTop: 8 }}>
+                    But this only solves <em>replication</em> correctness. It
+                    does <strong>not</strong> prevent two concurrent requests
+                    from both reading the same balance and both succeeding:
+                  </p>
+                  <pre
+                    style={{
+                      background: "#0f172a",
+                      borderRadius: 6,
+                      padding: "10px 14px",
+                      fontSize: 11,
+                      color: "#fca5a5",
+                      marginTop: 8,
+                    }}
+                  >{`T1 reads balance = 500  ✓ (majority-committed)
+T2 reads balance = 500  ✓ (majority-committed)
+T1 deducts 500 → writes 0   ✓
+T2 deducts 500 → writes -500 ❗  (both passed the check!)`}</pre>
+                  <p style={{ marginTop: 8 }}>
+                    To actually prevent double-spend you need one of these on
+                    top:
+                  </p>
+                  <ul style={{ marginTop: 6 }}>
+                    <li>
+                      <strong>Atomic conditional update</strong> —{" "}
+                      <code>
+                        {
+                          "updateOne({ balance: { $gte: 500 } }, { $inc: { balance: -500 } })"
+                        }
+                      </code>{" "}
+                      — check and deduct in one atomic step
+                    </li>
+                    <li>
+                      <strong>Multi-document transaction</strong> —{" "}
+                      <code>session.startTransaction()</code> — serialises
+                      concurrent operations at a cost of ~3× latency
+                    </li>
+                    <li>
+                      <strong>Optimistic locking</strong> — keep a{" "}
+                      <code>version</code> field, retry on version mismatch
+                    </li>
+                  </ul>
+                  <p style={{ marginTop: 8, color: "#f59e0b", fontSize: 11 }}>
+                    Bottom line: <code>w:majority</code> is necessary but not
+                    sufficient. Race conditions require application-level
+                    concurrency control.
+                  </p>
+                </>
+              ) : mongoLevel === "quorum" ? (
+                <p>
+                  <strong>⚠ Partial.</strong> Writes are durable (w:majority)
+                  but reads go to the primary only — not majority-confirmed.
+                  Enable <em>Majority read mode</em> to close the gap. With just
+                  primary reads, a newly elected primary can serve a value that
+                  was later rolled back.
+                </p>
+              ) : (
+                <p>
+                  <strong>✗ Not achieved.</strong> <code>w:1</code> writes
+                  acknowledge before replication. A primary crash before
+                  replication means the write disappears. Secondary reads can
+                  return stale data. This combination is unsafe for banking.
+                </p>
+              )
+            ) : (
+              <p>
+                <strong>✗ Not available.</strong> Cassandra is an AP system — it
+                prefers availability over consistency during network partitions.
+                Even at <code>QUORUM</code> consistency level you can get stale
+                reads from nodes that haven't received the latest write yet.
+              </p>
+            ),
+          ),
+        ],
+      },
+      "ACID transactions": {
+        title: "ACID Transactions",
+        subtitle: `Why ${wl} needs them — and how ${dbLabel} delivers them`,
+        accentColor: "#10b981",
+        sections: [
+          {
+            title: `Why ${wl} needs ACID transactions`,
+            accent: "#10b981",
+            content: (
+              <>
+                <p>
+                  A bank transfer is two operations:{" "}
+                  <strong>debit account A</strong> then{" "}
+                  <strong>credit account B</strong>. If the debit succeeds but
+                  the credit fails (network blip, crash), money vanishes. ACID
+                  atomicity guarantees both operations either commit together or
+                  both roll back.
+                </p>
+                <ul style={{ marginTop: 8 }}>
+                  <li>
+                    <strong>Atomicity</strong> — no partial writes
+                  </li>
+                  <li>
+                    <strong>Consistency</strong> — balance constraints enforced
+                    (no negative balance)
+                  </li>
+                  <li>
+                    <strong>Isolation</strong> — concurrent transfers don't
+                    interfere
+                  </li>
+                  <li>
+                    <strong>Durability</strong> — committed transfers survive
+                    crashes
+                  </li>
+                </ul>
+              </>
+            ),
+          },
+          dbSection(
+            isRelational ? (
+              <p>
+                <strong>✓ Native ACID.</strong> Every SQL statement in
+                PostgreSQL runs inside a transaction. Multi-table debit+credit
+                is a single <code>BEGIN / COMMIT</code>. Foreign keys enforce
+                referential integrity. Serializable isolation stops double-spend
+                race conditions.
+              </p>
+            ) : isMongo ? (
+              <p>
+                <strong>⚠ Multi-document transactions exist since v4.0</strong>,
+                but they carry meaningful overhead (~3× latency vs single-doc
+                ops). MongoDB's primary design is single-document atomicity —
+                the document is the transaction boundary. For a ledger, every
+                debit-credit pair spans at least two documents, so you're always
+                paying the transaction overhead.
+              </p>
+            ) : (
+              <p>
+                <strong>✗ No multi-partition ACID.</strong> Cassandra has{" "}
+                <em>Lightweight Transactions</em> (compare-and-set) but they
+                only cover a single partition and use Paxos — slow and limited.
+                There's no way to atomically update two different partitions
+                (e.g., two account balances) without an external coordinator.
+              </p>
+            ),
+          ),
+        ],
+      },
+      "Correctness over speed": {
+        title: "Correctness over Speed",
+        subtitle: `Why ${wl} prioritises correctness — and how ${dbLabel} aligns`,
+        accentColor: "#f59e0b",
+        sections: [
+          {
+            title: `Why ${wl} needs Correctness over speed`,
+            accent: "#f59e0b",
+            content: (
+              <>
+                <p>
+                  A bank would rather a transaction take 30ms than 5ms if the
+                  5ms version has any chance of losing data. A phantom balance
+                  that clears risk checks can pay out a fraudulent transaction.
+                  A lost write creates an audit gap that regulators audit.
+                </p>
+                <p style={{ marginTop: 8 }}>
+                  Regulatory environments (PCI-DSS, SOX, GDPR) require provable
+                  correctness, immutable audit trails, and the ability to replay
+                  every state change. Speed is measured in tens of milliseconds
+                  — correctness is measured in money.
+                </p>
+              </>
+            ),
+          },
+          dbSection(
+            isRelational ? (
+              <p>
+                <strong>✓ Designed correctness-first.</strong> Schema
+                constraints, foreign keys, CHECK constraints, triggers, and
+                row-level security are all part of the query engine. The
+                database enforces correctness so the application doesn't have
+                to.
+              </p>
+            ) : isMongo ? (
+              writeConcern === "wmajority" ? (
+                <p>
+                  <strong>⚠ w:majority reduces loss risk</strong> but MongoDB's
+                  document model has weaker structural guarantees. There are no
+                  foreign keys, no CHECK constraints enforced at DB level, and
+                  no referential integrity. Your application must enforce these
+                  — which is error-prone at scale.
+                </p>
+              ) : (
+                <p>
+                  <strong>✗ w:1 prioritises speed.</strong> The primary
+                  fires-and-forgets to secondaries. If the primary crashes
+                  before replication, the write disappears. For a financial
+                  ledger this is a data loss event, not a recoverable error.
+                </p>
+              )
+            ) : (
+              <p>
+                <strong>✗ AP system.</strong> Cassandra is explicitly designed
+                to favour availability over correctness. Under partition, it
+                will serve potentially stale or conflicting data rather than
+                refuse the request. This is the opposite of what a banking
+                system needs.
+              </p>
+            ),
+          ),
+        ],
+      },
+    };
+  }
+
+  /* ── E-Commerce needs ──────────────────────────────── */
+  if (workload === "ecommerce") {
+    return {
+      "Flexible schema": {
+        title: "Flexible Schema",
+        subtitle: `Why ${wl} needs it — and how ${dbLabel} handles it`,
+        accentColor: "#14b8a6",
+        sections: [
+          {
+            title: `Why ${wl} needs Flexible schema`,
+            accent: "#14b8a6",
+            content: (
+              <>
+                <p>
+                  A TV has{" "}
+                  <em>
+                    screen size, resolution, panel type, HDR format, HDMI ports
+                  </em>
+                  . A shirt has{" "}
+                  <em>size, colour, material, care instructions</em>. Forcing
+                  these into the same rigid table means either hundreds of NULL
+                  columns or an expensive <code>ALTER TABLE</code> every time a
+                  new product type is added.
+                </p>
+                <p style={{ marginTop: 8 }}>
+                  E-commerce catalogs evolve constantly — new product
+                  categories, A/B tested attributes, and regional variations
+                  must ship without a database migration window.
+                </p>
+              </>
+            ),
+          },
+          dbSection(
+            isMongo ? (
+              <p>
+                <strong>✓ Native flexible schema.</strong> Each product is its
+                own JSON document. A TV document has different fields from a
+                shirt document. Schema validation is optional and incremental —
+                you add constraints only where you need them. No migrations, no
+                NULLs, no attribute tables.
+              </p>
+            ) : isRelational ? (
+              <p>
+                <strong>⚠ Workable via JSONB.</strong> PostgreSQL's{" "}
+                <code>JSONB</code> column lets you store arbitrary attributes
+                per product. You get GIN indexes on JSON fields and full SQL on
+                structured columns. However, schema migrations for new typed
+                columns still require <code>ALTER TABLE</code> with table
+                rewrites on large catalogs.
+              </p>
+            ) : (
+              <p>
+                <strong>⚠ Wide-column flexibility.</strong> Cassandra allows
+                adding columns without a full schema migration, but all rows in
+                a partition share the same column family. You can't have truly
+                per-row arbitrary structure like a document store — deeply
+                nested product specs must be serialised into a blob column.
+              </p>
+            ),
+          ),
+        ],
+      },
+      "Nested product data": {
+        title: "Nested Product Data",
+        subtitle: `Why ${wl} needs it — and how ${dbLabel} handles it`,
+        accentColor: "#8b5cf6",
+        sections: [
+          {
+            title: `Why ${wl} needs Nested product data`,
+            accent: "#8b5cf6",
+            content: (
+              <>
+                <p>
+                  A single product page typically needs: the product, its
+                  variants (each with size/colour/price/stock), its images, its
+                  category path, its specs, and its shipping rules. In a
+                  relational schema this is 5–6 JOIN tables per page load.
+                </p>
+                <p style={{ marginTop: 8 }}>
+                  At catalog scale (100k page views/min), those JOINs become the
+                  bottleneck. Embedding all of this inside one document means a
+                  single indexed read returns the entire page payload.
+                </p>
+              </>
+            ),
+          },
+          dbSection(
+            isMongo ? (
+              <p>
+                <strong>✓ Optimal.</strong> Variants, specs, and images embed
+                directly inside the product document. One <code>findOne</code>{" "}
+                returns the full product tree. Updates to variants are atomic
+                within the document — no JOIN, no transaction boundary to
+                manage.
+              </p>
+            ) : isRelational ? (
+              <p>
+                <strong>⚠ Possible but requires JOINs.</strong> Products,
+                variants, images, and specs live in separate normalised tables.
+                A full product read requires a multi-table JOIN query. With
+                proper indexing this is fast for moderate scale, but at high
+                read throughput it becomes a primary bottleneck.
+              </p>
+            ) : (
+              <p>
+                <strong>✗ Flat rows only.</strong> Cassandra stores data in wide
+                rows but has no native nested structure. Variants and specs must
+                be serialised into a blob column or spread across multiple
+                tables with duplicated partition keys — losing the ability to
+                query or index nested fields.
+              </p>
+            ),
+          ),
+        ],
+      },
+      "Read-heavy workload": {
+        title: "Read-Heavy Workload",
+        subtitle: `Why ${wl} needs it — and how ${dbLabel} handles it`,
+        accentColor: "#3b82f6",
+        sections: [
+          {
+            title: `Why ${wl} needs Read-heavy workload support`,
+            accent: "#3b82f6",
+            content: (
+              <>
+                <p>
+                  A typical e-commerce ratio:{" "}
+                  <strong>~100 product page views for every 1 purchase</strong>.
+                  Browse, search, and filter traffic dwarfs write traffic. The
+                  database must handle burst read load — Black Friday traffic
+                  spikes — without degrading.
+                </p>
+                <p style={{ marginTop: 8 }}>
+                  Reads also need to be fast at the 99th percentile, not just
+                  average, because slow product pages directly hurt conversion
+                  rates (every 100ms of latency ≈ 1% revenue loss at
+                  Amazon-scale).
+                </p>
+              </>
+            ),
+          },
+          dbSection(
+            isMongo ? (
+              <p>
+                <strong>✓ Strong read scaling.</strong> Compound indexes, the
+                aggregation pipeline, and read preference routing to secondaries
+                all help. Sharding spreads read load horizontally. The document
+                model returns complete product payloads in one round trip.
+              </p>
+            ) : isRelational ? (
+              <p>
+                <strong>✓ Excellent with indexing.</strong> PostgreSQL's query
+                planner, bitmap index scans, and connection pooling handle
+                read-heavy workloads well. Read replicas offload primary
+                traffic. For e-commerce scale, this is a proven architecture.
+              </p>
+            ) : (
+              <p>
+                <strong>⚠ Partition-key dependent.</strong> Cassandra reads are
+                extremely fast when the query matches the partition key (e.g.,
+                products by category). Range queries, full-text search, or
+                cross-category browsing require multiple tables or a search
+                layer like Elasticsearch sitting in front of Cassandra.
+              </p>
+            ),
+          ),
+        ],
+      },
+    };
+  }
+
+  /* ── Chat needs ────────────────────────────────────── */
+  return {
+    "Massive write throughput": {
+      title: "Massive Write Throughput",
+      subtitle: `Why ${wl} needs it — and how ${dbLabel} handles it`,
+      accentColor: "#f59e0b",
+      sections: [
+        {
+          title: `Why ${wl} needs Massive write throughput`,
+          accent: "#f59e0b",
+          content: (
+            <>
+              <p>
+                A chat platform at Slack scale handles{" "}
+                <strong>hundreds of thousands of messages per second</strong>.
+                Each message, reaction, and presence update is a write. Unlike a
+                bank transfer, a message arriving 50ms late is acceptable — but
+                a message that <em>fails</em> to write is not.
+              </p>
+              <p style={{ marginTop: 8 }}>
+                A relational single-primary bottleneck hits its ceiling well
+                before this scale. You need a DB whose write path scales{" "}
+                <em>linearly</em> with the number of nodes — not one that
+                requires a single primary to serialize all writes.
+              </p>
+            </>
+          ),
+        },
+        dbSection(
+          isRelational ? (
+            <p>
+              <strong>✗ Primary bottleneck.</strong> All writes must go through
+              the single primary. Sharding PostgreSQL is possible but
+              operationally complex (Citus, Patroni). At millions of writes/sec
+              you're working against the architecture, not with it.
+            </p>
+          ) : isMongo ? (
+            <p>
+              <strong>⚠ Good but limited.</strong> MongoDB sharding distributes
+              writes across shard primaries. Each shard has its own write path.
+              At moderate scale this works well, but each shard still has a
+              primary bottleneck. At millions of writes/sec, Cassandra's ring
+              architecture with no primary outperforms MongoDB.
+            </p>
+          ) : (
+            <p>
+              <strong>✓ Built for this.</strong> Cassandra's log-structured
+              merge (LSM) storage engine turns all writes into sequential
+              appends — the fastest disk operation possible. Every node accepts
+              writes. Adding nodes linearly increases write capacity. No
+              primary, no bottleneck.
+            </p>
+          ),
+        ),
+      ],
+    },
+    "Partition-friendly reads": {
+      title: "Partition-Friendly Reads",
+      subtitle: `Why ${wl} needs it — and how ${dbLabel} handles it`,
+      accentColor: "#6366f1",
+      sections: [
+        {
+          title: `Why ${wl} needs Partition-friendly reads`,
+          accent: "#6366f1",
+          content: (
+            <>
+              <p>
+                Chat reads are highly predictable:{" "}
+                <strong>"get the last 50 messages in #general"</strong>. The
+                partition key is the channel ID; the sort key is the timestamp.
+                Every read is a single-partition range scan — cheap and fast.
+              </p>
+              <p style={{ marginTop: 8 }}>
+                Without partition-key aligned reads, fetching a channel timeline
+                requires scanning across nodes, merging results, and sorting —
+                turning a O(1) lookup into a O(n) scatter-gather operation at
+                scale.
+              </p>
+            </>
+          ),
+        },
+        dbSection(
+          isRelational ? (
+            <p>
+              <strong>⚠ Works with care.</strong> A{" "}
+              <code>(channel_id, ts)</code> composite index makes timeline reads
+              fast on a single node. However, as the messages table grows to
+              billions of rows across channels, range scans slow down and
+              partitioning strategies (table partitioning by date) add
+              operational complexity.
+            </p>
+          ) : isMongo ? (
+            <p>
+              <strong>⚠ Shard key matters.</strong> If you shard by{" "}
+              <code>channel_id</code>, timeline reads are partition-local and
+              fast. If you shard by <code>_id</code> (default), messages for the
+              same channel scatter across shards — requiring a scatter-gather
+              aggregation for every timeline read.
+            </p>
+          ) : (
+            <p>
+              <strong>✓ First-class partition model.</strong> Cassandra's
+              primary key is <code>(channel_id, ts)</code>. Every timeline read
+              is a single-partition range scan — guaranteed to hit exactly one
+              node. The data model is literally designed around this access
+              pattern.
+            </p>
+          ),
+        ),
+      ],
+    },
+    "High availability": {
+      title: "High Availability",
+      subtitle: `Why ${wl} needs it — and how ${dbLabel} handles it`,
+      accentColor: "#ec4899",
+      sections: [
+        {
+          title: `Why ${wl} needs High availability`,
+          accent: "#ec4899",
+          content: (
+            <>
+              <p>
+                Chat users expect the app to work <strong>24/7</strong>. A
+                10-second election window where writes are rejected is
+                unacceptable — messages fail, users see spinners, they switch to
+                a competitor. A 99.9% SLA allows only 8.7 hours of downtime per
+                year. 99.99% allows 52 minutes.
+              </p>
+              <p style={{ marginTop: 8 }}>
+                High availability means the system can tolerate a node dying, a
+                DC losing power, or a network partition — and continue serving
+                traffic without manual intervention.
+              </p>
+            </>
+          ),
+        },
+        dbSection(
+          isRelational ? (
+            <p>
+              <strong>⚠ Requires explicit setup.</strong> PostgreSQL HA needs
+              Patroni/Pacemaker/repmgr + a VIP or load balancer. Primary failure
+              triggers a promotion of a standby. Depending on configuration,
+              this takes 15–60 seconds of write downtime. Multi-region requires
+              careful replication lag management.
+            </p>
+          ) : isMongo ? (
+            <p>
+              <strong>⚠ Automatic but not instant.</strong> Replica sets hold an
+              election when the primary fails (~5–10 seconds). During the
+              election, writes are rejected. Other shards are unaffected. At
+              chat scale (potentially dozens of shards), the probability of{" "}
+              <em>some</em> shard being in election at any moment is
+              non-trivial.
+            </p>
+          ) : (
+            <p>
+              <strong>✓ Peer-to-peer, no single point of failure.</strong> With
+              no primary, any node can serve writes. Cassandra's gossip protocol
+              detects failures in milliseconds. Multi-DC replication with{" "}
+              <code>NetworkTopologyStrategy</code> gives 99.99%+ availability
+              even during full DC outages. Write traffic reroutes automatically.
+            </p>
+          ),
+        ),
+      ],
+    },
+  };
+}
+
 function NeedsChecklist({
   title,
   checks,
+  onNeedClick,
 }: {
   title: string;
   checks: NeedCheck[];
+  onNeedClick: (need: string) => void;
 }) {
   return (
     <div className="db-tradeoff-needs">
       <p className="db-tradeoff-needs__title">{title} needs:</p>
       {checks.map((c) => (
-        <div key={c.need} className="db-tradeoff-needs__row">
+        <button
+          key={c.need}
+          className="db-tradeoff-needs__row db-tradeoff-needs__row--btn"
+          onClick={() => onNeedClick(c.need)}
+        >
           <span
             className="db-tradeoff-needs__icon"
             style={{ color: STATUS_COLOR[c.status] }}
@@ -202,7 +852,7 @@ function NeedsChecklist({
             <span className="db-tradeoff-needs__label">{c.need}</span>
             <span className="db-tradeoff-needs__note">{c.note}</span>
           </div>
-        </div>
+        </button>
       ))}
     </div>
   );
@@ -238,6 +888,14 @@ const fitColor = (score: number) => {
 const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   const { runtime, signals } = useDbTradeoffAnimation(onAnimationComplete);
   const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
+  const needConcepts = buildNeedConcepts(
+    runtime.workload,
+    runtime.dbType,
+    runtime.writeConcern,
+    runtime.readPreference,
+  );
+  const { openConcept: openNeedConcept, ConceptModal: NeedModal } =
+    useConceptModal(needConcepts);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
@@ -263,10 +921,12 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     writeConcern,
     readPreference,
     replicaAckCount,
+    joinMode,
   } = runtime;
 
   const hot = (zone: string) => hotZones.includes(zone);
   const isReplicaAck = phase === "replica-ack";
+  const isJoinMerge = phase === "join-merge";
   const profile = DB_PROFILES[dbType];
   const dbColors = DB_COLORS[dbType];
 
@@ -306,7 +966,7 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       })
       .label(
         dbType === "cassandra"
-          ? "Partition Router"
+          ? "Coordinator Router"
           : dbType === "mongodb"
             ? "mongos / Driver"
             : "SQL Executor",
@@ -549,8 +1209,297 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
           }
         });
       }
+    } else if (dbType === "cassandra") {
+      /* ── Cassandra: peer-to-peer hash ring ───────────── */
+      const ringNodeCount = nodes.length;
+      const rf = Math.min(runtime.replicationFactor, ringNodeCount);
+      const coordIdx = runtime.coordinatorIdx % Math.max(1, ringNodeCount);
+      const coordId = nodes[coordIdx]?.id ?? "db-node-0";
+      const koIdx = runtime.keyOwnerIdx % Math.max(1, ringNodeCount);
+
+      // Progressive reveal: show roles only once the step has reached them
+      const ROUTE_PHASES = new Set([
+        "partition-route",
+        "replication",
+        "response",
+        "stale",
+        "consistent",
+        "summary",
+      ]);
+      const FANOUT_PHASES = new Set([
+        "replication",
+        "response",
+        "stale",
+        "consistent",
+        "summary",
+      ]);
+      const showCoordLabel = ROUTE_PHASES.has(phase);
+      const showRfLabels =
+        FANOUT_PHASES.has(phase) ||
+        (phase === "partition-route" && isReadOp(selectedOp));
+
+      // RF replica indices: key owner + next (RF-1) clockwise
+      const rfIndices: number[] = [];
+      for (let r = 0; r < rf; r++) {
+        rfIndices.push((koIdx + r) % ringNodeCount);
+      }
+      const rfSet = new Set(rfIndices);
+
+      // Token ring helpers (simplified 0–1000 token space)
+      const TOKEN_SPACE = 1000;
+      const tokenOf = (idx: number) =>
+        Math.round((idx * TOKEN_SPACE) / ringNodeCount);
+      const ownedRangeLabel = (idx: number) =>
+        idx === 0
+          ? `${tokenOf(ringNodeCount - 1)}\u21ba`
+          : `${tokenOf(idx - 1)}\u2013${tokenOf(idx)}`;
+      // Mid-angle of arc owned by node idx (clockwise arc from node idx-1 to node idx)
+      const arcMidAngle = (idx: number) =>
+        -Math.PI / 2 +
+        (idx - 0.5 + (idx === 0 ? ringNodeCount : 0)) *
+          ((2 * Math.PI) / ringNodeCount);
+
+      // Ring geometry
+      const cx = 730;
+      const cy = H / 2 - 10;
+      const R = ringNodeCount <= 3 ? 135 : ringNodeCount <= 4 ? 145 : 155;
+      const nodeW = 125;
+      const nodeH = 64;
+
+      // Ring circle overlay (consistent hash ring visual)
+      b.overlay((o) => {
+        o.add(
+          "circle",
+          {
+            x: cx,
+            y: cy,
+            r: R - 15,
+            fill: "none",
+            stroke: "rgba(245,158,11,0.12)",
+            strokeWidth: 1.5,
+            strokeDasharray: "6,4",
+          },
+          { key: "hash-ring" },
+        );
+        o.add(
+          "text",
+          {
+            x: cx,
+            y: cy - 8,
+            text: "Hash Ring",
+            fill: "rgba(245,158,11,0.3)",
+            fontSize: 10,
+            fontWeight: "600",
+          },
+          { key: "ring-label" },
+        );
+      });
+
+      // Token boundary labels (outside ring) + arc owned-range labels (inside ring)
+      // + hash-key landing dot on ring at key owner position (only after fanout)
+      b.overlay((o) => {
+        for (let i = 0; i < ringNodeCount; i++) {
+          const nodeAngle = -Math.PI / 2 + i * ((2 * Math.PI) / ringNodeCount);
+          const isKo = i === koIdx;
+
+          // T:N label just outside the ring circle
+          o.add(
+            "text",
+            {
+              x: cx + (R + 18) * Math.cos(nodeAngle),
+              y: cy + (R + 18) * Math.sin(nodeAngle),
+              text: `T:${tokenOf(i)}`,
+              fill: showRfLabels && isKo ? "#f97316" : "rgba(245,158,11,0.55)",
+              fontSize: 8,
+              fontWeight: "700",
+            },
+            { key: `tok-${i}` },
+          );
+
+          // Range label inside the ring at arc mid-angle
+          const mid = arcMidAngle(i);
+          o.add(
+            "text",
+            {
+              x: cx + (R - 34) * Math.cos(mid),
+              y: cy + (R - 34) * Math.sin(mid),
+              text: ownedRangeLabel(i),
+              fill:
+                showRfLabels && isKo
+                  ? "rgba(249,115,22,0.9)"
+                  : "rgba(245,158,11,0.32)",
+              fontSize: 8,
+              fontWeight: showRfLabels && isKo ? "700" : "400",
+            },
+            { key: `arc-${i}` },
+          );
+        }
+
+        // Orange dot on the ring at the key owner's position: "hash(key) lands here"
+        if (showRfLabels) {
+          const koAngle =
+            -Math.PI / 2 + koIdx * ((2 * Math.PI) / ringNodeCount);
+          o.add(
+            "circle",
+            {
+              x: cx + (R - 15) * Math.cos(koAngle),
+              y: cy + (R - 15) * Math.sin(koAngle),
+              r: 5,
+              fill: "#f97316",
+              stroke: "#fff",
+              strokeWidth: 1,
+            },
+            { key: "hash-land-dot" },
+          );
+        }
+      });
+
+      // Position nodes on ring
+      nodes.forEach((node, i) => {
+        const angle = -Math.PI / 2 + i * ((2 * Math.PI) / ringNodeCount);
+        const nx = cx + R * Math.cos(angle) - nodeW / 2;
+        const ny = cy + R * Math.sin(angle) - nodeH / 2;
+
+        const isCoord = i === coordIdx;
+        const isKeyOwner = i === koIdx;
+        const isRf = rfSet.has(i);
+        const statusColors = NODE_STATUS_COLORS[node.status];
+        const isHot = hot(node.id);
+
+        // Progressive role label
+        const roleLabel =
+          showCoordLabel && showRfLabels && isCoord && isKeyOwner
+            ? "COORD \u00b7 KEY"
+            : showCoordLabel && isCoord
+              ? "COORDINATOR"
+              : showRfLabels && isKeyOwner
+                ? "KEY OWNER"
+                : showRfLabels && isRf
+                  ? "RF Replica"
+                  : `Node ${i + 1}`;
+        const statusLabel =
+          node.status === "down"
+            ? "OFFLINE"
+            : node.status === "lagging"
+              ? "LAGGING"
+              : `${node.loadPct}%`;
+
+        // Progressive fill/stroke
+        const revealCoord = showCoordLabel && isCoord;
+        const revealKo = showRfLabels && isKeyOwner;
+        const revealRf = showRfLabels && isRf;
+
+        b.node(node.id)
+          .at(nx, ny)
+          .rect(nodeW, nodeH, 10)
+          .fill(
+            node.status === "down"
+              ? "#1c1917"
+              : isHot
+                ? dbColors.fill
+                : revealKo
+                  ? "rgba(120,53,15,0.7)"
+                  : revealRf
+                    ? "rgba(66,32,6,0.5)"
+                    : "#0f172a",
+          )
+          .stroke(
+            node.status === "down"
+              ? statusColors.stroke
+              : revealKo
+                ? "#f97316"
+                : revealCoord
+                  ? "#fbbf24"
+                  : isHot
+                    ? dbColors.stroke
+                    : revealRf
+                      ? "rgba(245,158,11,0.45)"
+                      : statusColors.stroke,
+            revealKo || revealCoord ? 2.5 : 2,
+          )
+          .richLabel(
+            (l) => {
+              l.color(
+                roleLabel,
+                revealKo ? "#f97316" : revealCoord ? "#fbbf24" : "#e2e8f0",
+                {
+                  fontSize: 10,
+                  bold: true,
+                },
+              );
+              l.newline();
+              l.color(
+                statusLabel,
+                node.status === "down"
+                  ? "#ef4444"
+                  : node.status === "lagging"
+                    ? "#f59e0b"
+                    : "#94a3b8",
+                { fontSize: 9 },
+              );
+              l.newline();
+              l.color(
+                `own: ${ownedRangeLabel(i)}`,
+                revealKo
+                  ? "#f97316"
+                  : revealRf
+                    ? "rgba(245,158,11,0.55)"
+                    : "#475569",
+                { fontSize: 8 },
+              );
+            },
+            { fill: "#fff", fontSize: 10, dy: 0, lineHeight: 1.5 },
+          )
+          .onClick(() => openConcept("token-ring"));
+      });
+
+      // Edge: query-layer → coordinator (shown once coordinator is revealed)
+      if (showCoordLabel && nodes[coordIdx]?.status !== "down") {
+        b.edge("query-layer", coordId, `e-query-${coordId}`)
+          .stroke(hot(coordId) ? "#fbbf24" : "#78350f", 2)
+          .arrow(true);
+      }
+
+      // Edges: coordinator → each RF node (shown once RF is revealed)
+      if (showRfLabels) {
+        rfIndices.forEach((ri) => {
+          if (
+            ri !== coordIdx &&
+            nodes[ri]?.status !== "down" &&
+            nodes[coordIdx]?.status !== "down"
+          ) {
+            b.edge(coordId, nodes[ri].id, `e-coord-${nodes[ri].id}`)
+              .stroke(
+                ri === koIdx ? "rgba(249,115,22,0.5)" : "rgba(245,158,11,0.4)",
+                1.4,
+              )
+              .arrow(true);
+          }
+        });
+      }
+
+      // Ring gossip edges (skip if already a coordinator→replica edge)
+      if (ringNodeCount >= 2) {
+        const coordRfEdges = new Set(
+          rfIndices
+            .filter((ri) => ri !== coordIdx)
+            .map((ri) => `${coordIdx}-${ri}`),
+        );
+        for (let i = 0; i < ringNodeCount; i++) {
+          const next = (i + 1) % ringNodeCount;
+          if (
+            nodes[i].status !== "down" &&
+            nodes[next].status !== "down" &&
+            !coordRfEdges.has(`${i}-${next}`)
+          ) {
+            b.edge(nodes[i].id, nodes[next].id, `ring-${i}-${next}`)
+              .stroke("rgba(120,53,15,0.5)", 1)
+              .dashed();
+          }
+        }
+      }
     } else {
-      /* ── Relational / Cassandra: flat node list ──────── */
+      /* ── Relational: flat node list ──────────────────── */
       const nodeCount = nodes.length;
       const dbLeft = 640;
       const dbSpacingY = nodeCount <= 3 ? 120 : 100;
@@ -562,11 +1511,7 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
         const isHot = hot(node.id);
 
         const roleLabel =
-          dbType === "cassandra"
-            ? `Replica ${i + 1}`
-            : node.role === "primary"
-              ? "Primary"
-              : `Secondary ${i}`;
+          node.role === "primary" ? "Primary" : `Secondary ${i}`;
 
         const statusLabel =
           node.status === "down"
@@ -610,9 +1555,7 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
             },
             { fill: "#fff", fontSize: 11, dy: 2, lineHeight: 1.7 },
           )
-          .onClick(() =>
-            openConcept(dbType === "cassandra" ? "cassandra" : "relational"),
-          );
+          .onClick(() => openConcept("relational"));
 
         b.edge("query-layer", node.id, `e-query-${node.id}`)
           .stroke(
@@ -628,25 +1571,121 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
 
       /* ── Replication edges ─────────────────────────── */
       if (nodeCount >= 2) {
-        if (dbType === "cassandra") {
-          for (let i = 0; i < nodeCount; i++) {
-            const next = (i + 1) % nodeCount;
-            if (nodes[i].status !== "down" && nodes[next].status !== "down") {
-              b.edge(nodes[i].id, nodes[next].id, `rep-${i}-${next}`)
-                .stroke("#78350f", 1.2)
-                .dashed();
-            }
-          }
-        } else {
-          for (let i = 1; i < nodeCount; i++) {
-            if (nodes[i].status !== "down") {
-              b.edge(nodes[0].id, nodes[i].id, `rep-0-${i}`)
-                .stroke("#334155", 1.2)
-                .dashed();
-            }
+        for (let i = 1; i < nodeCount; i++) {
+          if (nodes[i].status !== "down") {
+            b.edge(nodes[0].id, nodes[i].id, `rep-0-${i}`)
+              .stroke("#334155", 1.2)
+              .dashed();
           }
         }
       }
+    }
+
+    /* ── Join-mode annotation overlay ───────────────── */
+    if (selectedOp === "join-query" && dbType === "mongodb") {
+      const JOIN_MODE_META: Record<
+        JoinMode,
+        { text: string; fill: string; sub: string }
+      > = {
+        "app-join": {
+          text: "App-side join — 2 sequential round trips",
+          fill: "#f59e0b",
+          sub: isJoinMerge ? "MERGING COLLECTIONS IN APPLICATION LAYER" : "",
+        },
+        lookup: {
+          text: "$lookup aggregation pipeline — scatter-gather",
+          fill: "#8b5cf6",
+          sub: "",
+        },
+        denormalized: {
+          text: "Denormalized — embedded document, no join needed",
+          fill: "#22c55e",
+          sub: "",
+        },
+      };
+      const meta = JOIN_MODE_META[joinMode];
+      b.overlay((o) => {
+        o.add(
+          "text",
+          {
+            x: W / 2,
+            y: 22,
+            text: meta.text,
+            fill: meta.fill,
+            fontSize: 11,
+            fontWeight: "700",
+          },
+          { key: "join-mode-label" },
+        );
+        if (meta.sub) {
+          o.add(
+            "text",
+            {
+              x: W / 2,
+              y: 40,
+              text: meta.sub,
+              fill: "#f97316",
+              fontSize: 10,
+              fontWeight: "700",
+            },
+            { key: "join-merge-label" },
+          );
+        }
+      });
+    }
+
+    /* ── Cassandra CL annotation overlay (progressive) ──── */
+    if (
+      dbType === "cassandra" &&
+      phase !== "" &&
+      phase !== "data-model" &&
+      phase !== "request"
+    ) {
+      const rf = Math.min(runtime.replicationFactor, nodes.length);
+      const koIdx = runtime.keyOwnerIdx % Math.max(1, nodes.length);
+      const coordNode =
+        (runtime.coordinatorIdx % Math.max(1, nodes.length)) + 1;
+      const rfNodeLabels = Array.from(
+        { length: rf },
+        (_, r) => `N${((koIdx + r) % nodes.length) + 1}`,
+      );
+      const clName =
+        consistencyLevel === "strong"
+          ? "ALL"
+          : consistencyLevel === "quorum"
+            ? "QUORUM"
+            : "ONE";
+      const acksNeeded =
+        consistencyLevel === "strong"
+          ? rf
+          : consistencyLevel === "quorum"
+            ? Math.floor(rf / 2) + 1
+            : 1;
+
+      // Phase-appropriate text
+      const showFanout =
+        phase === "replication" ||
+        phase === "response" ||
+        phase === "summary" ||
+        (phase === "partition-route" && isReadOp(selectedOp));
+      const text = showFanout
+        ? `Coord: N${coordNode}  ·  hash(key) → N${koIdx + 1}  ·  RF=[${rfNodeLabels.join(" → ")}]  ·  CL=${clName} (${acksNeeded}/${rf} acks)`
+        : `Coord: N${coordNode}  ·  CL=${clName}`;
+
+      b.overlay((o) => {
+        o.add(
+          "text",
+          {
+            x: W / 2,
+            y: 22,
+            text,
+            fill: "#fbbf24",
+            fontSize: 11,
+            fontWeight: "700",
+          },
+          { key: "cassandra-cl-label" },
+        );
+      });
     }
 
     /* ── Data model overlay ──────────────────────────── */
@@ -812,6 +1851,18 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
       color: "#fed7aa",
       borderColor: "#f97316",
     },
+    {
+      key: "mongo-joins",
+      label: "MongoDB Joins",
+      color: "#c4b5fd",
+      borderColor: "#8b5cf6",
+    },
+    {
+      key: "token-ring",
+      label: "Token Ring",
+      color: "#fed7aa",
+      borderColor: "#f97316",
+    },
   ];
 
   return (
@@ -856,6 +1907,25 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                   color={result.shardsTouched === 1 ? "#22c55e" : "#f59e0b"}
                 />
               )}
+              {dbType === "mongodb" && selectedOp === "join-query" && (
+                <StatBadge
+                  label="Join"
+                  value={
+                    joinMode === "app-join"
+                      ? "App-side"
+                      : joinMode === "lookup"
+                        ? "$lookup"
+                        : "Embed'd"
+                  }
+                  color={
+                    joinMode === "app-join"
+                      ? "#f59e0b"
+                      : joinMode === "lookup"
+                        ? "#a78bfa"
+                        : "#22c55e"
+                  }
+                />
+              )}
               {dbType === "mongodb" && (
                 <StatBadge
                   label="RPO"
@@ -897,6 +1967,39 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                   }
                 />
               )}
+              {dbType === "cassandra" && (
+                <StatBadge
+                  label="RF"
+                  value={Math.min(runtime.replicationFactor, runtime.nodeCount)}
+                  color="#fbbf24"
+                />
+              )}
+              {dbType === "cassandra" && (
+                <StatBadge
+                  label="CL"
+                  value={
+                    consistencyLevel === "strong"
+                      ? "ALL"
+                      : consistencyLevel === "quorum"
+                        ? "QUORUM"
+                        : "ONE"
+                  }
+                  color={
+                    consistencyLevel === "strong"
+                      ? "#22c55e"
+                      : consistencyLevel === "quorum"
+                        ? "#f59e0b"
+                        : "#ef4444"
+                  }
+                />
+              )}
+              {dbType === "cassandra" && (
+                <StatBadge
+                  label="Coord"
+                  value={`Node ${(runtime.coordinatorIdx % Math.max(1, runtime.nodeCount)) + 1}`}
+                  color="#fbbf24"
+                />
+              )}
             </StageHeader>
             <CanvasStage canvasRef={containerRef} />
           </div>
@@ -913,6 +2016,7 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
                     writeConcern,
                     readPreference,
                   )}
+                  onNeedClick={openNeedConcept}
                 />
               ) : (
                 <p>{explanation}</p>
@@ -1084,6 +2188,7 @@ const DbTradeoffVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
         }
       />
       <ConceptModal />
+      <NeedModal />
     </div>
   );
 };

@@ -7,14 +7,17 @@ import {
   type ConsistencyLevel,
   type DbTradeoffState,
   type DbType,
+  type JoinMode,
   type OperationId,
   type ReadPreference,
   type WorkloadId,
   type WriteConcern,
   setConsistencyLevel,
   setDbType,
+  setJoinMode,
   setNodeCount,
   setReadPreference,
+  setReplicationFactor,
   setSelectedOp,
   setWorkload,
   setWriteConcern,
@@ -125,18 +128,47 @@ const DbTradeoffControls: React.FC = () => {
       {runtime.dbType !== "mongodb" && (
         <>
           <div className="db-tradeoff-controls__group">
-            <span className="db-tradeoff-controls__legend">Consistency</span>
-            {CONSISTENCY_LEVELS.map((cl) => (
-              <button
-                key={cl.value}
-                className={`db-tradeoff-controls__chip ${runtime.consistencyLevel === cl.value ? "is-active" : ""}`}
-                onClick={() =>
-                  sync(() => dispatch(setConsistencyLevel(cl.value)))
-                }
-              >
-                {cl.label}
-              </button>
-            ))}
+            <span className="db-tradeoff-controls__legend">
+              {runtime.dbType === "cassandra" ? "CL" : "Consistency"}
+            </span>
+            {CONSISTENCY_LEVELS.map((cl) => {
+              const cassLabel =
+                cl.value === "strong"
+                  ? "ALL"
+                  : cl.value === "quorum"
+                    ? "QUORUM"
+                    : "ONE";
+              return (
+                <button
+                  key={cl.value}
+                  className={`db-tradeoff-controls__chip ${runtime.consistencyLevel === cl.value ? "is-active" : ""}`}
+                  style={
+                    runtime.dbType === "cassandra" &&
+                    runtime.consistencyLevel === cl.value
+                      ? {
+                          borderColor:
+                            cl.value === "strong"
+                              ? "#22c55e"
+                              : cl.value === "quorum"
+                                ? "#f59e0b"
+                                : "#ef4444",
+                          color:
+                            cl.value === "strong"
+                              ? "#22c55e"
+                              : cl.value === "quorum"
+                                ? "#f59e0b"
+                                : "#ef4444",
+                        }
+                      : undefined
+                  }
+                  onClick={() =>
+                    sync(() => dispatch(setConsistencyLevel(cl.value)))
+                  }
+                >
+                  {runtime.dbType === "cassandra" ? cassLabel : cl.label}
+                </button>
+              );
+            })}
           </div>
           <span className="db-tradeoff-controls__sep" />
         </>
@@ -202,6 +234,51 @@ const DbTradeoffControls: React.FC = () => {
         </>
       )}
 
+      {runtime.dbType === "mongodb" && runtime.selectedOp === "join-query" && (
+        <>
+          <div className="db-tradeoff-controls__group">
+            <span className="db-tradeoff-controls__legend">Join Method</span>
+            {(
+              [
+                {
+                  value: "app-join" as JoinMode,
+                  label: "App-side",
+                  hint: "2 round trips in application code",
+                  color: "#f59e0b",
+                },
+                {
+                  value: "lookup" as JoinMode,
+                  label: "$lookup",
+                  hint: "Aggregation pipeline (cross-shard)",
+                  color: "#8b5cf6",
+                },
+                {
+                  value: "denormalized" as JoinMode,
+                  label: "Embedded",
+                  hint: "Data pre-embedded in one document",
+                  color: "#22c55e",
+                },
+              ] as const
+            ).map((jm) => (
+              <button
+                key={jm.value}
+                className={`db-tradeoff-controls__chip ${runtime.joinMode === jm.value ? "is-active" : ""}`}
+                style={
+                  runtime.joinMode === jm.value
+                    ? { borderColor: jm.color, color: jm.color }
+                    : undefined
+                }
+                title={jm.hint}
+                onClick={() => sync(() => dispatch(setJoinMode(jm.value)))}
+              >
+                {jm.label}
+              </button>
+            ))}
+          </div>
+          <span className="db-tradeoff-controls__sep" />
+        </>
+      )}
+
       <div className="db-tradeoff-controls__group">
         <span className="db-tradeoff-controls__legend">
           {runtime.dbType === "mongodb" ? "Shards" : "Nodes"}:{" "}
@@ -218,6 +295,24 @@ const DbTradeoffControls: React.FC = () => {
           className="db-tradeoff-controls__slider"
         />
       </div>
+
+      {runtime.dbType === "cassandra" && (
+        <div className="db-tradeoff-controls__group">
+          <span className="db-tradeoff-controls__legend">
+            RF: {Math.min(runtime.replicationFactor, runtime.nodeCount)}
+          </span>
+          <input
+            type="range"
+            min={1}
+            max={runtime.nodeCount}
+            value={Math.min(runtime.replicationFactor, runtime.nodeCount)}
+            onChange={(e) =>
+              sync(() => dispatch(setReplicationFactor(Number(e.target.value))))
+            }
+            className="db-tradeoff-controls__slider"
+          />
+        </div>
+      )}
 
       <div className="db-tradeoff-controls__group">
         <button

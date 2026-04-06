@@ -14,7 +14,9 @@ export type ConceptKey =
   | "ledger-critical"
   | "acid"
   | "write-concern"
-  | "mixed-concern";
+  | "mixed-concern"
+  | "mongo-joins"
+  | "token-ring";
 
 interface ConceptDefinition {
   title: string;
@@ -562,6 +564,209 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
       },
     ],
   },
+  "mongo-joins": {
+    title: "Joins in MongoDB",
+    subtitle: "No native SQL join engine — three approaches, three trade-offs",
+    accentColor: "#8b5cf6",
+    sections: [
+      {
+        title: "Why joins are harder in MongoDB",
+        accent: "#8b5cf6",
+        content: (
+          <ul>
+            <li>
+              MongoDB has <strong>no central join optimizer</strong> like a
+              relational engine. There is no execution plan that combines two
+              collections in one pass.
+            </li>
+            <li>
+              Data is <strong>distributed across shards</strong> — related
+              documents may live on different shards, requiring cross-shard
+              coordination.
+            </li>
+            <li>
+              Every join approach in MongoDB requires you to{" "}
+              <em>design around it upfront</em>.
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Approach 1 — App-side join (most common)",
+        accent: "#f59e0b",
+        content: (
+          <>
+            <p>
+              Your application issues <strong>2 separate queries</strong>:
+            </p>
+            <pre
+              style={{
+                background: "#0f172a",
+                borderRadius: 6,
+                padding: "10px 14px",
+                fontSize: 11,
+                color: "#fde68a",
+                marginTop: 8,
+              }}
+            >{`Step 1: db.users.find({ _id: userId })
+Step 2: db.orders.find({ user_id: userId })
+Step 3: merge in application code`}</pre>
+            <p style={{ marginTop: 8 }}>
+              <strong>Cost:</strong> 2 network round trips. Latency compounds.
+              If the collections are on <em>different shards</em>, each query
+              touches a different shard.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Approach 2 — $lookup (aggregation pipeline)",
+        accent: "#8b5cf6",
+        content: (
+          <>
+            <p>
+              MongoDB’s <code>$lookup</code> stage performs a join-like
+              operation inside an aggregation pipeline:
+            </p>
+            <pre
+              style={{
+                background: "#0f172a",
+                borderRadius: 6,
+                padding: "10px 14px",
+                fontSize: 11,
+                color: "#c4b5fd",
+                marginTop: 8,
+              }}
+            >{`db.users.aggregate([
+  { $lookup: {
+    from: "orders",
+    localField: "_id",
+    foreignField: "user_id",
+    as: "orders"
+  }}
+])`}</pre>
+            <p style={{ marginTop: 8 }}>
+              Works well when data is on the <strong>same shard</strong>. When
+              collections span multiple shards, MongoDB must{" "}
+              <em>scatter-gather</em> the pipeline — every shard runs the join
+              independently, which increases latency and coordination overhead.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Approach 3 — Denormalization (the Mongo way)",
+        accent: "#22c55e",
+        content: (
+          <>
+            <p>
+              Instead of joining, you <strong>embed related data</strong> in the
+              parent document:
+            </p>
+            <pre
+              style={{
+                background: "#0f172a",
+                borderRadius: 6,
+                padding: "10px 14px",
+                fontSize: 11,
+                color: "#86efac",
+                marginTop: 8,
+              }}
+            >{`{
+  userId: 1,
+  name: "Alice",
+  orders: [
+    { id: 101, amount: 50 },
+    { id: 102, amount: 30 }
+  ]
+}`}</pre>
+            <p style={{ marginTop: 8 }}>
+              Single document read — <strong>no join at query time</strong>.
+              Fast, targeted, and shard-local. The penalty is paid at{" "}
+              <em>write time</em> (you must update the embedded array when an
+              order changes).
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Shard key matters",
+        accent: "#ef4444",
+        content: (
+          <table
+            style={{
+              width: "100%",
+              fontSize: 11,
+              borderCollapse: "collapse",
+              color: "#e2e8f0",
+            }}
+          >
+            <thead>
+              <tr>
+                {["Scenario", "Result"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: "left",
+                      padding: "4px 8px",
+                      color: "#94a3b8",
+                      borderBottom: "1px solid #334155",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                [
+                  "users + orders sharded by userId",
+                  "✅ Co-located — fast $lookup within 1 shard",
+                ],
+                [
+                  "users by userId, orders by orderId",
+                  "❌ Cross-shard scatter — slower, complex coordination",
+                ],
+              ].map(([sc, res]) => (
+                <tr key={sc}>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                      fontFamily: "monospace",
+                      fontSize: 10,
+                    }}
+                  >
+                    {sc}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                    }}
+                  >
+                    {res}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ),
+      },
+      {
+        title: "Real intuition",
+        accent: "#8b5cf6",
+        content: (
+          <p>
+            MongoDB doesn’t remove joins — it forces you to{" "}
+            <strong>think about them upfront</strong>. Embed what you always
+            read together. Reference what you update independently.
+          </p>
+        ),
+      },
+    ],
+  },
   "mixed-concern": {
     title: "Mixed Concern (w:1 + Primary Reads)",
     subtitle: "Looks consistent — but durability is an illusion",
@@ -789,6 +994,179 @@ Step 5  Your data is gone  ❗`}</pre>
             <em>illusion of strong consistency</em> — it holds perfectly right
             up until the primary crashes.
           </p>
+        ),
+      },
+    ],
+  },
+  "token-ring": {
+    title: "Token Ring: Nodes Are Not Shards",
+    subtitle:
+      "Each node owns a slice of the hash space — and also stores replicas of other slices",
+    accentColor: "#f97316",
+    sections: [
+      {
+        title: "The mental shift",
+        accent: "#f97316",
+        content: (
+          <>
+            <p>
+              In Mongo sharding each shard owns{" "}
+              <strong>distinct, non-overlapping data</strong>. Shard A handles
+              users 0–1000, Shard B handles 1001–2000.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              In Cassandra every node owns a{" "}
+              <strong>slice of the hash ring</strong> (its primary token range){" "}
+              <em>and also stores replicas of nearby slices</em>. No node is a
+              dedicated owner of any key — the ring distributes responsibility
+              continuously.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "How a key lands on the ring",
+        accent: "#f97316",
+        content: (
+          <ol style={{ paddingLeft: 18, lineHeight: 1.8 }}>
+            <li>
+              The partition key is hashed:{" "}
+              <code style={{ fontSize: 11, color: "#fdba74" }}>
+                hash(account_id)
+              </code>
+            </li>
+            <li>
+              The result is a position on the ring (0 → 2⁶⁴, shown as 0–1000 in
+              the sandbox)
+            </li>
+            <li>
+              The node whose token range <em>contains</em> that position is the{" "}
+              <strong style={{ color: "#f97316" }}>key owner</strong>{" "}
+              (highlighted in orange)
+            </li>
+          </ol>
+        ),
+      },
+      {
+        title: "Clockwise replication",
+        accent: "#f97316",
+        content: (
+          <p>
+            Starting from the key owner, the next <strong>RF − 1</strong> nodes
+            clockwise each store a full replica. With RF = 3: key owner → next →
+            next again. All three nodes hold the <em>same partition data</em>,
+            even though each also owns its own distinct primary range.
+          </p>
+        ),
+      },
+      {
+        title: "What a node actually holds",
+        accent: "#f97316",
+        content: (
+          <>
+            <p>For a 4-node ring with RF = 3, node C at T:500 holds:</p>
+            <pre
+              style={{
+                background: "#0f172a",
+                borderRadius: 6,
+                padding: "10px 14px",
+                fontSize: 11,
+                color: "#fdba74",
+                marginTop: 8,
+              }}
+            >{`Node C (T:500):
+  PRIMARY → owns T:250–500
+  REPLICA  ← receives data from T:0–250   (Node B)
+  REPLICA  ← receives data from T:500–750 (Node D, it is N+1 of C)`}</pre>
+            <p style={{ marginTop: 8 }}>
+              With 4 nodes and RF = 3, every node holds{" "}
+              <strong>75% of the total dataset</strong>.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Mongo shards vs Cassandra nodes",
+        accent: "#ef4444",
+        content: (
+          <table
+            style={{
+              width: "100%",
+              fontSize: 11,
+              borderCollapse: "collapse",
+              color: "#e2e8f0",
+            }}
+          >
+            <thead>
+              <tr>
+                {["", "Mongo Shard", "Cassandra Node"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: "left",
+                      padding: "4px 8px",
+                      color: "#94a3b8",
+                      borderBottom: "1px solid #334155",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  ["Owns", "One specific slice", "One primary token range"],
+                  [
+                    "Also stores",
+                    "Replica of same slice",
+                    "Replicas of RF−1 other ranges",
+                  ],
+                  [
+                    "Data overlap",
+                    "Only within replica set",
+                    "Across the whole ring",
+                  ],
+                  [
+                    "Node removed",
+                    "That slice is in trouble",
+                    "Neighbours take over range",
+                  ],
+                ] as [string, string, string][]
+              ).map(([row, mongo, cass]) => (
+                <tr key={row}>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                      color: "#94a3b8",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {row}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                    }}
+                  >
+                    {mongo}
+                  </td>
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #1e293b",
+                      color: "#f97316",
+                    }}
+                  >
+                    {cass}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ),
       },
     ],

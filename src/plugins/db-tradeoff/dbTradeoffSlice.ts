@@ -14,6 +14,7 @@ export type OperationId =
 export type ConsistencyLevel = "strong" | "quorum" | "eventual";
 export type WriteConcern = "w1" | "wmajority";
 export type ReadPreference = "primary" | "secondary" | "majority";
+export type JoinMode = "app-join" | "lookup" | "denormalized";
 
 export interface DbNode {
   id: string;
@@ -63,6 +64,9 @@ export interface DbTradeoffState {
 
   targetShardIdx: number; // MongoDB: which shard a targeted query hits
   replicaAckCount: number; // MongoDB: how many nodes have the latest write (1 | 2 | 3)
+  joinMode: JoinMode; // MongoDB: how the join-query is executed
+  coordinatorIdx: number; // Cassandra: which ring node acts as coordinator
+  keyOwnerIdx: number; // Cassandra: which ring node hash(key) lands on (first replica)
   hotZones: string[];
   explanation: string;
   phase: string;
@@ -584,13 +588,46 @@ export function computeMetrics(state: DbTradeoffState) {
     rtoMs = failedNode ? 1000 : 0;
   }
 
+  // Join mode latency override (MongoDB + join-query only)
+  if (state.dbType === "mongodb" && state.selectedOp === "join-query") {
+    const mongoReadBase = 6;
+    if (state.joinMode === "denormalized") {
+      readMs = mongoReadBase + 4; // embedded doc — single targeted read, no join overhead
+    } else if (state.joinMode === "lookup") {
+      readMs = mongoReadBase + 16; // aggregation pipeline, less than app-join round trips
+    }
+    // app-join: keep existing readMs (base + 22 scatter penalty)
+  }
+
   // Shards touched
+  const isJoinDenorm =
+    state.selectedOp === "join-query" && state.joinMode === "denormalized";
   const shardsTouched =
     state.dbType === "mongodb"
-      ? isTargetedOp(state.selectedOp)
+      ? isTargetedOp(state.selectedOp) || isJoinDenorm
         ? 1
         : shardCount
       : 0;
+
+  // Nodes touched override for join modes
+  let nodesTouched = m.nodesTouched;
+  if (state.dbType === "mongodb" && state.selectedOp === "join-query") {
+    if (state.joinMode === "denormalized") nodesTouched = 1;
+    else if (state.joinMode === "lookup") nodesTouched = shardCount;
+    // app-join: keep m.nodesTouched (2)
+  }
+
+  // Cassandra: nodesTouched = RF (coordinator + replicas) for most ops
+  if (state.dbType === "cassandra") {
+    const rf = Math.min(state.replicationFactor, state.nodeCount);
+    if (state.selectedOp === "aggregate") {
+      nodesTouched = state.nodeCount; // full scatter
+    } else if (state.selectedOp === "join-query") {
+      nodesTouched = Math.min(state.nodeCount, rf + 1);
+    } else {
+      nodesTouched = rf;
+    }
+  }
 
   state.result = {
     readLatencyMs: readMs,
@@ -608,7 +645,7 @@ export function computeMetrics(state: DbTradeoffState) {
       state.consistencyLevel,
     ),
     fitScore: FIT_SCORES[state.dbType][state.workload],
-    nodesTouched: m.nodesTouched,
+    nodesTouched,
     shardsTouched,
     staleReadRisk,
     rpoRisk,
@@ -723,6 +760,9 @@ const baseState: DbTradeoffState = {
 
   targetShardIdx: 0,
   replicaAckCount: 2,
+  joinMode: "app-join" as JoinMode,
+  coordinatorIdx: 0,
+  keyOwnerIdx: 0,
   dataModel: "",
   dataModelDetail: [],
   whyThisDb: "",
@@ -759,6 +799,12 @@ const dbTradeoffSlice = createSlice({
         // 50/50: either only primary has new value (no majority yet)
         // or primary + one secondary do (majority reached)
         state.replicaAckCount = Math.random() < 0.5 ? 1 : 2;
+      }
+      // Randomize coordinator + key owner for Cassandra
+      if (state.dbType === "cassandra" && state.nodeCount > 0) {
+        state.coordinatorIdx = Math.floor(Math.random() * state.nodeCount);
+        // Key owner is where hash(key) lands — different from coordinator
+        state.keyOwnerIdx = Math.floor(Math.random() * state.nodeCount);
       }
       computeMetrics(state);
     },
@@ -819,9 +865,28 @@ const dbTradeoffSlice = createSlice({
       }
       computeMetrics(state);
     },
+    setJoinMode(state, action: PayloadAction<JoinMode>) {
+      state.joinMode = action.payload;
+      computeMetrics(state);
+    },
+    setReplicationFactor(state, action: PayloadAction<number>) {
+      state.replicationFactor = clamp(action.payload, 1, state.nodeCount);
+      computeMetrics(state);
+    },
     setNodeCount(state, action: PayloadAction<number>) {
       const max = state.dbType === "mongodb" ? 3 : 5;
       state.nodeCount = clamp(action.payload, 1, max);
+      // Clamp RF to not exceed node count
+      if (state.replicationFactor > state.nodeCount) {
+        state.replicationFactor = state.nodeCount;
+      }
+      // Clamp coordinator and key owner indices
+      if (state.coordinatorIdx >= state.nodeCount) {
+        state.coordinatorIdx = 0;
+      }
+      if (state.keyOwnerIdx >= state.nodeCount) {
+        state.keyOwnerIdx = 0;
+      }
       if (state.failedNodeIndex !== null) {
         const totalNodes =
           state.dbType === "mongodb" ? state.nodeCount * 3 : state.nodeCount;
@@ -858,6 +923,8 @@ export const {
   setConsistencyLevel,
   setWriteConcern,
   setReadPreference,
+  setJoinMode,
+  setReplicationFactor,
   setNodeCount,
   toggleNodeFailure,
 } = dbTradeoffSlice.actions;

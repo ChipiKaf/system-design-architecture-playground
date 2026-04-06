@@ -56,6 +56,21 @@ export function expandToken(token: string, state: DbTradeoffState): string[] {
       .map((n) => n.id);
   }
 
+  // $shard0Primary / $shard1Primary — explicit first/second shard primary for join visualisation
+  if (token === "$shard0Primary") {
+    const p = state.nodes.find((n) => n.shardIdx === 0 && n.role === "primary");
+    return p ? [p.id] : ["shard-0-primary"];
+  }
+  if (token === "$shard1Primary") {
+    const p = state.nodes.find((n) => n.shardIdx === 1 && n.role === "primary");
+    if (p) return [p.id];
+    // Fallback to shard 0 when only 1 shard
+    const p0 = state.nodes.find(
+      (n) => n.shardIdx === 0 && n.role === "primary",
+    );
+    return p0 ? [p0.id] : ["shard-0-primary"];
+  }
+
   /* ── Generic tokens (relational / cassandra) ───────── */
   if (token === "$primary") {
     const p = state.nodes.find((n) => n.role === "primary");
@@ -69,6 +84,67 @@ export function expandToken(token: string, state: DbTradeoffState): string[] {
   }
   if (token === "$allNodes") {
     return state.nodes.filter((n) => n.status !== "down").map((n) => n.id);
+  }
+  // Cassandra: the coordinator node for this request
+  if (token === "$coordinator") {
+    const idx = state.coordinatorIdx % state.nodes.length;
+    const node = state.nodes[idx];
+    return node && node.status !== "down"
+      ? [node.id]
+      : state.nodes
+          .filter((n) => n.status !== "down")
+          .slice(0, 1)
+          .map((n) => n.id);
+  }
+  // Cassandra: the node where hash(key) lands (first replica)
+  if (token === "$keyOwner") {
+    const idx = state.keyOwnerIdx % state.nodes.length;
+    const node = state.nodes[idx];
+    return node && node.status !== "down"
+      ? [node.id]
+      : state.nodes
+          .filter((n) => n.status !== "down")
+          .slice(0, 1)
+          .map((n) => n.id);
+  }
+  // Cassandra: the RF replica nodes clockwise from key owner, EXCLUDING key owner
+  if (token === "$rfReplicas") {
+    const n = state.nodes.length;
+    const rf = Math.min(state.replicationFactor, n);
+    const koIdx = state.keyOwnerIdx % n;
+    const ids: string[] = [];
+    for (let r = 1; r < rf; r++) {
+      const ri = (koIdx + r) % n;
+      if (state.nodes[ri].status !== "down") ids.push(state.nodes[ri].id);
+    }
+    return ids;
+  }
+  // Cassandra: ALL RF nodes (key owner + clockwise), for write fan-out
+  if (token === "$rfAll") {
+    const n = state.nodes.length;
+    const rf = Math.min(state.replicationFactor, n);
+    const koIdx = state.keyOwnerIdx % n;
+    const ids: string[] = [];
+    for (let r = 0; r < rf; r++) {
+      const ri = (koIdx + r) % n;
+      if (state.nodes[ri].status !== "down") ids.push(state.nodes[ri].id);
+    }
+    return ids;
+  }
+  // Cassandra: CL-appropriate subset of RF nodes (for ack/read fan-out)
+  if (token === "$clAckNodes") {
+    const n = state.nodes.length;
+    const rf = Math.min(state.replicationFactor, n);
+    const koIdx = state.keyOwnerIdx % n;
+    const cl = state.consistencyLevel;
+    const ackCount =
+      cl === "strong" ? rf : cl === "quorum" ? Math.floor(rf / 2) + 1 : 1;
+    const ids: string[] = [];
+    for (let r = 0; r < rf && ids.length < ackCount; r++) {
+      const ri = (koIdx + r) % n;
+      if (state.nodes[ri].status !== "down") ids.push(state.nodes[ri].id);
+    }
+    return ids;
   }
   if (token === "$lagging") {
     const l = state.nodes.find((n) => n.status === "lagging");
@@ -97,6 +173,7 @@ export type StepKey =
   | "db-route"
   | "replica-ack"
   | "db-response"
+  | "join-merge"
   | "replication"
   | "consistency-check"
   | "summary";
@@ -190,17 +267,106 @@ export const STEPS: StepDef[] = [
       {
         from: "query-layer",
         to: "$shardPrimaries",
-        when: (s) => s.dbType === "mongodb" && !isTargetedOp(s.selectedOp),
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          !isTargetedOp(s.selectedOp) &&
+          s.selectedOp !== "join-query",
         duration: 700,
         explain: "Scatter-gather: mongos fans out to ALL shard primaries.",
       },
-      // Cassandra: partition router → replica nodes
+      // MongoDB join-query: $lookup — scatter aggregation pipeline
       {
         from: "query-layer",
-        to: "$allNodes",
-        when: (s) => s.dbType === "cassandra",
+        to: "$shardPrimaries",
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          s.selectedOp === "join-query" &&
+          s.joinMode === "lookup",
         duration: 700,
-        explain: "Cassandra routes by partition key to replica nodes.",
+        explain:
+          "$lookup aggregation pipeline fans out to all shard primaries. Cross-shard joins require each shard to independently resolve the join.",
+      },
+      // MongoDB join-query: denormalized — targeted single shard (data is co-located)
+      {
+        from: "query-layer",
+        to: "$targetShardPrimary",
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          s.selectedOp === "join-query" &&
+          s.joinMode === "denormalized",
+        duration: 550,
+        explain:
+          "Denormalized: users and orders are embedded in one document. Single shard read — no join overhead.",
+      },
+      // MongoDB join-query: app-join — Round trip 1 (fetch collection A)
+      {
+        from: "query-layer",
+        to: "$shard0Primary",
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          s.selectedOp === "join-query" &&
+          s.joinMode === "app-join",
+        duration: 550,
+        explain:
+          "App-side join — Round trip 1 of 2: fetching first collection (e.g., users) from Shard 1.",
+      },
+      // MongoDB join-query: app-join — Round trip 1 return
+      {
+        from: "$shard0Primary",
+        to: "query-layer",
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          s.selectedOp === "join-query" &&
+          s.joinMode === "app-join",
+        duration: 450,
+        explain:
+          "Shard 1 returns the users collection. Issuing second query...",
+      },
+      // MongoDB join-query: app-join — Round trip 2 (fetch collection B)
+      {
+        from: "query-layer",
+        to: "$shard1Primary",
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          s.selectedOp === "join-query" &&
+          s.joinMode === "app-join",
+        duration: 550,
+        explain:
+          "App-side join — Round trip 2 of 2: fetching second collection (e.g., orders) from Shard 2.",
+      },
+      // MongoDB join-query: app-join — Round trip 2 return
+      {
+        from: "$shard1Primary",
+        to: "query-layer",
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          s.selectedOp === "join-query" &&
+          s.joinMode === "app-join",
+        duration: 450,
+        explain:
+          "Both collections received. Merging results in application layer...",
+      },
+      // Cassandra: route to coordinator node
+      {
+        from: "query-layer",
+        to: "$coordinator",
+        when: (s) => s.dbType === "cassandra",
+        duration: 550,
+        explain:
+          "Client connects to any node — it becomes the coordinator for this request.",
+      },
+      // Cassandra reads: coordinator reads from CL-appropriate replicas
+      {
+        from: "$coordinator",
+        to: "$clAckNodes",
+        when: (s) =>
+          s.dbType === "cassandra" &&
+          isReadOp(s.selectedOp) &&
+          s.replicationFactor >= 1 &&
+          s.nodes.filter((nd) => nd.status !== "down").length >= 1,
+        duration: 600,
+        explain:
+          "Coordinator hashes the key → finds replicas on the ring → reads from CL nodes.",
       },
     ],
     recalcMetrics: true,
@@ -209,14 +375,23 @@ export const STEPS: StepDef[] = [
         const targeted = isTargetedOp(s.selectedOp);
         const readSec =
           isReadOp(s.selectedOp) && s.readPreference === "secondary";
+        if (s.selectedOp === "join-query") {
+          if (s.joinMode === "app-join")
+            return `App-side join: 2 round trips to separate shards — more network latency, manual data stitching in application code.`;
+          if (s.joinMode === "lookup")
+            return `$lookup aggregation: mongos fans out the pipeline to all ${s.nodeCount} shard(s). Cross-shard joins require full scatter-gather.`;
+          if (s.joinMode === "denormalized")
+            return `Denormalized: users+orders embedded in one document at Shard ${s.targetShardIdx + 1}. Single targeted read — no join overhead. Shards touched: 1/${s.nodeCount}.`;
+        }
         if (targeted && readSec)
           return `readPreference:secondary — read sent to a secondary in Shard ${s.targetShardIdx + 1}. May return stale data.`;
         return targeted
           ? `Targeted query: mongos routes to Shard ${s.targetShardIdx + 1} only. Shards touched: 1/${s.nodeCount}.`
           : `Scatter-gather: mongos fans out to all ${s.nodeCount} shard(s). Shards touched: ${s.nodeCount}/${s.nodeCount}.`;
       }
-      if (s.dbType === "cassandra")
-        return `Partition-key routing: request hits ${s.result.nodesTouched} replica node(s).`;
+      if (s.dbType === "cassandra") {
+        return `Client connects to Node ${(s.coordinatorIdx % s.nodeCount) + 1} — it becomes the coordinator for this request.`;
+      }
       return `Request routed to primary. Write latency: ~${s.result.writeLatencyMs}ms.`;
     },
   },
@@ -257,7 +432,8 @@ export const STEPS: StepDef[] = [
         to: "query-layer",
         when: (s) =>
           s.dbType === "mongodb" &&
-          isTargetedOp(s.selectedOp) &&
+          (isTargetedOp(s.selectedOp) ||
+            (s.selectedOp === "join-query" && s.joinMode === "denormalized")) &&
           !(isReadOp(s.selectedOp) && s.readPreference === "secondary"),
         color: (s) =>
           s.dbType === "mongodb" &&
@@ -284,12 +460,27 @@ export const STEPS: StepDef[] = [
       {
         from: "$shardPrimaries",
         to: "query-layer",
-        when: (s) => s.dbType === "mongodb" && !isTargetedOp(s.selectedOp),
+        when: (s) =>
+          s.dbType === "mongodb" &&
+          !isTargetedOp(s.selectedOp) &&
+          !(s.selectedOp === "join-query" && s.joinMode === "app-join") &&
+          !(s.selectedOp === "join-query" && s.joinMode === "denormalized"),
         duration: 600,
       },
-      // Cassandra
+      // Cassandra: CL-appropriate acks from replicas → coordinator
       {
-        from: "$allNodes",
+        from: "$clAckNodes",
+        to: "$coordinator",
+        when: (s) =>
+          s.dbType === "cassandra" &&
+          s.replicationFactor >= 1 &&
+          s.nodes.filter((nd) => nd.status !== "down").length >= 1,
+        duration: 500,
+        explain:
+          "CL-required replicas acknowledge — coordinator can now respond.",
+      },
+      {
+        from: "$coordinator",
         to: "query-layer",
         when: (s) => s.dbType === "cassandra",
         duration: 600,
@@ -321,10 +512,50 @@ export const STEPS: StepDef[] = [
           ? `readConcern:majority → NEW value returned ✓  (${s.replicaAckCount}/3 nodes confirmed — majority snapshot is current).`
           : `readConcern:majority → OLD value returned  (new write is on 1/3 nodes only — not majority-committed yet, so the safe old snapshot is served).`;
       }
+      if (s.dbType === "mongodb" && s.selectedOp === "join-query") {
+        if (s.joinMode === "app-join")
+          return `Two collections fetched via 2 round trips and merged in app layer. Total latency ~${s.result.readLatencyMs}ms. ⚠ N+1 query cost scales with dataset size.`;
+        if (s.joinMode === "lookup")
+          return `$lookup pipeline completed across ${s.nodeCount} shard(s). Aggregated result returned. Latency ~${s.result.readLatencyMs}ms. Cross-shard $lookup degrades as data spreads.`;
+        if (s.joinMode === "denormalized")
+          return `Single embedded document returned — no join needed. Data was co-located in one document. Latency ~${s.result.readLatencyMs}ms ✓`;
+      }
+      if (s.dbType === "cassandra") {
+        const rf = Math.min(s.replicationFactor, s.nodeCount);
+        const clName =
+          s.consistencyLevel === "strong"
+            ? "ALL"
+            : s.consistencyLevel === "quorum"
+              ? "QUORUM"
+              : "ONE";
+        const ackCount =
+          s.consistencyLevel === "strong"
+            ? rf
+            : s.consistencyLevel === "quorum"
+              ? Math.floor(rf / 2) + 1
+              : 1;
+        if (isReadOp(s.selectedOp)) {
+          return `CL=${clName}: coordinator read from ${ackCount} replica(s) and returned the latest value. Read: ~${s.result.readLatencyMs}ms.`;
+        }
+        return `CL=${clName}: coordinator received ${ackCount}/${rf} acks → success returned.${ackCount < rf ? ` Remaining ${rf - ackCount} replica(s) complete their writes asynchronously (hinted handoff / read repair).` : ""} Write: ~${s.result.writeLatencyMs}ms.`;
+      }
       return `Response returned. Read: ~${s.result.readLatencyMs}ms, Write: ~${s.result.writeLatencyMs}ms.`;
     },
   },
 
+  {
+    key: "join-merge",
+    label: "Merge in App",
+    when: (s) =>
+      s.dbType === "mongodb" &&
+      s.selectedOp === "join-query" &&
+      s.joinMode === "app-join",
+    phase: "join-merge",
+    finalHotZones: ["query-layer"],
+    delay: 300,
+    explain:
+      "Application code stitches the two result sets together in memory. This is the N+1 query cost: 2 round trips + O(n) merge loop. Latency adds up as dataset size grows.",
+  },
   {
     key: "replication",
     label: "Replication",
@@ -352,15 +583,17 @@ export const STEPS: StepDef[] = [
         duration: 800,
         explain: `Shard primary replicates the write to its 2 secondaries.`,
       },
-      // Cassandra: peer-to-peer
+      // Cassandra: coordinator writes to ALL RF replicas in parallel
       {
-        from: "$allNodes",
-        to: "$allNodes",
+        from: "$coordinator",
+        to: "$rfAll",
         when: (s) =>
           s.dbType === "cassandra" &&
-          s.nodes.filter((n) => n.status !== "down").length >= 2,
+          s.replicationFactor >= 1 &&
+          s.nodes.filter((n) => n.status !== "down").length >= 1,
         duration: 800,
-        explain: "Cassandra replicates across peer nodes (no single primary).",
+        explain:
+          "Coordinator sends the write to ALL RF replicas in parallel. Every replica stores its own primary range AND replicas of other ranges.",
       },
     ],
     explain: (s) => {
@@ -369,8 +602,27 @@ export const STEPS: StepDef[] = [
           return `w:majority — Shard ${s.targetShardIdx + 1}'s primary waited for majority ack from secondaries BEFORE responding. Data is durable.`;
         return `w:1 — Shard ${s.targetShardIdx + 1}'s primary replicates AFTER the response was sent. If primary crashes now, the write could be lost.`;
       }
-      if (s.dbType === "cassandra")
-        return "Peer-to-peer replication: all replicas exchange data. Tunable consistency decides how many must confirm.";
+      if (s.dbType === "cassandra") {
+        const rf = Math.min(s.replicationFactor, s.nodeCount);
+        const koNode = s.keyOwnerIdx % s.nodeCount;
+        const rfNodes = Array.from(
+          { length: rf },
+          (_, r) => ((koNode + r) % s.nodeCount) + 1,
+        );
+        const clName =
+          s.consistencyLevel === "strong"
+            ? "ALL"
+            : s.consistencyLevel === "quorum"
+              ? "QUORUM"
+              : "ONE";
+        const ackCount =
+          s.consistencyLevel === "strong"
+            ? rf
+            : s.consistencyLevel === "quorum"
+              ? Math.floor(rf / 2) + 1
+              : 1;
+        return `Coordinator writes to ALL ${rf} replicas in parallel: [${rfNodes.join(" → ")}]. Each node stores its own token range + replicas of adjacent ranges. CL=${clName} → coordinator waits for ${ackCount}/${rf} acks before responding.`;
+      }
       return `Write replicated to ${Math.max(0, s.nodeCount - 1)} secondary node(s). Lag depends on replication mode.`;
     },
   },
@@ -437,6 +689,16 @@ export function buildSteps(state: DbTradeoffState): TaggedStep[] {
     }
   }
 
+  // Cassandra writes: coordinator writes to ALL replicas first, THEN returns acks
+  if (state.dbType === "cassandra" && !isReadOp(state.selectedOp)) {
+    const repIdx = active.findIndex((s) => s.key === "replication");
+    const respIdx = active.findIndex((s) => s.key === "db-response");
+    if (repIdx > respIdx && repIdx >= 0 && respIdx >= 0) {
+      const [rep] = active.splice(repIdx, 1);
+      active.splice(respIdx, 0, rep);
+    }
+  }
+
   return active.map((step, i) => {
     const nextStep = active[i + 1];
     let nextButtonText: string | undefined;
@@ -448,9 +710,15 @@ export function buildSteps(state: DbTradeoffState): TaggedStep[] {
       nextButtonText = nextStep.label;
     }
 
+    // Cassandra: relabel "Replication" → "Write to Replicas"
+    const label =
+      step.key === "replication" && state.dbType === "cassandra"
+        ? "Write to Replicas"
+        : step.label;
+
     return {
       key: step.key,
-      label: step.label,
+      label,
       autoAdvance: false,
       nextButtonText,
       nextButtonColor: step.nextButtonColor,
