@@ -12,6 +12,7 @@ import ScalabilityPlugin from "./plugins/scalability";
 import HttpCachingPlugin from "./plugins/http-caching";
 import FailoverPlugin from "./plugins/failover";
 import ShardingPlugin from "./plugins/sharding";
+import DbTradeoffPlugin from "./plugins/db-tradeoff";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -55,6 +56,7 @@ export const categories: PluginCategory[] = [
       HttpCachingPlugin,
       FailoverPlugin,
       ShardingPlugin,
+      DbTradeoffPlugin,
     ],
   },
   {

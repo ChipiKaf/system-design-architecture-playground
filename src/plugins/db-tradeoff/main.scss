@@ -1,0 +1,231 @@
+.db-tradeoff-root {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Controls ────────────────────────────────────────── */
+.db-tradeoff-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: center;
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  &__legend {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 0.1rem;
+  }
+
+  &__sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(148, 163, 184, 0.14);
+    margin: 0 0.1rem;
+  }
+
+  &__chip {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 6px;
+    padding: 0.18rem 0.45rem;
+    background: rgba(15, 23, 42, 0.9);
+    color: #94a3b8;
+    font-size: 0.64rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      transform 0.12s ease,
+      background 0.12s ease,
+      border-color 0.12s ease,
+      color 0.12s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(59, 130, 246, 0.1);
+      transform: translateY(-1px);
+    }
+
+    &.is-active {
+      background: rgba(59, 130, 246, 0.14);
+      border-color: currentColor;
+      color: #e2e8f0;
+      box-shadow: 0 0 0 1px currentColor inset;
+    }
+
+    &--danger {
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.25);
+
+      &:hover {
+        background: rgba(239, 68, 68, 0.1) !important;
+      }
+
+      &.is-active {
+        background: rgba(239, 68, 68, 0.15);
+        border-color: #ef4444;
+        color: #fca5a5;
+      }
+    }
+  }
+
+  &__slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 60px;
+    height: 3px;
+    border-radius: 2px;
+    background: #1e293b;
+    outline: none;
+    cursor: pointer;
+
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #3b82f6;
+      border: 2px solid #0f172a;
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+
+    &::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    &::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #3b82f6;
+      border: 2px solid #0f172a;
+      cursor: pointer;
+    }
+  }
+}
+
+/* ── Stage ───────────────────────────────────────────── */
+.db-tradeoff-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #0a0e1a;
+  border-radius: 12px;
+
+  &--overview {
+    --phase-accent: #64748b;
+  }
+  &--data-model {
+    --phase-accent: #38bdf8;
+  }
+  &--send {
+    --phase-accent: #818cf8;
+  }
+  &--route {
+    --phase-accent: #f59e0b;
+  }
+  &--response {
+    --phase-accent: #22c55e;
+  }
+  &--replicate {
+    --phase-accent: #6366f1;
+  }
+  &--stale {
+    --phase-accent: #ef4444;
+  }
+  &--summary {
+    --phase-accent: #a78bfa;
+  }
+}
+
+/* ── Schema block ────────────────────────────────────── */
+.db-tradeoff-schema {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 8px;
+  background: #0f172a;
+  border-radius: 6px;
+  border: 1px solid #1e293b;
+
+  code {
+    font-size: 10px;
+    color: #7dd3fc;
+    font-family: "SF Mono", Menlo, monospace;
+    line-height: 1.5;
+  }
+}
+
+/* ── KPIs table ──────────────────────────────────────── */
+.db-tradeoff-kpis {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid #1e293b;
+    font-size: 12px;
+
+    span {
+      color: #94a3b8;
+    }
+    strong {
+      color: #e2e8f0;
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+/* ── Strengths & weaknesses ──────────────────────────── */
+.db-tradeoff-traits {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  p {
+    margin: 2px 0;
+    font-size: 11px;
+    color: #cbd5e1;
+    line-height: 1.4;
+  }
+}
+
+/* ── Workload needs ──────────────────────────────────── */
+.db-tradeoff-needs {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+
+  li {
+    font-size: 11px;
+    color: #94a3b8;
+    padding: 2px 0 2px 12px;
+    position: relative;
+    line-height: 1.5;
+
+    &::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #475569;
+    }
+  }
+}
