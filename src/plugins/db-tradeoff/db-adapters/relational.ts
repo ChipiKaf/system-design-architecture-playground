@@ -1,8 +1,4 @@
-import type {
-  DbAdapter,
-  OpAdjustment,
-  StatBadgeConfig,
-} from "./types";
+import type { DbAdapter, OpAdjustment, StatBadgeConfig } from "./types";
 
 /* ── Node status helpers (shared colours for scene) ───── */
 
@@ -21,9 +17,7 @@ const isReadOp = (op: string) =>
   op === "read-after-write";
 
 /** Map consistency level to PostgreSQL replication behaviour. */
-const replicationMode = (
-  cl: string,
-): "sync" | "quorum-sync" | "async" =>
+const replicationMode = (cl: string): "sync" | "quorum-sync" | "async" =>
   cl === "strong" ? "sync" : cl === "quorum" ? "quorum-sync" : "async";
 
 /* ── Adapter ───────────────────────────────────────────── */
@@ -265,8 +259,7 @@ export const relationalAdapter: DbAdapter = {
           from: "query-layer",
           to: "$readTarget",
           duration: 600,
-          explain:
-            "Read routed to a streaming replica — offloads the primary.",
+          explain: "Read routed to a streaming replica — offloads the primary.",
         },
       ];
     }
@@ -478,11 +471,7 @@ export const relationalAdapter: DbAdapter = {
     const replicaH = 56;
     const primaryX = 660;
     const primaryY =
-      replicaCount === 0
-        ? H / 2 - primaryH / 2
-        : replicaCount <= 2
-          ? 175
-          : 150;
+      replicaCount === 0 ? H / 2 - primaryH / 2 : replicaCount <= 2 ? 175 : 150;
     const replicaBaseY = primaryY + primaryH + 75;
     const primaryCX = primaryX + primaryW / 2;
 
@@ -671,11 +660,7 @@ export const relationalAdapter: DbAdapter = {
       if (primaryNode.status !== "down") {
         b.edge("query-layer", primaryNode.id, `e-query-${primaryNode.id}`)
           .stroke(
-            isHot
-              ? dbColors.stroke
-              : showRouteInfo
-                ? "#3b82f6"
-                : "#475569",
+            isHot ? dbColors.stroke : showRouteInfo ? "#3b82f6" : "#475569",
             isHot ? 2.2 : showRouteInfo ? 2 : 1.5,
           )
           .arrow(true);
@@ -738,11 +723,7 @@ export const relationalAdapter: DbAdapter = {
           (l: any) => {
             l.color(
               roleLabel,
-              isReadTarget
-                ? "#22c55e"
-                : showReplInfo
-                  ? "#60a5fa"
-                  : "#cbd5e1",
+              isReadTarget ? "#22c55e" : showReplInfo ? "#60a5fa" : "#cbd5e1",
               { fontSize: 9, bold: true },
             );
             l.newline();
@@ -853,11 +834,7 @@ export const relationalAdapter: DbAdapter = {
     badges.push({
       label: "Repl",
       value:
-        mode === "sync"
-          ? "Sync"
-          : mode === "quorum-sync"
-            ? "Quorum"
-            : "Async",
+        mode === "sync" ? "Sync" : mode === "quorum-sync" ? "Quorum" : "Async",
       color:
         mode === "sync"
           ? "#22c55e"
