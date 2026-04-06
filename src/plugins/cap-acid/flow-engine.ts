@@ -99,9 +99,7 @@ export const STEPS: StepDef[] = [
     processingText: "Routing...",
     flow: [{ from: "$gateway", to: "$primary", duration: 600 }],
     finalHotZones: (s) => {
-      const p = s.nodes.find(
-        (n) => n.role === "primary" && n.status === "up",
-      );
+      const p = s.nodes.find((n) => n.role === "primary" && n.status === "up");
       return p ? [p.id] : [];
     },
     explain: (s) =>
@@ -113,8 +111,7 @@ export const STEPS: StepDef[] = [
     key: "write-replicate",
     label: "Replicate → Secondaries",
     phase: "write",
-    when: (s) =>
-      s.variant !== "cassandra" || s.consistencyLevel !== "eventual",
+    when: (s) => s.variant !== "cassandra" || s.consistencyLevel !== "eventual",
     processingText: "Replicating...",
     flow: [{ from: "$primary", to: "$replicas", duration: 700 }],
     recalcMetrics: true,
@@ -143,9 +140,7 @@ export const STEPS: StepDef[] = [
     processingText: "Fetching...",
     flow: [{ from: "$gateway", to: "$primary", duration: 500 }],
     finalHotZones: (s) => {
-      const p = s.nodes.find(
-        (n) => n.role === "primary" && n.status === "up",
-      );
+      const p = s.nodes.find((n) => n.role === "primary" && n.status === "up");
       return p ? [p.id] : [];
     },
     explain: (s) =>
@@ -210,9 +205,7 @@ export const STEPS: StepDef[] = [
     flow: [{ from: "$gateway", to: "$primary", duration: 600 }],
     recalcMetrics: true,
     finalHotZones: (s) => {
-      const p = s.nodes.find(
-        (n) => n.role === "primary" && n.status === "up",
-      );
+      const p = s.nodes.find((n) => n.role === "primary" && n.status === "up");
       return p ? [p.id] : [];
     },
     explain: (s) => {
@@ -233,8 +226,7 @@ export const STEPS: StepDef[] = [
     processingText: "Sending read...",
     flow: [{ from: "$client", to: "$gateway", duration: 500 }],
     finalHotZones: ["query-layer"],
-    explain: () =>
-      "Client sends a read request during the partition.",
+    explain: () => "Client sends a read request during the partition.",
   },
   {
     key: "partition-read-route",
@@ -246,14 +238,10 @@ export const STEPS: StepDef[] = [
       const target = s.nodes.find(
         (n) => n.role === "primary" && n.status === "up",
       );
-      return target
-        ? [{ from: "$gateway", to: target.id, duration: 500 }]
-        : [];
+      return target ? [{ from: "$gateway", to: target.id, duration: 500 }] : [];
     },
     finalHotZones: (s) => {
-      const p = s.nodes.find(
-        (n) => n.role === "primary" && n.status === "up",
-      );
+      const p = s.nodes.find((n) => n.role === "primary" && n.status === "up");
       return p ? [p.id] : [];
     },
     explain: (s) => {
