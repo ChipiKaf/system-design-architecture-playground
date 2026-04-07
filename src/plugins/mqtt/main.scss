@@ -1,0 +1,212 @@
+.mqtt-root {
+  --mqtt-bg: #020617;
+  --mqtt-panel: rgba(7, 17, 34, 0.88);
+  --mqtt-border: rgba(148, 163, 184, 0.18);
+  --mqtt-text: #e2e8f0;
+  --mqtt-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--mqtt-text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(124, 58, 237, 0.12),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(34, 211, 238, 0.1),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.mqtt-stage {
+  background: var(--mqtt-panel);
+  border: 1px solid var(--mqtt-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.mqtt-phase--overview .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.mqtt-phase--connect .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.mqtt-phase--subscribe .vc-stat-badge__value {
+  color: #818cf8;
+}
+.mqtt-phase--publish .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.mqtt-phase--matching .vc-stat-badge__value {
+  color: #22d3ee;
+}
+.mqtt-phase--deliver .vc-stat-badge__value {
+  color: #22c55e;
+}
+.mqtt-phase--qos-ack .vc-stat-badge__value {
+  color: #a78bfa;
+}
+.mqtt-phase--summary .vc-stat-badge__value {
+  color: #86efac;
+}
+
+/* ── Controls ────────────────────────────────────────── */
+.mqtt-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mqtt-controls__group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mqtt-controls__label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.mqtt-controls__btn {
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: rgba(51, 65, 85, 0.7);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.mqtt-controls__btn--active {
+  border-color: currentColor;
+  background: rgba(51, 65, 85, 0.5);
+  font-weight: 700;
+}
+
+.mqtt-controls__select {
+  background: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+
+  option {
+    background: #1e293b;
+    color: #e2e8f0;
+  }
+}
+
+.mqtt-controls__select--sm {
+  max-width: 180px;
+}
+
+.mqtt-controls__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mqtt-controls__sep {
+  width: 1px;
+  height: 1.2rem;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+/* ── Subscriber table in sidebar ─────────────────────── */
+.mqtt-sub-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mqtt-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.mqtt-sub-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mqtt-sub-name {
+  font-weight: 600;
+  color: #e2e8f0;
+  min-width: 36px;
+}
+
+.mqtt-sub-pattern {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  background: rgba(30, 41, 59, 0.6);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.mqtt-sub-match {
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.mqtt-sub-match--yes {
+  color: #22c55e;
+}
+
+.mqtt-sub-match--no {
+  color: #ef4444;
+}
+
+/* ── SVG transitions ─────────────────────────────────── */
+.mqtt-stage svg {
+  & circle,
+  & text,
+  & rect,
+  & path,
+  & line {
+    transition:
+      fill 0.35s ease,
+      stroke 0.35s ease,
+      opacity 0.4s ease,
+      stroke-width 0.3s ease;
+  }
+}

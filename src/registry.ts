@@ -14,6 +14,7 @@ import FailoverPlugin from "./plugins/failover";
 import ShardingPlugin from "./plugins/sharding";
 import DbTradeoffPlugin from "./plugins/db-tradeoff";
 import CapAcidPlugin from "./plugins/cap-acid";
+import MqttPlugin from "./plugins/mqtt";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -57,7 +58,9 @@ export const categories: PluginCategory[] = [
       HttpCachingPlugin,
       FailoverPlugin,
       ShardingPlugin,
-      DbTradeoffPlugin, CapAcidPlugin],
+      DbTradeoffPlugin,
+      CapAcidPlugin,
+    ],
   },
   {
     id: "architecture",
@@ -82,6 +85,14 @@ export const categories: PluginCategory[] = [
       "How code actually runs — event loops, call stacks, queues, rendering, and other runtime mechanics.",
     accent: "#14b8a6",
     plugins: [EventLoopPlugin],
+  },
+  {
+    id: "iot",
+    name: "IoT & Messaging",
+    description:
+      "Internet of Things protocols and messaging patterns — MQTT, topic routing, pub/sub, and device communication.",
+    accent: "#7c3aed",
+    plugins: [MqttPlugin],
   },
 ];
 

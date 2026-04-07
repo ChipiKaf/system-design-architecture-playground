@@ -1261,7 +1261,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({
           panZoom: true,
         }) ?? null;
     } else {
-      const saved = viewportRef.current;
+      const saved = pzRef.current?.getState() ?? viewportRef.current;
       builderRef.current?.destroy();
       builderRef.current = scene;
       pzRef.current =
@@ -1460,7 +1460,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
   /* ── Mount / destroy VizCraft scene ─────────────────── */
   useLayoutEffect(() => {
     if (!containerRef.current) return;
-    const saved = viewportRef.current;
+    const saved = pzRef.current?.getState() ?? viewportRef.current;
     builderRef.current?.destroy();
     builderRef.current = scene;
     pzRef.current =
@@ -1612,7 +1612,7 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
   /* ── Mount / destroy VizCraft scene ─────────────────── */
   useLayoutEffect(() => {
     if (!containerRef.current) return;
-    const saved = viewportRef.current;
+    const saved = pzRef.current?.getState() ?? viewportRef.current;
     builderRef.current?.destroy();
     builderRef.current = scene;
     pzRef.current =
