@@ -6,7 +6,8 @@ export type ConceptKey =
   | "modular-monolith"
   | "microservices"
   | "serverless"
-  | "tradeoffs";
+  | "tradeoffs"
+  | "when-to-migrate";
 
 interface ConceptDefinition {
   title: string;
@@ -200,56 +201,112 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <p>
             Each business capability (Auth, Catalog, Orders, …) runs as its own
-            fully independent service with its own database. Services
-            communicate via lightweight protocols: REST, gRPC, or async
-            messaging.
+            fully independent service with its own private database. Other
+            services should not reach into that database directly; they go
+            through the owning service via REST, gRPC, or async messaging.
           </p>
         ),
       },
       {
-        title: "Core benefits",
-        accent: "#22c55e",
+        title: "Database-per-service pattern",
+        accent: "#c084fc",
         content: (
           <ul>
             <li>
-              <strong>Independent scaling</strong> — scale only the tier that's
-              hot
+              <strong>Each service owns its private data store</strong> — the
+              Orders service owns order data, the Catalog service owns product
+              data, and so on.
             </li>
             <li>
-              <strong>Fault isolation</strong> — a crash in one service doesn't
-              cascade
+              <strong>No direct cross-service DB access</strong> — another
+              service should not connect to the Orders database and run SQL
+              against it.
             </li>
             <li>
-              <strong>Polyglot freedom</strong> — each service can use the best
-              language/DB for the job
+              <strong>Data is exposed through APIs or events</strong> — the
+              owning service defines the contract, which preserves autonomy and
+              prevents hidden coupling.
             </li>
             <li>
-              <strong>Small teams</strong> — Conway's Law: small services →
-              small autonomous teams
+              <strong>Ownership is explicit</strong> — when a schema changes,
+              one team is accountable and other teams consume the public
+              contract instead of internal tables.
             </li>
           </ul>
         ),
       },
       {
-        title: "The hidden costs",
+        title: "Why teams use it",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>
+              <strong>Loose coupling and service autonomy</strong> — service
+              boundaries are reinforced by data boundaries, not just code
+              boundaries
+            </li>
+            <li>
+              <strong>Independent schema evolution</strong> — one team can
+              change its internal tables without forcing every other service to
+              coordinate
+            </li>
+            <li>
+              <strong>Independent scalability</strong> — hot services can scale
+              their compute and data store separately from the rest of the
+              system
+            </li>
+            <li>
+              <strong>Improved fault isolation</strong> — a bad schema change or
+              datastore outage is more likely to stay within one service
+            </li>
+            <li>
+              <strong>Clear ownership</strong> — teams know which service owns
+              which data, which reduces accidental coupling
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Polyglot persistence",
+        accent: "#38bdf8",
+        content: (
+          <>
+            <p>
+              Database-per-service also enables{" "}
+              <strong>polyglot persistence</strong>: different services can use
+              different data stores when their access patterns are different.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              For example, Catalog might use a document database, Basket might
+              use a key-value store, and Ordering might stay on an RDBMS.
+              Microservices do not require this, but they make it possible
+              because each service owns its own data model.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "What gets harder",
         accent: "#f59e0b",
         content: (
           <ul>
             <li>
+              <strong>Joining data across services</strong> — you can no longer
+              write one big SQL join across the whole business domain
+            </li>
+            <li>
+              <strong>Distributed transactions and consistency</strong> — one
+              business action may span multiple services, so you need sagas,
+              outboxes, retries, and eventual consistency patterns
+            </li>
+            <li>
               <strong>Operational complexity</strong> — you now run N services,
-              N pipelines, N monitoring dashboards
+              N pipelines, N dashboards, and more cross-service failure modes
             </li>
             <li>
-              <strong>Distributed systems problems</strong> — network
-              partitions, eventual consistency, distributed tracing
-            </li>
-            <li>
-              <strong>Slow startup</strong> — onboarding a new engineer means
-              understanding dozens of repos and contracts
-            </li>
-            <li>
-              <strong>Data ownership</strong> — cross-service joins require
-              orchestration (Saga, API composition)
+              <strong>Tracing and debugging</strong> — following one request
+              across services and events is much harder than stepping through a
+              monolith
             </li>
           </ul>
         ),
@@ -323,6 +380,193 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
               locally is non-trivial
             </li>
           </ul>
+        ),
+      },
+    ],
+  },
+
+  "when-to-migrate": {
+    title: "When to Move to the Next Architecture",
+    subtitle:
+      "Concrete signals that tell you it's time to evolve — and when it's too early",
+    accentColor: "#f472b6",
+    sections: [
+      {
+        title: "Monolith → Modular Monolith",
+        accent: "#60a5fa",
+        content: (
+          <>
+            <p>
+              The monolith itself is a great starting point. You should only
+              restructure when you feel real pain — not because a blog post said
+              so.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              <strong>Move when you see:</strong>
+            </p>
+            <ul>
+              <li>
+                <strong>Merge conflicts across teams</strong> — different teams
+                step on each other's code because there are no clear ownership
+                boundaries.
+              </li>
+              <li>
+                <strong>Fear-driven deployments</strong> — a tiny change in one
+                area breaks something unrelated, and nobody wants to deploy on
+                Friday.
+              </li>
+              <li>
+                <strong>Unclear code ownership</strong> — no one knows who owns
+                the payment logic vs. catalog logic, and PRs constantly touch
+                shared files.
+              </li>
+              <li>
+                <strong>Growing team size (5–15 engineers)</strong> — the team
+                is large enough that coordination costs outweigh the simplicity
+                of one codebase, but not so large that independent services are
+                justified.
+              </li>
+              <li>
+                <strong>Domain boundaries are becoming visible</strong> — you
+                can clearly name 3–6 capabilities (Orders, Auth, Catalog…) that
+                belong in separate domains.
+              </li>
+            </ul>
+            <p style={{ marginTop: 8 }}>
+              <strong>Don't move yet if:</strong> You're a small team that can
+              deploy daily with no conflicts. Premature modularization adds
+              boilerplate without payoff.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Modular Monolith → Microservices",
+        accent: "#a78bfa",
+        content: (
+          <>
+            <p>
+              A modular monolith buys you internal clarity, but at some point
+              that single process can't satisfy independent scaling, independent
+              release cadences, or fault isolation.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              <strong>Move when you see:</strong>
+            </p>
+            <ul>
+              <li>
+                <strong>One module blocks deployment of others</strong> — the
+                Orders team is ready to ship, but they have to wait because the
+                Catalog module has a broken test.
+              </li>
+              <li>
+                <strong>Scaling is all-or-nothing</strong> — you can't give more
+                CPU to the hot path (e.g., Search) without scaling the entire
+                backend, wasting capacity.
+              </li>
+              <li>
+                <strong>A single fault takes everything down</strong> — an OOM
+                in one module crashes the whole process, and there's nothing the
+                modular boundary can do about it at runtime.
+              </li>
+              <li>
+                <strong>Teams need polyglot flexibility</strong> — one team
+                wants Go for a low-latency service; another prefers Python for
+                ML inference. A single runtime can't accommodate that.
+              </li>
+              <li>
+                <strong>Release cadence differs dramatically</strong> — the Auth
+                module ships once a quarter while the Checkout module ships
+                daily. They're on fundamentally different lifecycles.
+              </li>
+              <li>
+                <strong>You have the DevOps maturity to support it</strong> —
+                CI/CD pipelines, container orchestration, distributed tracing,
+                and on-call rotations per service are prerequisites, not
+                nice-to-haves.
+              </li>
+            </ul>
+            <p style={{ marginTop: 8 }}>
+              <strong>Don't move yet if:</strong> Your modules work well, you
+              can deploy frequently, and you don't need independent scaling.
+              Microservices tax is real and ongoing.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Microservices → Serverless",
+        accent: "#34d399",
+        content: (
+          <>
+            <p>
+              Serverless is the most extreme decomposition. It's a great fit for
+              specific workload shapes, but a bad fit for others.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              <strong>Move when you see:</strong>
+            </p>
+            <ul>
+              <li>
+                <strong>Bursty, event-driven traffic</strong> — workloads that
+                spike from 0 to 10,000 requests and back to 0 in minutes.
+                Keeping containers warm 24/7 wastes money.
+              </li>
+              <li>
+                <strong>Cost sensitivity at idle</strong> — you're paying for
+                instances that sit idle 80% of the time. Pay-per-invocation
+                eliminates idle cost entirely.
+              </li>
+              <li>
+                <strong>Tasks are naturally short-lived</strong> — image
+                resizing, webhook processing, file transformations, API
+                composition — jobs that finish in seconds, not minutes.
+              </li>
+              <li>
+                <strong>Platform-managed scaling is worth the trade-off</strong>{" "}
+                — you'd rather accept cold starts and vendor coupling than
+                manage Kubernetes, HPA policies, and node pools yourself.
+              </li>
+              <li>
+                <strong>You already use managed cloud services heavily</strong>{" "}
+                — DynamoDB, SQS, S3 event triggers, API Gateway. Serverless
+                composes naturally with the cloud-native event model.
+              </li>
+            </ul>
+            <p style={{ marginTop: 8 }}>
+              <strong>Don't move yet if:</strong> You have long-running
+              processes, need persistent connections (WebSockets, DB pools), or
+              require sub-10ms latency where cold starts are unacceptable.
+              Stateful or latency-critical services are better as containers.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "The Distributed Monolith anti-pattern",
+        accent: "#ef4444",
+        content: (
+          <>
+            <p>
+              The most expensive mistake is jumping from a tangled monolith
+              straight to microservices without ever establishing clear domain
+              boundaries first.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              A modular monolith forces you to define module interfaces, clarify
+              data ownership, and identify the real domain seams. Those are{" "}
+              <em>exactly</em> the boundaries you'll split on later. If you skip
+              that step, you'll create a distributed monolith — tightly coupled
+              services that communicate synchronously and share a database —
+              giving you all the costs of distribution with none of the
+              benefits.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              <strong>Rule of thumb:</strong> if you can't draw clean module
+              boundaries inside one codebase, you aren't ready to draw service
+              boundaries across a network.
+            </p>
+          </>
         ),
       },
     ],

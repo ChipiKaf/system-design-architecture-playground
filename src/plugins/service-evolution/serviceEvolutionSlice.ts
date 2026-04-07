@@ -100,7 +100,7 @@ export const VARIANT_PROFILES: Record<VariantKey, VariantProfile> = {
     color: "#a78bfa",
     accentText: "Fine-grained",
     description:
-      "Many small, independently deployable services each with their own DB. Independent scaling & fault isolation — but high ops overhead.",
+      "Many small, independently deployable services using the database-per-service pattern. Each service owns private data, scales independently, and exposes it through APIs or events — but ops overhead is much higher.",
     serviceCount: 6,
     dbCount: 6,
     traits: {

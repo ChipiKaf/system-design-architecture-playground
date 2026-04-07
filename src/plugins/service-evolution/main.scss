@@ -64,7 +64,10 @@
   background: #0f172a;
   color: #94a3b8;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
   font-size: 11px;
   font-weight: 500;
   line-height: 1;
@@ -140,4 +143,35 @@
   color: #64748b;
   white-space: nowrap;
   text-align: left;
+}
+
+.service-evolution-db-pattern {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  p {
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #cbd5e1;
+  }
+}
+
+.service-evolution-db-pattern__list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  li {
+    color: #94a3b8;
+    font-size: 10px;
+    line-height: 1.45;
+  }
+}
+
+.service-evolution-db-pattern__warning {
+  color: #fbbf24;
 }

@@ -315,13 +315,38 @@ function buildMicroScene(
       "text",
       {
         x: 595,
+        y: 108,
+        text: "Database-per-Service",
+        fill: TEXT_MAIN,
+        fontSize: 12,
+        fontWeight: 700,
+        textAnchor: "middle",
+      },
+      { key: "microservices-title" },
+    );
+    o.add(
+      "text",
+      {
+        x: 595,
         y: 122,
-        text: "Independent services + independent databases",
+        text: "Each service owns its private data",
         fill: TEXT_DIM,
-        fontSize: 10,
+        fontSize: 9,
         textAnchor: "middle",
       },
       { key: "microservices-subtitle" },
+    );
+    o.add(
+      "text",
+      {
+        x: 595,
+        y: 136,
+        text: "Other services should use APIs or events, not direct DB access",
+        fill: "#c4b5fd",
+        fontSize: 8,
+        textAnchor: "middle",
+      },
+      { key: "microservices-contract" },
     );
   });
 }
@@ -407,6 +432,7 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({
   } = st;
   const profile = VARIANT_PROFILES[variant];
   const hot = (zone: string) => hotZones.includes(zone);
+  const showMicroserviceDataCard = variant === "microservices";
 
   /* ── Build VizCraft scene based on active variant ──── */
   const scene = (() => {
@@ -508,6 +534,12 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({
       borderColor: "#10b981",
     },
     {
+      key: "when-to-migrate",
+      label: "When to Migrate",
+      color: "#f9a8d4",
+      borderColor: "#ec4899",
+    },
+    {
       key: "tradeoffs",
       label: "Trade-off Guide",
       color: "#fcd34d",
@@ -601,6 +633,37 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({
                 })}
               </div>
             </SideCard>
+
+            {showMicroserviceDataCard && (
+              <SideCard label="Database-per-Service" variant="info">
+                <div className="service-evolution-db-pattern">
+                  <p>
+                    Each database shown beneath a service is{" "}
+                    <strong>private to that service</strong>. The owning service
+                    is the only one allowed to read or write it directly.
+                  </p>
+                  <ul className="service-evolution-db-pattern__list">
+                    <li>
+                      Other services should call an API or consume an event, not
+                      query the database directly.
+                    </li>
+                    <li>
+                      That gives clear data ownership, independent schema
+                      evolution, and per-service scaling.
+                    </li>
+                    <li>
+                      It also enables polyglot persistence: one service can use
+                      SQL while another uses a document or key-value store.
+                    </li>
+                  </ul>
+                  <p className="service-evolution-db-pattern__warning">
+                    Trade-off: joins and multi-service transactions stop being
+                    simple database operations and become application-level
+                    coordination problems.
+                  </p>
+                </div>
+              </SideCard>
+            )}
           </SidePanel>
         }
       />
