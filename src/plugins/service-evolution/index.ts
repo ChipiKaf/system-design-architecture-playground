@@ -20,7 +20,7 @@ const ServiceEvolutionPlugin: DemoPlugin<
   id: "service-evolution",
   name: "Monolith → Serverless",
   description:
-    "Compare Monolith, Macroservices, Microservices and Serverless — deploy, scale, and fault-inject each architecture to feel the real trade-offs.",
+    "Compare Monolith, Modular Monolith, Microservices and Serverless — deploy, scale, and fault-inject each architecture to feel the real trade-offs.",
   initialState,
   reducer: serviceEvolutionReducer,
   Component: ServiceEvolutionVisualization,

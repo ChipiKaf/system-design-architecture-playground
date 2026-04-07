@@ -11,7 +11,7 @@ import {
 
 const VARIANT_ORDER: VariantKey[] = [
   "monolith",
-  "macroservices",
+  "modular-monolith",
   "microservices",
   "serverless",
 ];

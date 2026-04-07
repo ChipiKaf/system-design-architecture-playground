@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ── Arg parsing ────────────────────────────────────────────
-// Usage:  npm run generate <plugin-name> [--category "Category Name"] [--sandbox]
+// Usage:  npm run generate -- <plugin-name> [--category "Category Name"] [--sandbox | --timeline | --comparison]
 const args = process.argv.slice(2);
 let pluginName = null;
 let categoryName = null;
@@ -30,16 +30,12 @@ for (let i = 0; i < args.length; i++) {
 
 if (!pluginName) {
   console.error(
-    "Usage: npm run generate <plugin-name> [--category \"Category Name\"] [--sandbox | --timeline | --comparison]\n" +
-      "       Name must be kebab-case, e.g. npm run generate api-gateway\n" +
+    "Usage: npm run generate -- <plugin-name> [--category \"Category Name\"] [--sandbox | --timeline | --comparison]\n" +
+      "       Name must be kebab-case, e.g. npm run generate -- api-gateway\n" +
       "       --category    / -c   Existing or new category to place the plugin in\n" +
-      "       --sandbox     / -s   Generate a sandbox plugin with declarative flow engine,\n" +
-      "                            Controls panel, and dynamic component toggling\n" +
-      "       --timeline    / -t   Generate a timeline plugin with progressive reveal,\n" +
-      "                            animated nodes, progress bar, and declarative steps\n" +
-      "       --comparison  / -l   Generate a comparison-lab plugin using the shared\n" +
-      "                            lab-engine (variant selection, strategy profiles,\n" +
-      "                            declarative flow + animation via useLabAnimation)",
+      "       --sandbox     / -s   Dynamic controls + declarative flow engine\n" +
+      "       --timeline    / -t   Progressive-reveal timeline\n" +
+      "       --comparison  / -l   Shared lab-engine comparison lab",
   );
   process.exit(1);
 }

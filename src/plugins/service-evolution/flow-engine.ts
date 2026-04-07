@@ -30,6 +30,8 @@ function serviceNodes(s: ServiceEvolutionState): string[] {
   if (s.variant === "serverless")
     return Array.from({ length: count }, (_, i) => `fn-${i}`);
   if (s.variant === "monolith") return ["app"];
+  if (s.variant === "modular-monolith")
+    return Array.from({ length: count }, (_, i) => `mod-${i}`);
   return Array.from({ length: count }, (_, i) => `svc-${i}`);
 }
 
@@ -37,24 +39,37 @@ function dbNodes(s: ServiceEvolutionState): string[] {
   const count = VARIANT_PROFILES[s.variant].dbCount;
   if (count === 0) return [];
   if (s.variant === "monolith") return ["db"];
-  if (s.variant === "macroservices") return ["db-0", "db-1"];
+  if (s.variant === "modular-monolith") return ["db"];
   return Array.from({ length: count }, (_, i) => `db-${i}`);
 }
 
 function targetNode(s: ServiceEvolutionState): string {
   if (s.variant === "monolith") return "app";
+  if (s.variant === "modular-monolith") return "mod-0";
   if (s.variant === "serverless") return "fn-0";
   return "svc-0";
 }
 
+function targetSchema(s: ServiceEvolutionState): string {
+  if (s.variant === "modular-monolith") return "schema-0";
+  return "db";
+}
+
 function faultTarget(s: ServiceEvolutionState): string {
   if (s.variant === "monolith") return "app";
+  if (s.variant === "modular-monolith") return "mod-1";
   if (s.variant === "serverless") return "fn-2";
   return "svc-1";
 }
 
+function faultSchema(s: ServiceEvolutionState): string {
+  if (s.variant === "modular-monolith") return "schema-1";
+  return "db";
+}
+
 function faultCascade(s: ServiceEvolutionState): string {
   if (s.variant === "monolith") return "db";
+  if (s.variant === "modular-monolith") return "db";
   return "svc-0";
 }
 
@@ -124,13 +139,16 @@ export const STEPS: StepDef[] = [
       },
     ],
     recalcMetrics: true,
-    finalHotZones: (s) => ["gateway", targetNode(s)],
+    finalHotZones: (s) =>
+      s.variant === "modular-monolith"
+        ? ["gateway", targetNode(s), targetSchema(s), "db"]
+        : ["gateway", targetNode(s)],
     explain: (s) =>
       `Deploy time: ~${s.deployTimeS}s. ${
         s.variant === "monolith"
           ? "The entire application was offline during the window."
-          : s.variant === "macroservices"
-            ? "One service offline; others stayed live and continued serving."
+          : s.variant === "modular-monolith"
+            ? "One module changed, and it owns its own schema, but the whole backend still redeployed because it remains a single deploy unit."
             : "Only one tiny unit swapped — zero blast radius on other services."
       }`,
   },
@@ -162,14 +180,19 @@ export const STEPS: StepDef[] = [
       },
     ],
     recalcMetrics: true,
-    finalHotZones: (s) => ["gateway", ...serviceNodes(s)],
+    finalHotZones: (s) =>
+      s.variant === "modular-monolith"
+        ? ["gateway", "app", "db", ...serviceNodes(s)]
+        : ["gateway", ...serviceNodes(s)],
     explain: (s) =>
       `Scale-out latency: ~${s.scaleLatencyS}s. ${
         s.variant === "monolith"
           ? "Vertical scale only — can't scale one feature without scaling everything."
-          : s.variant === "serverless"
-            ? "Auto-elastic scale in seconds — no pre-provisioning required."
-            : "Each service scales its own replicas independently."
+          : s.variant === "modular-monolith"
+            ? "Modules and schemas are cleaner, but the single backend instance is still the bottleneck under heavy traffic."
+            : s.variant === "serverless"
+              ? "Auto-elastic scale in seconds — no pre-provisioning required."
+              : "Each service scales its own replicas independently."
       }`,
   },
 
@@ -182,7 +205,7 @@ export const STEPS: StepDef[] = [
     processingText: "Crashing...",
     phase: "fault",
     nextButton: (s) =>
-      s.variant === "monolith" || s.variant === "macroservices"
+      s.variant === "monolith" || s.variant === "modular-monolith"
         ? "See cascade →"
         : "Recovery →",
     flow: [
@@ -197,28 +220,33 @@ export const STEPS: StepDef[] = [
         from: "$gateway",
         to: "$fault-target",
         duration: 600,
-        explain: "The fault lands in a specific unit.",
+        explain: "The fault lands in one bounded unit first.",
         color: "#ef4444",
       },
     ],
-    finalHotZones: (s) => [faultTarget(s)],
+    finalHotZones: (s) =>
+      s.variant === "modular-monolith"
+        ? [faultTarget(s), faultSchema(s), "db"]
+        : [faultTarget(s)],
     explain: (s) => {
       const pct = s.blastRadius;
       if (s.variant === "monolith")
         return `100% blast radius — the entire application is down. Every user affected.`;
+      if (s.variant === "modular-monolith")
+        return `≈${pct}% blast radius. Modules help structure the code, but shared process and shared DB still let faults escape.`;
       if (s.variant === "serverless")
         return `≈${pct}% blast radius. One function fails; all other functions keep serving.`;
       return `≈${pct}% blast radius — only this service is impacted, others stay healthy.`;
     },
   },
 
-  /* 4 — Fault propagation (monolith + macroservices only)
+  /* 4 — Fault propagation (monolith + modular-monolith only)
      The cascade reveals why process boundaries matter.
   */
   {
     key: "fault-spread",
     label: "Fault Propagation",
-    when: (s) => s.variant === "monolith" || s.variant === "macroservices",
+    when: (s) => s.variant === "monolith" || s.variant === "modular-monolith",
     phase: "fault",
     nextButton: "Recovery →",
     flow: [
@@ -230,11 +258,14 @@ export const STEPS: StepDef[] = [
         color: "#ef4444",
       },
     ],
-    finalHotZones: (s) => [faultTarget(s), faultCascade(s)],
+    finalHotZones: (s) =>
+      s.variant === "modular-monolith"
+        ? [faultTarget(s), faultSchema(s), faultCascade(s)]
+        : [faultTarget(s), faultCascade(s)],
     explain: (s) =>
       s.variant === "monolith"
         ? "No fault boundary inside a monolith — the DB connection pool crashes with the app."
-        : "Macroservices have some isolation, but sync calls allow cascading timeouts.",
+        : "Strong module boundaries help the codebase, but shared runtime and shared data still allow cascading failures.",
   },
 
   /* 5 — Recovery */
@@ -248,6 +279,8 @@ export const STEPS: StepDef[] = [
     explain: (s) => {
       if (s.variant === "monolith")
         return `Full app restart — ~${s.deployTimeS}s before traffic resumes. Every user experienced the outage.`;
+      if (s.variant === "modular-monolith")
+        return `Recovery is cleaner because ownership is clearer, but the full backend still restarts in ~${s.deployTimeS}s.`;
       if (s.variant === "serverless")
         return `Failed function replaced automatically in ~${s.scaleLatencyS}s. Most users never noticed.`;
       return `Impacted service(s) restart independently in ~${s.deployTimeS}s — ~${s.blastRadius}% of surface affected.`;

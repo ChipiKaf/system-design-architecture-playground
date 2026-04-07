@@ -15,7 +15,10 @@ import {
   CanvasStage,
 } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
-import { useServiceEvolutionAnimation, type Signal } from "./useServiceEvolutionAnimation";
+import {
+  useServiceEvolutionAnimation,
+  type Signal,
+} from "./useServiceEvolutionAnimation";
 import {
   VARIANT_PROFILES,
   TRAIT_META,
@@ -38,14 +41,13 @@ const CLIENT_X = 60;
 const GATEWAY_X = 200;
 const GATEWAY_Y = H / 2;
 const SERVICES_START_X = 360;
-const DB_OFFSET_Y = 100;
 
 /* ─── Colours ─────────────────────────────────────────── */
-const DARK_BG     = "#0f172a";
+const DARK_BG = "#0f172a";
 const CARD_STROKE = "#334155";
-const TEXT_MAIN   = "#f1f5f9";
-const TEXT_DIM    = "#94a3b8";
-const HOT_FILL    = "#1e3a5f";
+const TEXT_MAIN = "#f1f5f9";
+const TEXT_DIM = "#94a3b8";
+const HOT_FILL = "#1e3a5f";
 
 /* ─── Node builder helpers ──────────────────────────────
    Shared, parametric helpers so individual service/fn
@@ -87,11 +89,14 @@ function buildMonolithScene(
     .rect(200, 160, 12)
     .fill(hot("app") ? "#1a2942" : DARK_BG)
     .stroke(hot("app") ? color : CARD_STROKE, 2)
-    .richLabel((l) => {
-      l.bold("Application");
-      l.newline();
-      l.color("UI · Logic · Data", TEXT_DIM, { fontSize: 9 });
-    }, { fill: TEXT_MAIN, fontSize: 13, dy: 4, lineHeight: 1.8 });
+    .richLabel(
+      (l) => {
+        l.bold("Application");
+        l.newline();
+        l.color("UI · Logic · Data", TEXT_DIM, { fontSize: 9 });
+      },
+      { fill: TEXT_MAIN, fontSize: 13, dy: 4, lineHeight: 1.8 },
+    );
 
   // DB below the app
   b.node("db")
@@ -105,48 +110,164 @@ function buildMonolithScene(
   b.edge("app", "db", "e-app-db").stroke(CARD_STROKE, 1.5).arrow(true);
 }
 
-/** Macroservices: 3 services, 2 DBs (one shared, one per domain) */
-function buildMacroScene(
+/** Modular Monolith: a single backend containing bounded modules. */
+function buildModularMonolithScene(
   b: ReturnType<typeof viz>,
   hot: (id: string) => boolean,
   variant: VariantKey,
 ) {
   const color = VARIANT_PROFILES[variant].color;
-  const svcs = [
-    { id: "svc-0", label: "API Service",     y: GATEWAY_Y - 110 },
-    { id: "svc-1", label: "Order Service",   y: GATEWAY_Y },
-    { id: "svc-2", label: "User Service",    y: GATEWAY_Y + 110 },
-  ];
-  const dbs = [
-    { id: "db-0", label: "Orders DB", y: GATEWAY_Y - 40 },
-    { id: "db-1", label: "Users DB",  y: GATEWAY_Y + 90 },
+  const modules = [
+    {
+      id: "mod-0",
+      label: "Catalog Module",
+      schemaId: "schema-0",
+      schemaLabel: "catalog.*",
+      y: GATEWAY_Y - 92,
+      x: 430,
+      schemaX: 790,
+    },
+    {
+      id: "mod-1",
+      label: "Ordering Module",
+      schemaId: "schema-1",
+      schemaLabel: "ordering.*",
+      y: GATEWAY_Y - 92,
+      x: 605,
+      schemaX: 872,
+    },
+    {
+      id: "mod-2",
+      label: "Basket Module",
+      schemaId: "schema-2",
+      schemaLabel: "basket.*",
+      y: GATEWAY_Y,
+      x: 430,
+      schemaX: 790,
+    },
+    {
+      id: "mod-3",
+      label: "Identity Module",
+      schemaId: "schema-3",
+      schemaLabel: "identity.*",
+      y: GATEWAY_Y,
+      x: 605,
+      schemaX: 872,
+    },
+    {
+      id: "mod-4",
+      label: "Payment Module",
+      schemaId: "schema-4",
+      schemaLabel: "payment.*",
+      y: GATEWAY_Y + 92,
+      x: 430,
+      schemaX: 790,
+    },
+    {
+      id: "mod-5",
+      label: "Shipment Module",
+      schemaId: "schema-5",
+      schemaLabel: "shipment.*",
+      y: GATEWAY_Y + 92,
+      x: 605,
+      schemaX: 872,
+    },
   ];
 
-  svcs.forEach(({ id, label, y }) => {
+  // Outer application shell
+  b.node("app")
+    .at(520, GATEWAY_Y)
+    .rect(360, 280, 16)
+    .fill(hot("app") ? "#1a2942" : DARK_BG)
+    .stroke(hot("app") ? color : CARD_STROKE, 2);
+
+  // Shared database shell that contains separate per-module schemas.
+  b.node("db")
+    .at(830, GATEWAY_Y)
+    .rect(170, 280, 16)
+    .fill(hot("db") ? "#1c2b1e" : DARK_BG)
+    .stroke(hot("db") ? "#4ade80" : CARD_STROKE, 2);
+
+  modules.forEach(({ id, label, y, x, schemaId, schemaLabel, schemaX }) => {
     b.node(id)
-      .at(SERVICES_START_X + 40, y)
-      .rect(140, 44, 8)
+      .at(x, y)
+      .rect(142, 42, 8)
       .fill(hot(id) ? HOT_FILL : DARK_BG)
       .stroke(hot(id) ? color : CARD_STROKE, 1.5)
-      .label(label, { fill: TEXT_MAIN, fontSize: 10, fontWeight: "bold" });
-    b.edge("gateway", id, `e-gw-${id}`).stroke(CARD_STROKE, 1).arrow(true);
+      .label(label, { fill: TEXT_MAIN, fontSize: 9, fontWeight: "bold" });
+
+    b.node(schemaId)
+      .at(schemaX, y)
+      .rect(68, 30, 6)
+      .fill(hot(schemaId) ? "#1f3522" : "#111827")
+      .stroke(hot(schemaId) ? "#4ade80" : CARD_STROKE, 1)
+      .label(schemaLabel, {
+        fill: hot(schemaId) ? "#bbf7d0" : TEXT_DIM,
+        fontSize: 7.5,
+        fontWeight: "bold",
+      });
+
+    b.edge(id, schemaId, `e-${id}-${schemaId}`)
+      .stroke("#334155", 1)
+      .arrow(true)
+      .dashed();
   });
 
-  dbs.forEach(({ id, label, y }) => {
-    b.node(id)
-      .at(SERVICES_START_X + 230, y)
-      .rect(100, 36, 5)
-      .fill(hot(id) ? "#1c2b1e" : DARK_BG)
-      .stroke(hot(id) ? "#4ade80" : CARD_STROKE, 1.5)
-      .label(label, { fill: TEXT_DIM, fontSize: 9 });
-  });
+  b.edge("gateway", "app", "e-gw-app").stroke(CARD_STROKE, 1.5).arrow(true);
+  b.edge("app", "db", "e-app-db").stroke(CARD_STROKE, 1.5).arrow(true);
 
-  // Services share DB-0; only svc-2 uses DB-1
-  b.edge("svc-0", "db-0", "e-svc0-db0").stroke(CARD_STROKE, 1).arrow(true).dashed();
-  b.edge("svc-1", "db-0", "e-svc1-db0").stroke(CARD_STROKE, 1).arrow(true).dashed();
-  b.edge("svc-2", "db-1", "e-svc2-db1").stroke(CARD_STROKE, 1).arrow(true).dashed();
-  // Cascade edge (shown in fault-spread step)
-  b.edge("svc-1", "svc-0", "e-cascade").stroke("#ef444430", 1).dashed();
+  b.overlay((o) => {
+    o.add(
+      "text",
+      {
+        x: 520,
+        y: 150,
+        text: "Modular Monolith",
+        fill: TEXT_MAIN,
+        fontSize: 15,
+        fontWeight: 700,
+        textAnchor: "middle",
+      },
+      { key: "modulith-title" },
+    );
+    o.add(
+      "text",
+      {
+        x: 520,
+        y: 162,
+        text: "Single deployment unit",
+        fill: TEXT_DIM,
+        fontSize: 9,
+        textAnchor: "middle",
+      },
+      { key: "modulith-subtitle" },
+    );
+    o.add(
+      "text",
+      {
+        x: 830,
+        y: 150,
+        text: "PostgreSQL",
+        fill: TEXT_MAIN,
+        fontSize: 14,
+        fontWeight: 700,
+        textAnchor: "middle",
+      },
+      { key: "db-title" },
+    );
+    o.add(
+      "text",
+      {
+        x: 830,
+        y: 162,
+        text: "Separate schema per module",
+        fill: TEXT_DIM,
+        fontSize: 8,
+        textAnchor: "middle",
+      },
+      { key: "db-subtitle" },
+    );
+  });
 }
 
 /** Microservices: 6 independent services, each with own DB */
@@ -156,41 +277,53 @@ function buildMicroScene(
   variant: VariantKey,
 ) {
   const color = VARIANT_PROFILES[variant].color;
-  const labels = ["Auth", "Orders", "Users", "Catalog", "Pay", "Notify"];
-  const rows = 2;
-  const cols = 3;
-  const startX = SERVICES_START_X + 10;
-  const startY = GATEWAY_Y - 120;
-  const spacingX = 175;
-  const spacingY = 130;
+  const services = [
+    { id: "svc-0", label: "Catalog Svc", y: GATEWAY_Y - 120, x: 470 },
+    { id: "svc-1", label: "Ordering Svc", y: GATEWAY_Y - 120, x: 690 },
+    { id: "svc-2", label: "Basket Svc", y: GATEWAY_Y - 10, x: 470 },
+    { id: "svc-3", label: "Identity Svc", y: GATEWAY_Y - 10, x: 690 },
+    { id: "svc-4", label: "Payment Svc", y: GATEWAY_Y + 100, x: 470 },
+    { id: "svc-5", label: "Shipment Svc", y: GATEWAY_Y + 100, x: 690 },
+  ];
 
-  for (let i = 0; i < 6; i++) {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const svcId = `svc-${i}`;
-    const dbId  = `db-${i}`;
-    const sx    = startX + col * spacingX;
-    const sy    = startY + row * spacingY;
+  services.forEach(({ id, label, x, y }, i) => {
+    const dbId = `db-${i}`;
 
-    b.node(svcId)
-      .at(sx, sy)
-      .rect(110, 38, 6)
-      .fill(hot(svcId) ? HOT_FILL : DARK_BG)
-      .stroke(hot(svcId) ? color : CARD_STROKE, 1.5)
-      .label(`${labels[i]} Svc`, { fill: TEXT_MAIN, fontSize: 9, fontWeight: "bold" });
+    b.node(id)
+      .at(x, y)
+      .rect(132, 40, 7)
+      .fill(hot(id) ? HOT_FILL : DARK_BG)
+      .stroke(hot(id) ? color : CARD_STROKE, 1.5)
+      .label(label, { fill: TEXT_MAIN, fontSize: 9, fontWeight: "bold" });
 
     b.node(dbId)
-      .at(sx + 20, sy + 54)
-      .rect(72, 28, 4)
+      .at(x, y + 50)
+      .rect(70, 28, 5)
       .fill(hot(dbId) ? "#1c2b1e" : DARK_BG)
       .stroke(hot(dbId) ? "#4ade80" : CARD_STROKE, 1)
-      .label("DB", { fill: TEXT_DIM, fontSize: 8 });
+      .label("Owned DB", { fill: TEXT_DIM, fontSize: 7.5, fontWeight: "bold" });
 
-    b.edge("gateway", svcId, `e-gw-${svcId}`).stroke(CARD_STROKE, 1).arrow(true);
-    b.edge(svcId, dbId, `e-${svcId}-${dbId}`).stroke(CARD_STROKE, 1).arrow(true).dashed();
-  }
+    b.edge("gateway", id, `e-gw-${id}`).stroke(CARD_STROKE, 1).arrow(true);
+    b.edge(id, dbId, `e-${id}-${dbId}`)
+      .stroke(CARD_STROKE, 1)
+      .arrow(true)
+      .dashed();
+  });
 
-  void rows; // satisfy linter
+  b.overlay((o) => {
+    o.add(
+      "text",
+      {
+        x: 595,
+        y: 122,
+        text: "Independent services + independent databases",
+        fill: TEXT_DIM,
+        fontSize: 10,
+        textAnchor: "middle",
+      },
+      { key: "microservices-subtitle" },
+    );
+  });
 }
 
 /** Serverless: 12 function nodes in a grid (no DBs — managed services) */
@@ -206,22 +339,37 @@ function buildServerlessScene(
   const startY = GATEWAY_Y - 130;
   const spacingX = 130;
   const spacingY = 95;
-  const fnLabels = ["auth", "order", "user", "catalog", "pay", "notify",
-                    "email", "search", "report", "cart", "review", "ship"];
+  const fnLabels = [
+    "auth",
+    "order",
+    "user",
+    "catalog",
+    "pay",
+    "notify",
+    "email",
+    "search",
+    "report",
+    "cart",
+    "review",
+    "ship",
+  ];
 
   for (let i = 0; i < 12; i++) {
     const col = i % cols;
     const row = Math.floor(i / cols);
     const fnId = `fn-${i}`;
-    const x    = startX + col * spacingX;
-    const y    = startY + row * spacingY;
+    const x = startX + col * spacingX;
+    const y = startY + row * spacingY;
 
     b.node(fnId)
       .at(x, y)
       .circle(28)
       .fill(hot(fnId) ? "#1e3a1f" : DARK_BG)
       .stroke(hot(fnId) ? color : "#334155", 1.5)
-      .label(`ƒ\n${fnLabels[i]}`, { fill: hot(fnId) ? color : TEXT_DIM, fontSize: 8 });
+      .label(`ƒ\n${fnLabels[i]}`, {
+        fill: hot(fnId) ? color : TEXT_DIM,
+        fontSize: 8,
+      });
 
     b.edge("gateway", fnId, `e-gw-${fnId}`).stroke("#1e293b", 1).arrow(true);
   }
@@ -233,17 +381,30 @@ function buildServerlessScene(
    Main component
 ═══════════════════════════════════════════════════════════ */
 
-const ServiceEvolutionVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
-  const { runtime, signals } = useServiceEvolutionAnimation(onAnimationComplete);
+const ServiceEvolutionVisualization: React.FC<Props> = ({
+  onAnimationComplete,
+}) => {
+  const { runtime, signals } =
+    useServiceEvolutionAnimation(onAnimationComplete);
   const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
   const containerRef = useRef<HTMLDivElement>(null!);
   const builderRef = useRef<ReturnType<typeof viz> | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
-  const viewportRef = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(null);
+  const viewportRef = useRef<{
+    zoom: number;
+    pan: { x: number; y: number };
+  } | null>(null);
 
   const st = runtime as ServiceEvolutionState;
-  const { explanation, hotZones, phase, variant,
-          deployTimeS, scaleLatencyS, blastRadius } = st;
+  const {
+    explanation,
+    hotZones,
+    phase,
+    variant,
+    deployTimeS,
+    scaleLatencyS,
+    blastRadius,
+  } = st;
   const profile = VARIANT_PROFILES[variant];
   const hot = (zone: string) => hotZones.includes(zone);
 
@@ -255,10 +416,18 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({ onAnimationComplete })
     buildGateway(b, hot);
 
     switch (variant) {
-      case "monolith":     buildMonolithScene(b, hot, variant); break;
-      case "macroservices": buildMacroScene(b, hot, variant);  break;
-      case "microservices": buildMicroScene(b, hot, variant);  break;
-      case "serverless":    buildServerlessScene(b, hot, variant); break;
+      case "monolith":
+        buildMonolithScene(b, hot, variant);
+        break;
+      case "modular-monolith":
+        buildModularMonolithScene(b, hot, variant);
+        break;
+      case "microservices":
+        buildMicroScene(b, hot, variant);
+        break;
+      case "serverless":
+        buildServerlessScene(b, hot, variant);
+        break;
     }
 
     /* ── Signals overlay ─────────────────────────────── */
@@ -266,7 +435,10 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({ onAnimationComplete })
       b.overlay((o) => {
         signals.forEach((sig: Signal) => {
           const { id, colorClass, ...params } = sig;
-          o.add("signal", params as SignalOverlayParams, { key: id, className: colorClass });
+          o.add("signal", params as SignalOverlayParams, {
+            key: id,
+            className: colorClass,
+          });
         });
       });
     }
@@ -280,14 +452,19 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({ onAnimationComplete })
     const saved = pzRef.current?.getState() ?? viewportRef.current;
     builderRef.current?.destroy();
     builderRef.current = scene;
-    pzRef.current = scene.mount(containerRef.current, {
-      autoplay: true,
-      panZoom: true,
-      initialZoom: saved?.zoom ?? 0.9,
-      initialPan: saved?.pan ?? { x: 20, y: 0 },
-    }) ?? null;
-    const unsub = pzRef.current?.onChange((s) => { viewportRef.current = s; });
-    return () => { unsub?.(); };
+    pzRef.current =
+      scene.mount(containerRef.current, {
+        autoplay: true,
+        panZoom: true,
+        initialZoom: saved?.zoom ?? 0.9,
+        initialPan: saved?.pan ?? { x: 20, y: 0 },
+      }) ?? null;
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => {
+      unsub?.();
+    };
   }, [scene]);
 
   useEffect(() => {
@@ -306,11 +483,36 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({ onAnimationComplete })
 
   /* ── Concept pills ────────────────────────────────── */
   const pills = [
-    { key: "monolith",       label: "Monolith",       color: "#94a3b8", borderColor: "#64748b" },
-    { key: "macroservices",  label: "Macroservices",  color: "#93c5fd", borderColor: "#3b82f6" },
-    { key: "microservices",  label: "Microservices",  color: "#c4b5fd", borderColor: "#8b5cf6" },
-    { key: "serverless",     label: "Serverless",     color: "#6ee7b7", borderColor: "#10b981" },
-    { key: "tradeoffs",      label: "Trade-off Guide", color: "#fcd34d", borderColor: "#d97706" },
+    {
+      key: "monolith",
+      label: "Monolith",
+      color: "#94a3b8",
+      borderColor: "#64748b",
+    },
+    {
+      key: "modular-monolith",
+      label: "Modular Monolith",
+      color: "#93c5fd",
+      borderColor: "#3b82f6",
+    },
+    {
+      key: "microservices",
+      label: "Microservices",
+      color: "#c4b5fd",
+      borderColor: "#8b5cf6",
+    },
+    {
+      key: "serverless",
+      label: "Serverless",
+      color: "#6ee7b7",
+      borderColor: "#10b981",
+    },
+    {
+      key: "tradeoffs",
+      label: "Trade-off Guide",
+      color: "#fcd34d",
+      borderColor: "#d97706",
+    },
   ];
 
   /* ── Trait bars ───────────────────────────────────── */
@@ -323,23 +525,41 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({ onAnimationComplete })
         canvas={
           <div className="service-evolution-stage">
             <StageHeader
-              title="Service Architecture Evolution"
-              subtitle={`${profile.label} · ${profile.accentText}`}
+              title="Monolith → Serverless"
+              subtitle={`${profile.label} · ${profile.accentText} · compare deploy, scale, and fault boundaries`}
             >
               <StatBadge
                 label="Deploy"
                 value={`~${deployTimeS}s`}
-                color={deployTimeS <= 8 ? "#4ade80" : deployTimeS <= 45 ? "#fbbf24" : "#f87171"}
+                color={
+                  deployTimeS <= 8
+                    ? "#4ade80"
+                    : deployTimeS <= 45
+                      ? "#fbbf24"
+                      : "#f87171"
+                }
               />
               <StatBadge
                 label="Scale"
                 value={`~${scaleLatencyS}s`}
-                color={scaleLatencyS <= 5 ? "#4ade80" : scaleLatencyS <= 20 ? "#fbbf24" : "#f87171"}
+                color={
+                  scaleLatencyS <= 5
+                    ? "#4ade80"
+                    : scaleLatencyS <= 20
+                      ? "#fbbf24"
+                      : "#f87171"
+                }
               />
               <StatBadge
                 label="Blast %"
                 value={`${blastRadius}%`}
-                color={blastRadius <= 5 ? "#4ade80" : blastRadius <= 35 ? "#fbbf24" : "#f87171"}
+                color={
+                  blastRadius <= 5
+                    ? "#4ade80"
+                    : blastRadius <= 35
+                      ? "#fbbf24"
+                      : "#f87171"
+                }
               />
             </StageHeader>
             <CanvasStage canvasRef={containerRef} />
@@ -354,22 +574,28 @@ const ServiceEvolutionVisualization: React.FC<Props> = ({ onAnimationComplete })
             <SideCard label="Architecture traits" variant="info">
               <div className="service-evolution-traits">
                 {traitKeys.map((key) => {
-                  const meta  = TRAIT_META[key];
+                  const meta = TRAIT_META[key];
                   const score = profile.traits[key];
                   const label = profile.traitLabels[key];
                   return (
                     <div key={key} className="service-evolution-trait-row">
-                      <span className="service-evolution-trait-name">{meta.label}</span>
+                      <span className="service-evolution-trait-name">
+                        {meta.label}
+                      </span>
                       <div className="service-evolution-trait-bar-wrap">
                         {Array.from({ length: 5 }, (_, i) => (
                           <span
                             key={i}
                             className={`service-evolution-trait-pip${i < score ? " active" : ""}`}
-                            style={i < score ? { background: profile.color } : {}}
+                            style={
+                              i < score ? { background: profile.color } : {}
+                            }
                           />
                         ))}
                       </div>
-                      <span className="service-evolution-trait-label">{label}</span>
+                      <span className="service-evolution-trait-label">
+                        {label}
+                      </span>
                     </div>
                   );
                 })}

@@ -11,7 +11,7 @@ import type { LabState } from "../../lib/lab-engine";
 /* ── Variant identifiers ─────────────────────────────── */
 export type VariantKey =
   | "monolith"
-  | "macroservices"
+  | "modular-monolith"
   | "microservices"
   | "serverless";
 
@@ -68,30 +68,30 @@ export const VARIANT_PROFILES: Record<VariantKey, VariantProfile> = {
       faultIsolation: "None",
     },
   },
-  macroservices: {
-    key: "macroservices",
-    label: "Macroservices",
+  "modular-monolith": {
+    key: "modular-monolith",
+    label: "Modular Monolith",
     color: "#60a5fa",
-    accentText: "Coarse modules",
+    accentText: "Bounded modules",
     description:
-      "A handful of large services, each owning a domain. Easier to reason about than microservices but still chunky deploys.",
-    serviceCount: 3,
-    dbCount: 2,
+      "A single backend split into well-defined modules with clear interfaces, often with schema-per-module ownership inside one shared database. Better code organization and team autonomy, but still one deployment unit.",
+    serviceCount: 6,
+    dbCount: 1,
     traits: {
-      deployUnit: 2,
-      scalability: 3,
-      teamCoupling: 2,
-      operationalCost: 3,
+      deployUnit: 1,
+      scalability: 2,
+      teamCoupling: 3,
+      operationalCost: 4,
       startupSpeed: 4,
       faultIsolation: 2,
     },
     traitLabels: {
-      deployUnit: "Per service",
-      scalability: "Per service",
-      teamCoupling: "Moderate",
-      operationalCost: "Moderate",
+      deployUnit: "Whole app",
+      scalability: "Scale together",
+      teamCoupling: "Module ownership",
+      operationalCost: "Low",
       startupSpeed: "Good",
-      faultIsolation: "Partial",
+      faultIsolation: "Mostly logical",
     },
   },
   microservices: {
@@ -194,10 +194,10 @@ export function computeMetrics(state: ServiceEvolutionState) {
       state.scaleLatencyS = 60;
       state.blastRadius = 100;
       break;
-    case "macroservices":
-      state.deployTimeS = 45;
-      state.scaleLatencyS = 30;
-      state.blastRadius = 35;
+    case "modular-monolith":
+      state.deployTimeS = 75;
+      state.scaleLatencyS = 45;
+      state.blastRadius = 70;
       break;
     case "microservices":
       state.deployTimeS = 8;
