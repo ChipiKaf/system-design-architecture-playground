@@ -1,0 +1,143 @@
+/* ═══════════════════════════════════════════════════════════
+ *  Service Evolution — Styles
+ * ═══════════════════════════════════════════════════════════ */
+
+.service-evolution-root {
+  display: contents;
+}
+
+/* ── Stage ────────────────────────────────────────────── */
+
+.service-evolution-stage {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ── Phase-driven accent on fault ────────────────────── */
+
+.service-evolution-phase--fault .vc-canvas-stage {
+  outline: 1px solid #ef444440;
+}
+
+/* ── Controls bar (arch spectrum) ────────────────────── */
+
+.service-evolution-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 2px;
+}
+
+.service-evolution-controls__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.service-evolution-controls__spectrum {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.service-evolution-controls__arrow {
+  font-size: 10px;
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.service-evolution-controls__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 10px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+
+  &:hover {
+    border-color: #60a5fa;
+    color: #e2e8f0;
+    background: #1e293b;
+  }
+
+  &--active {
+    background: #1e293b;
+    font-weight: 700;
+  }
+}
+
+.service-evolution-controls__btn-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.service-evolution-controls__btn-sub {
+  font-size: 9px;
+  color: #64748b;
+  transition: color 0.15s;
+}
+
+/* ── Sidebar trait bars ───────────────────────────────── */
+
+.service-evolution-traits {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.service-evolution-trait-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.service-evolution-trait-name {
+  font-size: 10px;
+  color: #94a3b8;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.service-evolution-trait-bar-wrap {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.service-evolution-trait-pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  flex-shrink: 0;
+  transition: background 0.2s;
+
+  &.active {
+    border-color: transparent;
+  }
+}
+
+.service-evolution-trait-label {
+  font-size: 9px;
+  color: #64748b;
+  white-space: nowrap;
+  text-align: left;
+}

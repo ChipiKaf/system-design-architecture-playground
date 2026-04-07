@@ -15,6 +15,7 @@ import ShardingPlugin from "./plugins/sharding";
 import DbTradeoffPlugin from "./plugins/db-tradeoff";
 import CapAcidPlugin from "./plugins/cap-acid";
 import MqttPlugin from "./plugins/mqtt";
+import ServiceEvolutionPlugin from "./plugins/service-evolution";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -93,6 +94,14 @@ export const categories: PluginCategory[] = [
       "Internet of Things protocols and messaging patterns — MQTT, topic routing, pub/sub, and device communication.",
     accent: "#7c3aed",
     plugins: [MqttPlugin],
+  },
+  {
+    id: "microservices",
+    name: "Microservices",
+    description:
+      "From monolith to nanoservices — explore how architecture granularity shapes deployability, scalability, and fault isolation.",
+    accent: "#a78bfa",
+    plugins: [ServiceEvolutionPlugin],
   },
 ];
 
