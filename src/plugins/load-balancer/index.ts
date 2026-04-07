@@ -18,7 +18,7 @@ const LoadBalancerPlugin: DemoPlugin<
   id: "load-balancer",
   name: "Load Balancer",
   description:
-    "Visualize how a load balancer distributes incoming requests across multiple server instances using different strategies.",
+    "Compare round robin, least connections, IP hash, weighted routing, and sticky-session affinity across a small server pool.",
   initialState,
   reducer: loadBalancerReducer,
   Component: LoadBalancerVisualization,
@@ -26,14 +26,23 @@ const LoadBalancerPlugin: DemoPlugin<
     text: "Reset",
   },
   getSteps: (_state: LoadBalancerState) => [
-    { label: "Setup", autoAdvance: false, nextButtonText: "Send Request" },
+    {
+      label: "Choose Strategy",
+      autoAdvance: false,
+      nextButtonText: "Route First Request",
+    },
     {
       label: "Single Request Routed",
       autoAdvance: false,
-      nextButtonText: "Send Burst",
+      nextButtonText: "Replay Mixed Traffic",
+      processingText: "Routing the first client...",
     },
-    { label: "Burst of 5 Requests", autoAdvance: true },
-    { label: "Analysis", autoAdvance: false },
+    {
+      label: "Burst of 6 Timed Requests",
+      autoAdvance: true,
+      processingText: "Replaying traffic with slower pacing...",
+    },
+    { label: "Compare Outcome", autoAdvance: false },
   ],
   init: (dispatch) => {
     dispatch(releaseConnections());

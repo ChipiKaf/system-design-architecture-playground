@@ -1,39 +1,92 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { type RootState } from "../../store/store";
-import { dispatchRequest, type LoadBalancerState } from "./loadBalancerSlice";
+import { dispatchRequest, releaseConnections } from "./loadBalancerSlice";
+
+const SINGLE_REQUEST_CLIENT = "client-a";
+const BURST_SEQUENCE = [
+  "client-a",
+  "client-b",
+  "client-a",
+  "client-c",
+  "client-b",
+  "client-d",
+];
+const SINGLE_REQUEST_DELAY_MS = 900;
+const BURST_INTERVAL_MS = 850;
+const BURST_SETTLE_DELAY_MS = 900;
 
 export const useLoadBalancerAnimation = (onAnimationComplete?: () => void) => {
   const dispatch = useDispatch();
-  const { currentStep } = useSelector((state: RootState) => state.simulation);
-  const loadBalancer = useSelector(
-    (state: RootState) => state.loadBalancer,
-  ) as LoadBalancerState;
+  const { currentStep, passCount } = useSelector(
+    (state: RootState) => state.simulation,
+  );
+  const loadBalancer = useSelector((state: RootState) => state.loadBalancer);
+
+  const onCompleteRef = useRef(onAnimationComplete);
+  useEffect(() => {
+    onCompleteRef.current = onAnimationComplete;
+  });
 
   useEffect(() => {
+    let completionTimer: number | undefined;
+    const done = () => onCompleteRef.current?.();
+
     if (currentStep === 0) {
-      setTimeout(() => onAnimationComplete?.(), 0);
-    } else if (currentStep === 1) {
-      // Dispatch a single request to demonstrate routing
-      dispatch(dispatchRequest());
-      setTimeout(() => onAnimationComplete?.(), 600);
-    } else if (currentStep === 2) {
-      // Dispatch a burst of requests
-      const totalRequests = 5;
-      let dispatched = 0;
-      const interval = setInterval(() => {
-        dispatch(dispatchRequest());
-        dispatched += 1;
-        if (dispatched >= totalRequests) {
-          clearInterval(interval);
-          setTimeout(() => onAnimationComplete?.(), 400);
+      dispatch(releaseConnections());
+      completionTimer = window.setTimeout(done, 0);
+
+      return () => {
+        if (completionTimer !== undefined) {
+          window.clearTimeout(completionTimer);
         }
-      }, 300);
-      return () => clearInterval(interval);
-    } else {
-      setTimeout(() => onAnimationComplete?.(), 0);
+      };
     }
-  }, [currentStep]);
+
+    if (currentStep === 1) {
+      dispatch(dispatchRequest({ clientId: SINGLE_REQUEST_CLIENT }));
+      completionTimer = window.setTimeout(done, SINGLE_REQUEST_DELAY_MS);
+
+      return () => {
+        if (completionTimer !== undefined) {
+          window.clearTimeout(completionTimer);
+        }
+      };
+    }
+
+    if (currentStep === 2) {
+      dispatch(dispatchRequest({ clientId: BURST_SEQUENCE[0] }));
+
+      let nextRequestIndex = 1;
+      const interval = window.setInterval(() => {
+        dispatch(
+          dispatchRequest({ clientId: BURST_SEQUENCE[nextRequestIndex] }),
+        );
+        nextRequestIndex += 1;
+
+        if (nextRequestIndex >= BURST_SEQUENCE.length) {
+          window.clearInterval(interval);
+          completionTimer = window.setTimeout(done, BURST_SETTLE_DELAY_MS);
+        }
+      }, BURST_INTERVAL_MS);
+
+      return () => {
+        window.clearInterval(interval);
+
+        if (completionTimer !== undefined) {
+          window.clearTimeout(completionTimer);
+        }
+      };
+    }
+
+    completionTimer = window.setTimeout(done, 0);
+
+    return () => {
+      if (completionTimer !== undefined) {
+        window.clearTimeout(completionTimer);
+      }
+    };
+  }, [currentStep, dispatch, passCount]);
 
   return { loadBalancer, currentStep };
 };
