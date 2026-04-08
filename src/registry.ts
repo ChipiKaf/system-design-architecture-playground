@@ -17,6 +17,10 @@ import CapAcidPlugin from "./plugins/cap-acid";
 import MqttPlugin from "./plugins/mqtt";
 import ServiceEvolutionPlugin from "./plugins/service-evolution";
 import DecompositionPlugin from "./plugins/decomposition";
+import MicroserviceCommPlugin from "./plugins/microservice-comm";
+import RestApiPlugin from "./plugins/rest-api";
+import GraphqlApiPlugin from "./plugins/graphql-api";
+import GrpcApiPlugin from "./plugins/grpc-api";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -102,7 +106,7 @@ export const categories: PluginCategory[] = [
     description:
       "From monolith to nanoservices — explore how architecture granularity shapes deployability, scalability, and fault isolation.",
     accent: "#a78bfa",
-    plugins: [ServiceEvolutionPlugin, DecompositionPlugin],
+    plugins: [ServiceEvolutionPlugin, DecompositionPlugin, MicroserviceCommPlugin, RestApiPlugin, GraphqlApiPlugin, GrpcApiPlugin],
   },
 ];
 

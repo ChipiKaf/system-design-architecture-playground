@@ -1,0 +1,175 @@
+.microservice-comm-root {
+  --microservice-comm-bg: #020617;
+  --microservice-comm-panel: rgba(7, 17, 34, 0.88);
+  --microservice-comm-border: rgba(148, 163, 184, 0.18);
+  --microservice-comm-text: #e2e8f0;
+  --microservice-comm-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--microservice-comm-text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(59, 130, 246, 0.14),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(139, 92, 246, 0.12),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.microservice-comm-stage {
+  background: var(--microservice-comm-panel);
+  border: 1px solid var(--microservice-comm-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Signal ball color overrides ─────────────────────── */
+.viz-signal.viz-signal-green {
+  fill: #22c55e;
+  transition: none;
+}
+.viz-signal.viz-signal-amber {
+  fill: #f59e0b;
+  transition: none;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.microservice-comm-phase--overview .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.microservice-comm-phase--request .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.microservice-comm-phase--routing .vc-stat-badge__value {
+  color: #818cf8;
+}
+.microservice-comm-phase--inter-service .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.microservice-comm-phase--inter-service-2 .vc-stat-badge__value {
+  color: #818cf8;
+}
+.microservice-comm-phase--data-access .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.microservice-comm-phase--data-access-2 .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.microservice-comm-phase--response .vc-stat-badge__value {
+  color: #22c55e;
+}
+/* gRPC-specific */
+.microservice-comm-phase--discovery .vc-stat-badge__value {
+  color: #14b8a6;
+}
+.microservice-comm-phase--mesh .vc-stat-badge__value {
+  color: #5eead4;
+}
+.microservice-comm-phase--streaming .vc-stat-badge__value {
+  color: #a78bfa;
+}
+/* GraphQL-specific */
+.microservice-comm-phase--auth .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.microservice-comm-phase--fan-out .vc-stat-badge__value {
+  color: #e535ab;
+}
+/* AMQP / Kafka shared */
+.microservice-comm-phase--publish .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.microservice-comm-phase--ack .vc-stat-badge__value {
+  color: #22c55e;
+}
+.microservice-comm-phase--consume-1 .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.microservice-comm-phase--consume-2 .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.microservice-comm-phase--error-handling .vc-stat-badge__value {
+  color: #ef4444;
+}
+/* Kafka-specific */
+.microservice-comm-phase--archive .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.microservice-comm-phase--summary .vc-stat-badge__value {
+  color: #86efac;
+}
+
+/* ── Controls ────────────────────────────────────────── */
+.microservice-comm-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: center;
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  &__legend {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 0.1rem;
+  }
+
+  &__sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(148, 163, 184, 0.14);
+    margin: 0 0.1rem;
+  }
+
+  &__chip {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 6px;
+    padding: 0.18rem 0.45rem;
+    background: rgba(15, 23, 42, 0.9);
+    color: #94a3b8;
+    font-size: 0.64rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      transform 0.12s ease,
+      background 0.12s ease,
+      border-color 0.12s ease,
+      color 0.12s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(59, 130, 246, 0.1);
+      transform: translateY(-1px);
+    }
+
+    &.is-active {
+      background: rgba(59, 130, 246, 0.14);
+      border-color: currentColor;
+      color: #e2e8f0;
+      box-shadow: 0 0 0 1px currentColor inset;
+    }
+  }
+}
