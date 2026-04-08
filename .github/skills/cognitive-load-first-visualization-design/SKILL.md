@@ -1,6 +1,6 @@
 ---
 name: cognitive-load-first-visualization-design
-description: Use cognitive load and visualization rules before building VizCraft scenes, steps, labels, motion, and controls.
+description: Use cognitive load and visualization rules before building VizCraft scenes, steps, labels, motion, and controls. Keep each step singular: one thing or one movement at a time.
 license: Complete terms in LICENSE.txt
 ---
 
@@ -16,6 +16,7 @@ Cognitive load is part of correctness. If the scene is hard to decode, redesign 
 - Show only the concepts needed for the current step.
 - Keep anchors stable: major regions, node positions, control placement, and color meaning.
 - Reveal meaning in stages: skeleton -> one active path -> one transition -> result -> summary.
+- One step should correspond to one thing or one movement; split chained changes into separate steps.
 - Put essential labels next to the thing they describe; use tooltips for extras only.
 - Prefer strong encodings first: position, alignment, length, proximity, enclosure.
 - Animate only when motion explains change. One primary motion at a time.

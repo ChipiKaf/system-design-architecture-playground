@@ -129,11 +129,6 @@ const CapAcidVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
 
       // Vertex labels + highlight
       const capFlags = [cap.a, cap.c, cap.p];
-      const conceptKeys: ConceptKey[] = [
-        "availability",
-        "consistency-cap",
-        "partition-tolerance",
-      ];
       pts.forEach((pt, i) => {
         const active = capFlags[i];
         o.add(
@@ -556,15 +551,6 @@ const CapAcidVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
   /* ── Stat badge helpers ─────────────────────────────── */
   const capLabel =
     [cap.c && "C", cap.a && "A", cap.p && "P"].filter(Boolean).join("") || "—";
-  const acidGrade = (g: AcidGrade | IsolationGrade | "at-risk") =>
-    g === "full" || g === "serializable"
-      ? "full"
-      : g === "partial" ||
-          g === "snapshot" ||
-          g === "read-committed" ||
-          g === "at-risk"
-        ? "partial"
-        : "none";
   const overallAcid =
     [acid.atomicity, acid.consistency, acid.durability].every(
       (g) => g === "full",
@@ -575,13 +561,6 @@ const CapAcidVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
           ) || acid.isolation === "none"
         ? "DEGRADED"
         : "PARTIAL";
-  const overallAcidColor =
-    overallAcid === "FULL"
-      ? "#22c55e"
-      : overallAcid === "PARTIAL"
-        ? "#f59e0b"
-        : "#ef4444";
-
   return (
     <div className={`cap-acid-root cap-acid-phase--${phase}`}>
       <PluginLayout

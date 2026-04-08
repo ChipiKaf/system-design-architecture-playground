@@ -82,7 +82,8 @@ const defaultClients: ClientNode[] = [
   { id: "client-3", type: "desktop" },
 ];
 
-const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+const clamp = (n: number, lo: number, hi: number) =>
+  Math.max(lo, Math.min(hi, n));
 
 const hashNumber = (input: string | number) => {
   const s = String(input);
@@ -115,12 +116,18 @@ function distributionWeights(state: ShardingState): number[] {
   }
 
   if (state.skewMode === "hotUser") {
-    const idx = Math.max(0, Math.min(n - 1, hashNumber(state.sampleUserId) % n));
+    const idx = Math.max(
+      0,
+      Math.min(n - 1, hashNumber(state.sampleUserId) % n),
+    );
     w[idx] *= state.strategy === "range" ? 2.2 : 1.7;
   }
 
   if (state.skewMode === "hotRegion") {
-    const idx = Math.max(0, Math.min(n - 1, regionToSeed[state.sampleRegion] % n));
+    const idx = Math.max(
+      0,
+      Math.min(n - 1, regionToSeed[state.sampleRegion] % n),
+    );
     w[idx] *= state.shardKey === "region" ? 2.4 : 1.5;
   }
 
@@ -150,7 +157,8 @@ function estimateShardsTouched(state: ShardingState): number {
   }
 
   if (q === "join-user-orders") {
-    const colocated = state.shardKey === "userId" && state.colocateOrdersWithUsers;
+    const colocated =
+      state.shardKey === "userId" && state.colocateOrdersWithUsers;
     return colocated ? 1 : n;
   }
 
@@ -181,14 +189,16 @@ export function computeMetrics(state: ShardingState) {
   const loads = state.shards.map((s) => s.loadPct);
   const maxLoad = Math.max(...loads);
   const minLoad = Math.min(...loads);
-  const avgLoad = loads.reduce((a, b) => a + b, 0) / loads.length;
-
   const spread = maxLoad - minLoad;
   state.hotspotLevel = clamp(Math.round(spread * 1.6), 0, 100);
   state.balanceScore = clamp(Math.round(100 - spread * 1.35), 10, 99);
 
-  const hottest = state.shards.reduce((a, b) => (a.loadPct >= b.loadPct ? a : b));
-  const coolest = state.shards.reduce((a, b) => (a.loadPct <= b.loadPct ? a : b));
+  const hottest = state.shards.reduce((a, b) =>
+    a.loadPct >= b.loadPct ? a : b,
+  );
+  const coolest = state.shards.reduce((a, b) =>
+    a.loadPct <= b.loadPct ? a : b,
+  );
   state.hottestShardId = hottest.id;
   state.coolestShardId = coolest.id;
 
@@ -201,11 +211,17 @@ export function computeMetrics(state: ShardingState) {
       : state.shardKey === "userId" && state.colocateOrdersWithUsers;
 
   const hotspotPenalty = Math.round(state.hotspotLevel * 0.6);
-  const joinPenalty = state.selectedQuery === "join-user-orders" && !joinColocated ? 70 : 0;
+  const joinPenalty =
+    state.selectedQuery === "join-user-orders" && !joinColocated ? 70 : 0;
   const mergePenalty = mergeCost * 12;
   const denormBoost = state.denormalized ? 12 : 0;
   const latencyMs = clamp(
-    18 + fanOut * 15 + mergePenalty + hotspotPenalty + joinPenalty - denormBoost,
+    18 +
+      fanOut * 15 +
+      mergePenalty +
+      hotspotPenalty +
+      joinPenalty -
+      denormBoost,
     20,
     520,
   );
@@ -221,9 +237,14 @@ export function computeMetrics(state: ShardingState) {
   const capacityBase = 650 + state.shardCount * 240;
   const strategyFactor = state.strategy === "hash" ? 1.1 : 1.0;
   const skewPenalty = 1 - state.hotspotLevel / 180;
-  state.throughputRps = Math.max(120, Math.round(capacityBase * strategyFactor * skewPenalty));
+  state.throughputRps = Math.max(
+    120,
+    Math.round(capacityBase * strategyFactor * skewPenalty),
+  );
 
-  const totalDataMb = Math.round(state.shards.reduce((a, s) => a + s.records, 0) / 4.8);
+  const totalDataMb = Math.round(
+    state.shards.reduce((a, s) => a + s.records, 0) / 4.8,
+  );
   state.dataMovedMb = Math.round(
     totalDataMb * (state.strategy === "hash" ? 0.58 : 0.34),
   );

@@ -16,6 +16,7 @@ import DbTradeoffPlugin from "./plugins/db-tradeoff";
 import CapAcidPlugin from "./plugins/cap-acid";
 import MqttPlugin from "./plugins/mqtt";
 import ServiceEvolutionPlugin from "./plugins/service-evolution";
+import DecompositionPlugin from "./plugins/decomposition";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -101,7 +102,7 @@ export const categories: PluginCategory[] = [
     description:
       "From monolith to nanoservices — explore how architecture granularity shapes deployability, scalability, and fault isolation.",
     accent: "#a78bfa",
-    plugins: [ServiceEvolutionPlugin],
+    plugins: [ServiceEvolutionPlugin, DecompositionPlugin],
   },
 ];
 

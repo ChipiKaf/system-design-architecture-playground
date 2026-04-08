@@ -1,6 +1,6 @@
 ---
 name: vizcraft-comparison-lab-plugin
-description: Build comparison-lab VizCraft plugins that compare variants or strategies with the shared lab-engine. Use when the user asks for a lab, comparison, or trade-off plugin; use for --comparison generator output, variant profiles, and shared flow execution. Do not use for sandbox or standard linear plugins.
+description: Build comparison-lab VizCraft plugins that compare variants or strategies with the shared lab-engine. Use when the user asks for a lab, comparison, or trade-off plugin; use for --comparison generator output, variant profiles, and shared flow execution. Do not use for sandbox or standard linear plugins. Keep each step singular: one comparison or one movement at a time.
 ---
 
 # VizCraft Comparison Lab Plugin
@@ -42,6 +42,7 @@ A comparison lab plugin uses these files:
 - Keep variant logic in the slice and flow-engine, not spread across the scene.
 - Use `VariantKey` and `VARIANT_PROFILES` as the source of truth for labels, colors, and descriptions.
 - Define steps as data and give each step a unique flow path.
+- One step should compare or move one thing at a time; split any chained transitions.
 - Use the shared `lib/lab-engine` executor instead of writing per-step animation switches.
 - Reset or soft-reset when switching variants so step state stays valid.
 - Keep controls simple: one button per variant, with the active variant highlighted.

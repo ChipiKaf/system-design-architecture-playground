@@ -16,7 +16,10 @@ import {
 } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 import { QUERY_CATALOG } from "./shardingSlice";
-import { useShardingAnimation, type Signal } from "./useShardingAnimation";
+import {
+  useShardingAnimation,
+  type Signal as _Signal,
+} from "./useShardingAnimation";
 import "./main.scss";
 
 interface Props {

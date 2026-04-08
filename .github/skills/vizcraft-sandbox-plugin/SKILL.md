@@ -1,6 +1,6 @@
 ---
 name: vizcraft-sandbox-plugin
-description: Build sandbox-style VizCraft plugins with dynamic components, declarative flow steps, capacity/prerequisite rules, and adaptive scenes.
+description: Build sandbox-style VizCraft plugins with dynamic components, declarative flow steps, capacity/prerequisite rules, and adaptive scenes. Keep each step singular: one thing or one movement; split chained changes into separate steps.
 ---
 
 # VizCraft Sandbox Plugin
@@ -40,6 +40,7 @@ A sandbox plugin uses 8 files:
 ## Flow engine rules
 
 - Define steps as data, not switches.
+- One step should cover one thing or one movement; do not chain multiple transitions into one step.
 - Every step owns a unique signal path; never reuse the same from -> to in another step.
 - Use $tokens for dynamic node sets and expand them at runtime.
 - Keep buildSteps(state) as the filter/label layer: hide inactive steps and derive the next button from the next active step when needed.

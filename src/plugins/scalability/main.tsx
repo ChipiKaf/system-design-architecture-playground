@@ -57,7 +57,7 @@ const ScalabilityVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     droppedRequests,
     responseTimeMs,
     serverCpuPercent,
-    serverHealthy,
+    serverHealthy: _serverHealthy,
     maxCapacity,
     explanation,
     hotZones,

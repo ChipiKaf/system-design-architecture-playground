@@ -1,6 +1,6 @@
 ---
 name: vizcraft-playground
-description: "Build, extend, and debug VizCraft interactive visualization playgrounds. USE WHEN: the workspace depends on 'vizcraft' in package.json, has src/registry.ts with PluginCategory[], has src/components/plugin-kit/, or has scripts/generate-plugin.js. USE FOR: creating new plugins, building VizCraft scenes (nodes, edges, signals, overlays), writing animation hooks, defining concept pills and InfoModal content, configuring Redux slices for plugin state, styling plugins with dark-theme SCSS, managing signal persistence and multi-hop chains, wiring plugins into the category registry. DO NOT USE FOR: non-VizCraft React projects, general Redux questions unrelated to plugins."
+description: "Build, extend, and debug VizCraft interactive visualization playgrounds. USE WHEN: the workspace depends on 'vizcraft' in package.json, has src/registry.ts with PluginCategory[], has src/components/plugin-kit/, or has scripts/generate-plugin.js. USE FOR: creating new plugins, building VizCraft scenes (nodes, edges, signals, overlays), writing animation hooks, defining concept pills and InfoModal content, configuring Redux slices for plugin state, styling plugins with dark-theme SCSS, managing signal persistence and multi-hop chains, wiring plugins into the category registry, and applying walkthrough UX rules (button-gated steps, smooth signal animation, numbered edges, progressive disclosure, and one thing or movement per step; split chained changes into separate steps). DO NOT USE FOR: non-VizCraft React projects, general Redux questions unrelated to plugins."
 ---
 
 # VizCraft Playground Skill
@@ -17,28 +17,28 @@ Use this skill whenever working inside a VizCraft playground — any project sca
 
 A VizCraft playground is a **plugin-based interactive visualization platform**.
 
-| Layer | Files | Purpose |
-|-------|-------|---------|
-| Config | `src/playground.config.ts` | Branding: title, subtitle, accent |
-| Registry | `src/registry.ts` | Single source of truth for categories + plugins |
-| Store | `src/store/store.ts` | Redux store from `pluginReducerMap` |
-| Simulation | `src/store/slices/simulationSlice.ts` | Shared `currentStep`, `passCount`, `isPlaying` |
-| Shell | `src/components/Shell.tsx` | Step lifecycle, restart, nav |
-| Plugin Kit | `src/components/plugin-kit/` | Reusable UI building blocks |
-| Plugins | `src/plugins/{name}/` | Self-contained demos |
+| Layer      | Files                                 | Purpose                                         |
+| ---------- | ------------------------------------- | ----------------------------------------------- |
+| Config     | `src/playground.config.ts`            | Branding: title, subtitle, accent               |
+| Registry   | `src/registry.ts`                     | Single source of truth for categories + plugins |
+| Store      | `src/store/store.ts`                  | Redux store from `pluginReducerMap`             |
+| Simulation | `src/store/slices/simulationSlice.ts` | Shared `currentStep`, `passCount`, `isPlaying`  |
+| Shell      | `src/components/Shell.tsx`            | Step lifecycle, restart, nav                    |
+| Plugin Kit | `src/components/plugin-kit/`          | Reusable UI building blocks                     |
+| Plugins    | `src/plugins/{name}/`                 | Self-contained demos                            |
 
 ## Plugin anatomy
 
 Every plugin lives in `src/plugins/{kebab-name}/` with exactly six files.
 
-| File | Naming | Purpose |
-|------|--------|---------|
-| `index.ts` | — | DemoPlugin export, steps, restart config |
-| `{camelName}Slice.ts` | `eventStreamingSlice.ts` | Redux slice: state type, reducers, actions |
-| `use{PascalName}Animation.ts` | `useEventStreamingAnimation.ts` | Step-driven animation orchestration |
-| `main.tsx` | — | React component rendering VizCraft scene |
-| `concepts.tsx` | — | ConceptKey type + ConceptDefinition record |
-| `main.scss` | — | Plugin-specific dark-theme styles |
+| File                          | Naming                          | Purpose                                    |
+| ----------------------------- | ------------------------------- | ------------------------------------------ |
+| `index.ts`                    | —                               | DemoPlugin export, steps, restart config   |
+| `{camelName}Slice.ts`         | `eventStreamingSlice.ts`        | Redux slice: state type, reducers, actions |
+| `use{PascalName}Animation.ts` | `useEventStreamingAnimation.ts` | Step-driven animation orchestration        |
+| `main.tsx`                    | —                               | React component rendering VizCraft scene   |
+| `concepts.tsx`                | —                               | ConceptKey type + ConceptDefinition record |
+| `main.scss`                   | —                               | Plugin-specific dark-theme styles          |
 
 ### Scaffolding
 
@@ -55,9 +55,9 @@ If the category does not exist, a new entry is created in the `categories` array
 
 ```typescript
 interface DemoPlugin<State, Actions, TRootState, TDispatch> {
-  id: string;              // kebab-case
-  name: string;            // Display name
-  description: string;     // One-liner
+  id: string; // kebab-case
+  name: string; // Display name
+  description: string; // One-liner
   initialState: State;
   reducer: Reducer<State, Actions>;
   Component: React.FC<{ onAnimationComplete?: () => void }>;
@@ -76,6 +76,14 @@ interface DemoStep {
   nextButtonColor?: string;
 }
 ```
+
+## Step granularity
+
+Keep walkthroughs comprehensive overall, but make each step singular:
+
+- One step = one idea, one movement, or one state change.
+- If a step needs multiple transitions or explanations, split it.
+- The viewer should be able to say what changed at the end of the step without referencing later steps.
 
 The `selector` uses a local root type: `type LocalRootState = { [camelName]: State }`.
 
@@ -118,7 +126,7 @@ Horizontal row of clickable info pills.
 const pills: PillDef[] = [
   { key: "kafka", label: "Kafka", color: "#7dd3fc", borderColor: "#0ea5e9" },
 ];
-<ConceptPills pills={pills} onOpen={openConcept} />
+<ConceptPills pills={pills} onOpen={openConcept} />;
 ```
 
 Props: `pills: PillDef[]`, `onOpen: (key: string) => void`, `className?`.
@@ -131,7 +139,8 @@ Use inline `color`/`borderColor` for pill colours (not variant classes).
 Hook that manages the InfoModal lifecycle.
 
 ```tsx
-const { openConcept, closeConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
+const { openConcept, closeConcept, ConceptModal } =
+  useConceptModal<ConceptKey>(concepts);
 // Render <ConceptModal /> anywhere in JSX
 ```
 
@@ -179,7 +188,8 @@ Floating info indicator over a scene region. Opens concepts on click.
 
 ```tsx
 <VizInfoBeacon
-  viewWidth={900} viewHeight={600}
+  viewWidth={900}
+  viewHeight={600}
   hoverRegion={{ x: 100, y: 200, width: 140, height: 60 }}
   indicatorPosition={{ x: 170, y: 195 }}
   ariaLabel="Learn about Producer"
@@ -204,7 +214,11 @@ interface InfoModalSection {
 ### Scene setup
 
 ```typescript
-import { viz, type PanZoomController, type SignalOverlayParams } from "vizcraft";
+import {
+  viz,
+  type PanZoomController,
+  type SignalOverlayParams,
+} from "vizcraft";
 
 const b = viz().view(width, height);
 ```
@@ -214,7 +228,7 @@ const b = viz().view(width, height);
 ```typescript
 b.node("my-node")
   .at(x, y)
-  .rect(w, h, cornerRadius)    // or .circle(radius)
+  .rect(w, h, cornerRadius) // or .circle(radius)
   .fill(color)
   .stroke(color, width)
   .label(text, { fill, fontSize, fontWeight, dy })
@@ -238,7 +252,11 @@ b.edge("from-id", "to-id", "edge-id")
 
 ```typescript
 b.overlay((o) => {
-  o.add("rect", { x, y, w, h, rx, ry, fill, stroke, strokeWidth, opacity }, { key, className });
+  o.add(
+    "rect",
+    { x, y, w, h, rx, ry, fill, stroke, strokeWidth, opacity },
+    { key, className },
+  );
   o.add("text", { x, y, text, fill, fontSize, fontWeight }, { key });
   o.add("circle", { x, y, r, fill, stroke }, { key });
   o.add("signal", signalParams, { key });
@@ -266,15 +284,19 @@ useLayoutEffect(() => {
   const saved = pzRef.current?.getState() ?? null;
   builderRef.current?.destroy();
   builderRef.current = scene;
-  pzRef.current = scene.mount(containerRef.current, {
-    autoplay: true, panZoom: true,
-    initialZoom: saved?.zoom ?? 1,
-    initialPan: saved?.pan ?? { x: 0, y: 0 },
-  }) ?? null;
+  pzRef.current =
+    scene.mount(containerRef.current, {
+      autoplay: true,
+      panZoom: true,
+      initialZoom: saved?.zoom ?? 1,
+      initialPan: saved?.pan ?? { x: 0, y: 0 },
+    }) ?? null;
 }, [scene]);
 
 useEffect(() => {
-  return () => { builderRef.current?.destroy(); };
+  return () => {
+    builderRef.current?.destroy();
+  };
 }, []);
 ```
 
@@ -300,26 +322,35 @@ type Signal = { id: string } & SignalOverlayParams;
 **This is critical.** When signals represent persistent state (events sitting in a partition, messages stored in a queue, data at rest), they must remain visible after animation completes. When signals represent transient events (a request in flight), they disappear after reaching their destination.
 
 **Transient** — disappear after arrival:
+
 ```typescript
 animateChain(hops, 500, () => setSignals([]));
 ```
 
 **Persistent** — stay visible at destination:
+
 ```typescript
 // After animation, keep as resting circles
 persistedRef.current.push({
   id: `rest-${Date.now()}`,
   nodeId: "partition-0",
-  offsetX: 8, offsetY: -4,
+  offsetX: 8,
+  offsetY: -4,
 });
 // Render resting signals as circle overlays
 b.overlay((o) => {
-  persistedRef.current.forEach(s => {
+  persistedRef.current.forEach((s) => {
     const pos = nodePositions[s.nodeId];
-    o.add("circle", {
-      x: pos.x + s.offsetX, y: pos.y + s.offsetY,
-      r: 5, fill: "#fbbf24",
-    }, { key: s.id });
+    o.add(
+      "circle",
+      {
+        x: pos.x + s.offsetX,
+        y: pos.y + s.offsetY,
+        r: 5,
+        fill: "#fbbf24",
+      },
+      { key: s.id },
+    );
   });
 });
 ```
@@ -331,51 +362,68 @@ Use `useRef` to carry persistent signal state across step changes. Maintain a po
 Signals natively travel one edge. For multi-hop chains, use `requestAnimationFrame`:
 
 ```typescript
-const animateSignalChain = useCallback((
-  hops: { from: string; to: string }[],
-  durationPerHop: number,
-  onDone: () => void,
-  options?: { keepFinal?: boolean; extra?: Signal[] },
-) => {
-  const extra = options?.extra ?? [];
-  const totalDuration = hops.length * durationPerHop;
-  const sigId = `chain-${Date.now()}`;
-  const startTime = performance.now();
+const animateSignalChain = useCallback(
+  (
+    hops: { from: string; to: string }[],
+    durationPerHop: number,
+    onDone: () => void,
+    options?: { keepFinal?: boolean; extra?: Signal[] },
+  ) => {
+    const extra = options?.extra ?? [];
+    const totalDuration = hops.length * durationPerHop;
+    const sigId = `chain-${Date.now()}`;
+    const startTime = performance.now();
 
-  const step = (now: number) => {
-    const rawP = Math.min((now - startTime) / totalDuration, 1);
-    const progress = rawP * hops.length;
-    setSignals([...extra, { id: sigId, chain: hops, progress, magnitude: 1 }]);
-    if (rawP < 1) {
-      rafRef.current = requestAnimationFrame(step);
-    } else {
-      if (!options?.keepFinal) setSignals([...extra]);
-      onDone();
-    }
-  };
-  rafRef.current = requestAnimationFrame(step);
-}, []);
+    const step = (now: number) => {
+      const rawP = Math.min((now - startTime) / totalDuration, 1);
+      const progress = rawP * hops.length;
+      setSignals([
+        ...extra,
+        { id: sigId, chain: hops, progress, magnitude: 1 },
+      ]);
+      if (rawP < 1) {
+        rafRef.current = requestAnimationFrame(step);
+      } else {
+        if (!options?.keepFinal) setSignals([...extra]);
+        onDone();
+      }
+    };
+    rafRef.current = requestAnimationFrame(step);
+  },
+  [],
+);
 ```
 
 ### Parallel signals (fan-out / fan-in)
 
 ```typescript
-const animateSignalsParallel = useCallback((
-  pairs: { from: string; to: string }[],
-  duration: number,
-  onDone: () => void,
-  options?: { extra?: Signal[] },
-) => {
-  const start = performance.now();
-  const sigs = pairs.map((p, i) => ({ id: `par-${i}`, from: p.from, to: p.to, progress: 0 }));
-  const step = (now: number) => {
-    const p = Math.min((now - start) / duration, 1);
-    setSignals([...(options?.extra ?? []), ...sigs.map(s => ({ ...s, progress: p }))]);
-    if (p < 1) rafRef.current = requestAnimationFrame(step);
-    else onDone();
-  };
-  rafRef.current = requestAnimationFrame(step);
-}, []);
+const animateSignalsParallel = useCallback(
+  (
+    pairs: { from: string; to: string }[],
+    duration: number,
+    onDone: () => void,
+    options?: { extra?: Signal[] },
+  ) => {
+    const start = performance.now();
+    const sigs = pairs.map((p, i) => ({
+      id: `par-${i}`,
+      from: p.from,
+      to: p.to,
+      progress: 0,
+    }));
+    const step = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      setSignals([
+        ...(options?.extra ?? []),
+        ...sigs.map((s) => ({ ...s, progress: p })),
+      ]);
+      if (p < 1) rafRef.current = requestAnimationFrame(step);
+      else onDone();
+    };
+    rafRef.current = requestAnimationFrame(step);
+  },
+  [],
+);
 ```
 
 ## Animation hook pattern
@@ -403,11 +451,14 @@ export const useMyPluginAnimation = (onAnimationComplete?: () => void) => {
     setSignals([]);
   }, []);
 
-  const sleep = useCallback((ms: number) =>
-    new Promise<void>(resolve => {
-      const id = setTimeout(resolve, ms);
-      timeoutsRef.current.push(id);
-    }), []);
+  const sleep = useCallback(
+    (ms: number) =>
+      new Promise<void>((resolve) => {
+        const id = setTimeout(resolve, ms);
+        timeoutsRef.current.push(id);
+      }),
+    [],
+  );
 
   const finish = useCallback(() => onCompleteRef.current?.(), []);
 
@@ -440,6 +491,7 @@ export const useMyPluginAnimation = (onAnimationComplete?: () => void) => {
 ```
 
 Key rules:
+
 - Always call `cleanup()` at the start of each step.
 - Always call `finish()` when a step's animation is done — this enables the Next button.
 - Use `onCompleteRef` to avoid stale closure issues.
@@ -466,7 +518,9 @@ const slice = createSlice({
     patchState(state, action: PayloadAction<Partial<MyPluginState>>) {
       Object.assign(state, action.payload);
     },
-    reset() { return initialState; },
+    reset() {
+      return initialState;
+    },
     // domain-specific reducers as needed
   },
 });
@@ -551,10 +605,10 @@ import MyPlugin from "./plugins/my-plugin";
 
 export const categories: PluginCategory[] = [
   {
-    id: "my-category",        // URL slug
-    name: "My Category",      // Display name
+    id: "my-category", // URL slug
+    name: "My Category", // Display name
     description: "...",
-    accent: "#3b82f6",        // Card colour
+    accent: "#3b82f6", // Card colour
     plugins: [MyPlugin],
   },
 ];

@@ -7,7 +7,6 @@ import {
   setIsolationLevel,
   setConsistencyLevel,
   togglePartition,
-  VARIANT_PROFILES,
   type CapAcidState,
   type VariantKey,
   type IsolationLevel,

@@ -1,4 +1,3 @@
-import React from "react";
 import type { InfoModalSection } from "../../components/InfoModal/InfoModal";
 
 export type ConceptKey =

@@ -11,7 +11,10 @@ import {
   CanvasStage,
 } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
-import { useFailoverAnimation, type Signal } from "./useFailoverAnimation";
+import {
+  useFailoverAnimation,
+  type Signal as _Signal,
+} from "./useFailoverAnimation";
 import { STRATEGY_PROFILES, SYSTEM_PROFILES } from "./failoverSlice";
 import "./main.scss";
 
@@ -66,9 +69,9 @@ const FailoverVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
     eventLog,
     explanation,
     hotZones,
-    phase,
+    phase: _phase,
     failureActive,
-    failoverInProgress,
+    failoverInProgress: _failoverInProgress,
     systemProfile,
   } = runtime;
 
