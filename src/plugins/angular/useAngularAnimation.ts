@@ -2,8 +2,8 @@ import {
   patchState,
   softResetRun,
   recalcMetrics,
-  type AngularConstructorVsNgoninitState,
-} from "./angularConstructorVsNgoninitSlice";
+  type AngularState,
+} from "./angularSlice";
 import { STEPS, buildSteps, expandToken, type StepKey } from "./flow-engine";
 import {
   useLabAnimation,
@@ -13,18 +13,17 @@ import {
 
 export type { Signal };
 
-const labConfig: UseLabAnimationConfig<AngularConstructorVsNgoninitState, StepKey> = {
-  selector: (root) => root.angularConstructorVsNgoninit as AngularConstructorVsNgoninitState,
+const labConfig: UseLabAnimationConfig<AngularState, StepKey> = {
+  selector: (root) => root.angular as AngularState,
   allSteps: STEPS,
   buildSteps,
   expandToken,
   actions: () => ({
     resetRun: { create: () => softResetRun(), terminal: true },
-    // TODO: add more action mappings as needed
   }),
   recalcMetrics: () => recalcMetrics(),
   patchState: (p) => patchState(p),
 };
 
-export const useAngularConstructorVsNgoninitAnimation = (onAnimationComplete?: () => void) =>
+export const useAngularAnimation = (onAnimationComplete?: () => void) =>
   useLabAnimation(labConfig, onAnimationComplete);

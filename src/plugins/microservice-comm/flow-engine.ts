@@ -838,7 +838,7 @@ export const STEPS: StepDef[] = [
     ],
     finalHotZones: ["ops-app", "device-shadow"],
     explain:
-      "This is the common AWS command path. The cloud writes the new wanted state into the shadow's 'desired' section. The shadow now has reported: {\"temp\": 22} and desired: {\"temp\": 20}. AWS automatically computes the delta (what still needs to change).",
+      'This is the common AWS command path. The cloud writes the new wanted state into the shadow\'s \'desired\' section. The shadow now has reported: {"temp": 22} and desired: {"temp": 20}. AWS automatically computes the delta (what still needs to change).',
   },
   {
     key: "mqtt-shadow-delta",
@@ -853,7 +853,7 @@ export const STEPS: StepDef[] = [
         duration: 420,
         color: "#60a5fa",
         explain:
-          "The shadow computes the delta: desired says temp 20, reported says temp 22, so the delta is {\"temp\": 20} — meaning the device still needs to reach 20.",
+          'The shadow computes the delta: desired says temp 20, reported says temp 22, so the delta is {"temp": 20} — meaning the device still needs to reach 20.',
       },
     ],
     finalHotZones: ["device-shadow", "iot-core"],
@@ -873,7 +873,7 @@ export const STEPS: StepDef[] = [
         duration: 500,
         color: "#22c55e",
         explain:
-          "Because the Temp Sensor already has a live MQTT session, AWS IoT Core pushes the delta down immediately over that same connection. The device receives {\"temp\": 20} and adjusts.",
+          'Because the Temp Sensor already has a live MQTT session, AWS IoT Core pushes the delta down immediately over that same connection. The device receives {"temp": 20} and adjusts.',
       },
     ],
     finalHotZones: ["iot-core", "device-temp", "device-shadow"],

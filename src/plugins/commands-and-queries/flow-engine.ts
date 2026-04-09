@@ -31,6 +31,7 @@ export type StepKey =
   | "publish-event"
   | "project-consume"
   | "refresh-view"
+  | "replay-events"
   | "client-query"
   | "route-query"
   | "query-read"
@@ -122,7 +123,8 @@ export const STEPS: StepDef[] = [
     key: "refresh-view",
     label: "Materialized View Refreshes",
     processingText: "Refreshing view...",
-    nextButton: "Send Query",
+    nextButton: (state) =>
+      state.pattern === "event-sourcing" ? "Replay Events" : "Send Query",
     nextButtonColor: "#f59e0b",
     phase: "projection-refresh",
     flow: (state) =>
@@ -131,6 +133,21 @@ export const STEPS: StepDef[] = [
       getAdapter(state.pattern).getStepHotZones("refresh-view", state),
     explain: (state) =>
       getAdapter(state.pattern).getStepExplanation("refresh-view", state),
+  },
+  {
+    key: "replay-events",
+    label: "Replay Events to Rebuild View",
+    processingText: "Replaying events...",
+    nextButton: "Send Query",
+    nextButtonColor: "#94a3b8",
+    phase: "replay",
+    when: (state) => state.pattern === "event-sourcing",
+    flow: (state) =>
+      getAdapter(state.pattern).getStepFlows("replay-events", state),
+    finalHotZones: (state) =>
+      getAdapter(state.pattern).getStepHotZones("replay-events", state),
+    explain: (state) =>
+      getAdapter(state.pattern).getStepExplanation("replay-events", state),
   },
   {
     key: "client-query",

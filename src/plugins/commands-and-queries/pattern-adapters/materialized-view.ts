@@ -51,7 +51,7 @@ function formatLag(ms: number): string {
 }
 
 function overviewExplanation(state: CommandsQueriesState): string {
-  return `Materialized view strategically duplicates query data into a local read model while the write side remains the source of truth. Events keep that duplicate synchronized asynchronously, so the query path avoids ${state.syncCallsAvoided} synchronous service calls and returns in about ${state.readLatencyMs}ms. Current projection lag is ${formatLag(state.projectionLagMs)}, so the read side is eventually consistent.`;
+  return `This service owns a Write DB (normalized, ACID) as its source of truth and maintains a separate Read DB (denormalized materialized view) for fast queries. Events keep the Read DB synchronized asynchronously, so the query path avoids ${state.syncCallsAvoided} synchronous service calls and returns in about ${state.readLatencyMs}ms. Current projection lag is ${formatLag(state.projectionLagMs)}, so the read side is eventually consistent.`;
 }
 
 function stepHotZones(step: StepKey): string[] {
@@ -109,8 +109,8 @@ function calloutFor(state: CommandsQueriesState): {
     return {
       title: "Command side",
       lines: [
-        "The write model remains the source of truth.",
-        "The read copy never owns authoritative state.",
+        "Write DB: normalized, authoritative database.",
+        "Read DB: denormalized copy — never the source of truth.",
       ],
       accent: "#38bdf8",
     };
@@ -121,11 +121,11 @@ function calloutFor(state: CommandsQueriesState): {
       title: "Async projection",
       lines: state.staleRisk
         ? [
-            "Events refresh the duplicated read copy later.",
+            "Events refresh the Read DB (denormalized copy) later.",
             `Current lag: ${formatLag(state.projectionLagMs)}.`,
           ]
         : [
-            "Publish/subscribe updates the read copy off-path.",
+            "Pub/sub updates the Read DB off the request path.",
             `Current lag: ${formatLag(state.projectionLagMs)} and caught up.`,
           ],
       accent: "#f59e0b",
@@ -137,12 +137,12 @@ function calloutFor(state: CommandsQueriesState): {
       title: "Query side",
       lines: state.staleRisk
         ? [
-            "Queries hit a local duplicated snapshot.",
+            "Queries hit the Read DB — a local denormalized snapshot.",
             "Freshness is traded for speed while it catches up.",
           ]
         : [
-            "Queries read one strategic local copy.",
-            "No live fan-out to source services is needed.",
+            "Queries read from the Read DB — one denormalized copy.",
+            "No live fan-out to other services needed.",
           ],
       accent: "#22c55e",
     };
@@ -151,8 +151,8 @@ function calloutFor(state: CommandsQueriesState): {
   return {
     title: "Materialized view",
     lines: [
-      "Data is duplicated strategically for read speed.",
-      "The write side still owns the source of truth.",
+      "Write DB (normalized) and Read DB (denormalized) — both real databases.",
+      "The Write DB owns the truth; Read DB is a pre-built local copy.",
     ],
     accent: "#22c55e",
   };
@@ -358,7 +358,7 @@ function addNodeNotes(
       {
         x: POS["write-model"].x,
         y: POS["write-model"].y + 44,
-        text: "source of truth",
+        text: "normalized · source of truth",
         fill: "#7dd3fc",
         fontSize: 8,
         fontWeight: 700,
@@ -410,8 +410,8 @@ function addNodeNotes(
       "text",
       {
         x: POS["read-model"].x,
-        y: POS["read-model"].y - 8,
-        text: "strategic duplicate: cart + product + price",
+        y: POS["read-model"].y - 42,
+        text: "denormalized copy (materialized view)",
         fill: "#86efac",
         fontSize: 8,
         fontWeight: 700,
@@ -425,7 +425,7 @@ function addNodeNotes(
         "text",
         {
           x: POS["read-model"].x,
-          y: POS["read-model"].y + 10 + index * 16,
+          y: POS["read-model"].y + 46 + index * 14,
           text: line,
           fill: index === 0 ? "#7dd3fc" : "#dbeafe",
           fontSize: index === 0 ? 8 : 7.5,
@@ -653,7 +653,7 @@ export const materializedViewAdapter: PatternAdapter = {
           ? "The response still returns immediately from the local view, but freshness is only eventual until the projection catches up."
           : "Gateway returns one denormalized response from the local view. The read path stays fast because the expensive stitching already happened earlier.";
       case "summary":
-        return `Materialized view strategically duplicates data for the read path while keeping the write side authoritative. The query side avoids ${state.syncCallsAvoided} synchronous service calls, reads in about ${state.readLatencyMs}ms, and currently carries ${formatLag(state.projectionLagMs)} of projection lag because synchronization happens asynchronously.`;
+        return `This service owns a Write DB (normalized, ACID) and a separate Read DB (denormalized materialized view) for fast queries. The query side avoids ${state.syncCallsAvoided} synchronous service calls, reads in about ${state.readLatencyMs}ms, and currently carries ${formatLag(state.projectionLagMs)} of projection lag because the Read DB is synchronized asynchronously via events.`;
       case "overview":
       default:
         return overviewExplanation(state);
@@ -682,12 +682,24 @@ export const materializedViewAdapter: PatternAdapter = {
 
     addFrame(
       builder,
+      "service-boundary",
+      358,
+      70,
+      682,
+      500,
+      "This Service (e.g. Order Service)",
+      "#94a3b8",
+      true,
+    );
+
+    addFrame(
+      builder,
       "command-lane",
       378,
       128,
-      406,
+      420,
       118,
-      "Command side",
+      "Command side (writes)",
       "#38bdf8",
       commandActive || summaryActive,
     );
@@ -697,7 +709,7 @@ export const materializedViewAdapter: PatternAdapter = {
       862,
       128,
       164,
-      340,
+      372,
       "Async projection",
       "#f59e0b",
       projectionActive || summaryActive,
@@ -706,10 +718,10 @@ export const materializedViewAdapter: PatternAdapter = {
       builder,
       "query-lane",
       378,
-      360,
-      406,
-      128,
-      "Query side",
+      354,
+      420,
+      196,
+      "Query side (reads)",
       "#22c55e",
       queryActive || summaryActive,
     );
@@ -752,7 +764,7 @@ export const materializedViewAdapter: PatternAdapter = {
     drawBox(
       builder,
       "write-model",
-      "Write Model",
+      "Write DB",
       helpers.hot("write-model"),
       "#0f172a",
       "rgba(14, 116, 144, 0.92)",
@@ -804,14 +816,14 @@ export const materializedViewAdapter: PatternAdapter = {
     drawBox(
       builder,
       "read-model",
-      "Materialized View",
+      "Read DB",
       helpers.hot("read-model"),
       "#0f172a",
       "rgba(20, 83, 45, 0.96)",
       state.staleRisk ? "#f59e0b" : "#22c55e",
-      190,
-      104,
-      18,
+      162,
+      58,
+      16,
       () => helpers.openConcept("materialized-view"),
     );
 
@@ -910,7 +922,7 @@ export const materializedViewAdapter: PatternAdapter = {
       builder,
       "lag-state",
       606,
-      548,
+      590,
       state.staleRisk
         ? `Lagging: ${formatLag(state.projectionLagMs)} behind`
         : `Projection lag: ${formatLag(state.projectionLagMs)}`,
@@ -921,8 +933,8 @@ export const materializedViewAdapter: PatternAdapter = {
       builder,
       "fanout-removed",
       382,
-      548,
-      "Read path removes live fan-out",
+      590,
+      "Owns Write DB · builds Read DB from events",
       "rgba(14, 165, 233, 0.12)",
       "#38bdf8",
     );

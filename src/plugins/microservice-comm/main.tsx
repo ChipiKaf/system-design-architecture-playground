@@ -1388,8 +1388,8 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
           "Thing identity: the AWS record that represents one device.",
           "Dead-Letter Queue (DLQ): a safety-net queue where failed messages go instead of being lost.",
           "Device Shadow: stores ONLY the last state (not history) — has 'reported' and 'desired' sections.",
-          "Reported state: the latest state the device says it has (e.g. {\"temp\": 22}).",
-          "Desired state: the state the cloud wants the device to reach (e.g. {\"temp\": 20}).",
+          'Reported state: the latest state the device says it has (e.g. {"temp": 22}).',
+          'Desired state: the state the cloud wants the device to reach (e.g. {"temp": 20}).',
           "Delta: the difference between desired and reported — what still needs to change.",
           "Timestream: a database for measurements collected over time (the actual history).",
         ]

@@ -442,14 +442,12 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
               (routing rules) and forwards the message to the right AWS service
             </li>
             <li>
-              If processing fails, a{" "}
-              <strong>Dead-Letter Queue (DLQ)</strong> preserves the message so
-              it can be inspected and replayed later
+              If processing fails, a <strong>Dead-Letter Queue (DLQ)</strong>{" "}
+              preserves the message so it can be inspected and replayed later
             </li>
             <li>
-              <strong>Device Shadow</strong> stores only the{" "}
-              <em>last state</em> (reported from device + desired from cloud) —
-              not a history log
+              <strong>Device Shadow</strong> stores only the <em>last state</em>{" "}
+              (reported from device + desired from cloud) — not a history log
             </li>
             <li>
               Cloud apps send commands by updating the shadow's desired state
@@ -593,14 +591,11 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
               e.g. <code>{`{"temp": 20}`}</code> — meaning the device still
               needs to change to 20.
             </p>
-            <p
-              style={{ marginTop: 8, color: "#f87171", fontWeight: "bold" }}
-            >
-              Important: the shadow only keeps the LATEST value for each
-              field. When a new reading arrives, it overwrites the previous
-              one. It is NOT a history log. If you need a history of
-              temperature readings over time, store telemetry in Timestream
-              or S3.
+            <p style={{ marginTop: 8, color: "#f87171", fontWeight: "bold" }}>
+              Important: the shadow only keeps the LATEST value for each field.
+              When a new reading arrives, it overwrites the previous one. It is
+              NOT a history log. If you need a history of temperature readings
+              over time, store telemetry in Timestream or S3.
             </p>
           </>
         ),
@@ -611,16 +606,14 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <ol>
             <li>
-              Device publishes reported state:{" "}
-              <code>{`{"temp": 22}`}</code>
+              Device publishes reported state: <code>{`{"temp": 22}`}</code>
             </li>
             <li>
-              Backend writes desired state:{" "}
-              <code>{`{"temp": 20}`}</code>
+              Backend writes desired state: <code>{`{"temp": 20}`}</code>
             </li>
             <li>
-              Shadow computes delta:{" "}
-              <code>{`{"temp": 20}`}</code> (device needs to cool down)
+              Shadow computes delta: <code>{`{"temp": 20}`}</code> (device needs
+              to cool down)
             </li>
             <li>
               Device receives delta, adjusts, then reports:{" "}

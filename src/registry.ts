@@ -29,7 +29,7 @@ import CommandsQueriesPlugin from "./plugins/commands-and-queries";
 import CiCdBuildPlugin from "./plugins/ci-cd-build";
 import EcommerceCapPlugin from "./plugins/ecommerce-cap";
 import DistributedTransactionsPlugin from "./plugins/distributed-transactions";
-import AngularConstructorVsNgoninitPlugin from "./plugins/angular-constructor-vs-ngoninit";
+import AngularPlugin from "./plugins/angular";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -75,7 +75,9 @@ export const categories: PluginCategory[] = [
       ShardingPlugin,
       DbTradeoffPlugin,
       CapAcidPlugin,
-      CiCdBuildPlugin, EcommerceCapPlugin],
+      CiCdBuildPlugin,
+      EcommerceCapPlugin,
+    ],
   },
   {
     id: "architecture",
@@ -99,7 +101,7 @@ export const categories: PluginCategory[] = [
     description:
       "How code actually runs — event loops, call stacks, queues, rendering, and other runtime mechanics.",
     accent: "#14b8a6",
-    plugins: [EventLoopPlugin, AngularConstructorVsNgoninitPlugin],
+    plugins: [EventLoopPlugin, AngularPlugin],
   },
   {
     id: "iot",
@@ -126,7 +128,9 @@ export const categories: PluginCategory[] = [
       SyncVsEventDrivenPlugin,
       DataManagementPlugin,
       CommandsQueriesPlugin,
-      DatabaseSelectionPlugin, DistributedTransactionsPlugin],
+      DatabaseSelectionPlugin,
+      DistributedTransactionsPlugin,
+    ],
   },
 ];
 

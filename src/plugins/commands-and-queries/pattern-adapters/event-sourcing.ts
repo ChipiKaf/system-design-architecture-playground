@@ -13,13 +13,13 @@ import type { StepKey } from "../flow-engine";
 const POS = {
   "client-app": { x: 80, y: 340 },
   "api-gateway": { x: 230, y: 340 },
-  "command-api": { x: 420, y: 170 },
-  "write-model": { x: 640, y: 170 },
-  "message-broker": { x: 870, y: 308 },
-  projector: { x: 870, y: 480 },
-  "query-api": { x: 420, y: 480 },
-  "read-model": { x: 640, y: 480 },
-  replay: { x: 1060, y: 480 },
+  "command-api": { x: 430, y: 180 },
+  "write-model": { x: 660, y: 180 },
+  "message-broker": { x: 890, y: 310 },
+  projector: { x: 890, y: 490 },
+  "query-api": { x: 430, y: 490 },
+  "read-model": { x: 660, y: 490 },
+  replay: { x: 1080, y: 490 },
 } as const;
 
 type NodeId = keyof typeof POS;
@@ -75,6 +75,8 @@ function stepHotZones(step: StepKey): string[] {
       return ["message-broker", "projector"];
     case "refresh-view":
       return ["projector", "read-model"];
+    case "replay-events":
+      return ["write-model", "replay", "read-model"];
     case "route-query":
       return ["api-gateway", "query-api"];
     case "query-read":
@@ -133,6 +135,17 @@ function calloutFor(state: CommandsQueriesState): {
             "No joins or live fan-out at query time.",
           ],
       accent: "#22c55e",
+    };
+  }
+
+  if (state.phase === "replay") {
+    return {
+      title: "Replay (rebuild read model)",
+      lines: [
+        "Re-process the entire event log from the Event Store.",
+        "Rebuild the Read DB from scratch — new schema, lost data, new projection.",
+      ],
+      accent: "#94a3b8",
     };
   }
 
@@ -356,14 +369,14 @@ function addNodeNotes(
       { key: "write-model-note" },
     );
 
-    /* Event log sample inside the event store box area */
+    /* Event log sample — above command frame */
     const eventLines = ["SCCreated → ItemAdded", "ItemAdded → ItemDeleted"];
     eventLines.forEach((line, idx) => {
       overlay.add(
         "text",
         {
           x: POS["write-model"].x,
-          y: POS["write-model"].y - 32 + idx * 14,
+          y: POS["write-model"].y - 50 + idx * 14,
           text: line,
           fill: "#fda4af",
           fontSize: 7,
@@ -419,12 +432,12 @@ function addNodeNotes(
       { key: "query-api-note" },
     );
 
-    /* Read model caption */
+    /* Read model caption — below node */
     overlay.add(
       "text",
       {
         x: POS["read-model"].x,
-        y: POS["read-model"].y - 10,
+        y: POS["read-model"].y + 48,
         text: "materialized view (denormalized)",
         fill: "#86efac",
         fontSize: 8,
@@ -453,8 +466,8 @@ function addNodeNotes(
     overlay.add(
       "text",
       {
-        x: 760,
-        y: 408,
+        x: 780,
+        y: 440,
         text: "Eventual Consistency",
         fill: state.staleRisk ? "#f59e0b" : "#94a3b8",
         fontSize: 10,
@@ -651,6 +664,25 @@ export const eventSourcingAdapter: PatternAdapter = {
               "The response returns from the pre-built read model. The read side scales independently.",
           },
         ];
+      case "replay-events":
+        return [
+          {
+            from: "$write-model",
+            to: "$replay",
+            color: "#94a3b8",
+            duration: 800,
+            explain:
+              "The Replay job reads the entire event log from the Event Store from the very beginning.",
+          },
+          {
+            from: "$replay",
+            to: "$read-model",
+            color: "#94a3b8",
+            duration: 800,
+            explain:
+              "Events are re-processed sequentially to rebuild the Read Database from scratch.",
+          },
+        ];
       case "overview":
       case "summary":
       default:
@@ -688,6 +720,8 @@ export const eventSourcingAdapter: PatternAdapter = {
         return state.staleRisk
           ? "The response still returns quickly from the materialized view. The app and UI must be designed to handle or tolerate this potential short staleness."
           : "The materialized view returns a pre-shaped response. If a view ever gets corrupted or needs a new shape, it can be rebuilt by replaying events from the Event Store.";
+      case "replay-events":
+        return "Replay is the Event Sourcing superpower. A job reads the entire event log from the Event Store — from the very first event — and re-processes every event sequentially through the projector to rebuild the Read Database from scratch. This is used when the read DB is lost, the schema changes, or you need a brand new projection. Because the Event Store retains the full immutable history, any view can be reconstructed at any time.";
       case "summary":
         return `CQRS + Event Sourcing persists every state change as an immutable event in the Event Store (source of truth). Events are published to an Event Bus, and consumers asynchronously update materialized views for fast queries (${state.readLatencyMs}ms reads). The trade-off is eventual consistency (${formatLag(state.projectionLagMs)} lag). The payoff: full audit log, temporal queries, and the ability to replay events to rebuild any read model from scratch.`;
       case "overview":
@@ -723,6 +757,10 @@ export const eventSourcingAdapter: PatternAdapter = {
         : "Query Reads Materialized View";
     }
 
+    if (step.key === "replay-events") {
+      return "Replay: Rebuild Read DB from Events";
+    }
+
     return step.label;
   },
   buildScene(builder, state, helpers) {
@@ -736,10 +774,10 @@ export const eventSourcingAdapter: PatternAdapter = {
     addFrame(
       builder,
       "command-lane",
-      308,
-      94,
-      402,
-      130,
+      318,
+      104,
+      420,
+      140,
       "Command side (Event Sourcing)",
       "#f472b6",
       commandActive || summaryActive,
@@ -747,10 +785,10 @@ export const eventSourcingAdapter: PatternAdapter = {
     addFrame(
       builder,
       "sync-lane",
-      780,
-      232,
-      178,
-      310,
+      798,
+      240,
+      186,
+      340,
       "Event-driven sync",
       "#f59e0b",
       syncActive || summaryActive,
@@ -758,10 +796,10 @@ export const eventSourcingAdapter: PatternAdapter = {
     addFrame(
       builder,
       "query-lane",
-      308,
-      400,
-      402,
-      140,
+      318,
+      410,
+      420,
+      152,
       "Query side (materialized views)",
       "#22c55e",
       queryActive || summaryActive,
@@ -769,13 +807,13 @@ export const eventSourcingAdapter: PatternAdapter = {
     addFrame(
       builder,
       "replay-zone",
-      990,
-      420,
+      1010,
+      410,
       160,
-      100,
+      152,
       "Replay",
       "#94a3b8",
-      summaryActive,
+      helpers.phase === "replay" || summaryActive,
     );
 
     /* Nodes */
@@ -883,7 +921,7 @@ export const eventSourcingAdapter: PatternAdapter = {
       builder,
       "replay",
       "Replay",
-      summaryActive,
+      helpers.hot("replay") || helpers.phase === "replay" || summaryActive,
       "#0f172a",
       "rgba(51, 65, 85, 0.72)",
       "#94a3b8",
@@ -984,7 +1022,25 @@ export const eventSourcingAdapter: PatternAdapter = {
     /* Replay dashed edge (Event Store → Replay) */
     builder
       .edge("write-model", "replay", "e-store-replay")
-      .stroke("#94a3b8", 1.4)
+      .stroke(
+        edgeColor(
+          helpers.hot("write-model") && helpers.hot("replay"),
+          "#94a3b8",
+        ),
+        1.4,
+      )
+      .arrow(true);
+
+    /* Replay → Read DB edge */
+    builder
+      .edge("replay", "read-model", "e-replay-read")
+      .stroke(
+        edgeColor(
+          helpers.hot("replay") && helpers.hot("read-model"),
+          "#94a3b8",
+        ),
+        1.4,
+      )
       .arrow(true);
 
     addCallout(builder, state);
@@ -994,7 +1050,7 @@ export const eventSourcingAdapter: PatternAdapter = {
       builder,
       "lag-state",
       540,
-      580,
+      600,
       state.staleRisk
         ? `Lagging: ${formatLag(state.projectionLagMs)} behind`
         : `Sync lag: ${formatLag(state.projectionLagMs)}`,
@@ -1005,7 +1061,7 @@ export const eventSourcingAdapter: PatternAdapter = {
       builder,
       "immutable-note",
       302,
-      580,
+      600,
       "Append-only: full history retained",
       "rgba(244, 114, 182, 0.12)",
       "#f472b6",

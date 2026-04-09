@@ -1,0 +1,153 @@
+/* ── Angular Plugin ─────────────────────────────────── */
+.angular-root {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Phase accent colours ───────────────────────────── */
+.angular-phase--overview {
+  --phase-accent: #60a5fa;
+}
+.angular-phase--instantiate {
+  --phase-accent: #818cf8;
+}
+.angular-phase--di {
+  --phase-accent: #14b8a6;
+}
+.angular-phase--inputs {
+  --phase-accent: #a78bfa;
+}
+.angular-phase--hook {
+  --phase-accent: #22c55e;
+}
+.angular-phase--logic {
+  --phase-accent: #f59e0b;
+}
+.angular-phase--summary {
+  --phase-accent: #22c55e;
+}
+
+/* Q2 phases */
+.angular-phase--ve-styles {
+  --phase-accent: #a78bfa;
+}
+.angular-phase--ve-scoping {
+  --phase-accent: #3b82f6;
+}
+.angular-phase--ve-render {
+  --phase-accent: #818cf8;
+}
+.angular-phase--ve-isolation {
+  --phase-accent: #f59e0b;
+}
+.angular-phase--ve-summary {
+  --phase-accent: #22c55e;
+}
+
+/* ── Stage chrome ───────────────────────────────────── */
+.angular-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Stat badges ────────────────────────────────────── */
+.angular-phase {
+  border-color: var(--phase-accent, #60a5fa);
+  color: var(--phase-accent, #60a5fa);
+}
+
+/* ── Controls bar ───────────────────────────────────── */
+.angular-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: center;
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  &__select {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 6px;
+    padding: 0.2rem 1.4rem 0.2rem 0.5rem;
+    background: rgba(15, 23, 42, 0.9)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E")
+      no-repeat right 0.45rem center / 8px 5px;
+    color: #e2e8f0;
+    font-size: 0.66rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:focus {
+      outline: none;
+      border-color: #60a5fa;
+    }
+
+    option {
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+  }
+
+  &__sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(148, 163, 184, 0.14);
+    margin: 0 0.15rem;
+  }
+
+  &__btn {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    background: rgba(15, 23, 42, 0.9);
+    color: #94a3b8;
+    font-size: 0.66rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      transform 0.12s ease,
+      background 0.12s ease,
+      border-color 0.12s ease,
+      color 0.12s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(59, 130, 246, 0.1);
+      transform: translateY(-1px);
+    }
+
+    &--active {
+      background: rgba(59, 130, 246, 0.14);
+      border-color: currentColor;
+      color: #e2e8f0;
+      box-shadow: 0 0 0 1px currentColor inset;
+    }
+  }
+}
+
+/* ── Code example block ─────────────────────────────── */
+.angular-code {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  background: rgba(2, 6, 18, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+  color: #cbd5e1;
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre;
+  overflow-x: auto;
+  tab-size: 2;
+}
