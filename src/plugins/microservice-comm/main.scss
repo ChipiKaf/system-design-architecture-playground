@@ -54,8 +54,14 @@
 .microservice-comm-phase--request .vc-stat-badge__value {
   color: #60a5fa;
 }
+.microservice-comm-phase--connect .vc-stat-badge__value {
+  color: #a78bfa;
+}
 .microservice-comm-phase--routing .vc-stat-badge__value {
   color: #818cf8;
+}
+.microservice-comm-phase--ingest .vc-stat-badge__value {
+  color: #f59e0b;
 }
 .microservice-comm-phase--inter-service .vc-stat-badge__value {
   color: #60a5fa;
@@ -68,6 +74,15 @@
 }
 .microservice-comm-phase--data-access-2 .vc-stat-badge__value {
   color: #fbbf24;
+}
+.microservice-comm-phase--shadow .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.microservice-comm-phase--command .vc-stat-badge__value {
+  color: #93c5fd;
+}
+.microservice-comm-phase--delivery .vc-stat-badge__value {
+  color: #22c55e;
 }
 .microservice-comm-phase--response .vc-stat-badge__value {
   color: #22c55e;

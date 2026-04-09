@@ -9,6 +9,9 @@ export type ConceptKey =
   | "grpc"
   | "graphql"
   | "amqp"
+  | "mqtt"
+  | "iot-core"
+  | "device-shadow"
   | "kafka"
   | "service-discovery"
   | "serialization"
@@ -381,6 +384,189 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             <li>Broker is a single point of failure (cluster for HA)</li>
             <li>Eventual consistency — consumers process at their own pace</li>
             <li>Harder to trace end-to-end request flow</li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  mqtt: {
+    title: "MQTT on AWS IoT Core",
+    subtitle:
+      "Lightweight pub/sub for connected devices and cloud-to-device control",
+    accentColor: "#a78bfa",
+    sections: [
+      {
+        title: "How it works",
+        accent: "#a78bfa",
+        content: (
+          <>
+            <p>
+              MQTT is a lightweight publish/subscribe protocol built for devices
+              with constrained CPU, battery, or network quality. Devices do not
+              call backend services directly. They keep a long-lived connection
+              to a broker and publish or subscribe on topics.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              On AWS, that broker is usually <strong>AWS IoT Core</strong>.
+              Devices connect to the account-specific IoT endpoint, publish
+              telemetry to topics, and receive downlink commands or shadow delta
+              updates over the same MQTT session.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Typical AWS flow",
+        accent: "#60a5fa",
+        content: (
+          <ul>
+            <li>Device connects with X.509 certificate and IoT policy</li>
+            <li>Device publishes telemetry topic to AWS IoT Core</li>
+            <li>
+              IoT Rules route matching messages to Lambda, Timestream, SQS,
+              EventBridge, or Kinesis
+            </li>
+            <li>Device Shadow stores desired and reported device state</li>
+            <li>
+              Cloud apps publish commands through AWS IoT APIs or shadow updates
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "When to use",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>
+              Telemetry ingestion from sensors, gateways, and embedded devices
+            </li>
+            <li>Cloud-to-device commands or configuration changes</li>
+            <li>Offline-tolerant device state synchronization with shadows</li>
+            <li>Low-bandwidth or intermittently connected device fleets</li>
+          </ul>
+        ),
+      },
+      {
+        title: "Trade-offs",
+        accent: "#ef4444",
+        content: (
+          <ul>
+            <li>Not a replayable event log like Kafka</li>
+            <li>
+              Per-device certificates and topic permissions need lifecycle
+              management
+            </li>
+            <li>
+              Topic hierarchy and fleet identity model need strong governance
+            </li>
+            <li>
+              Best for device messaging, not as a generic integration backbone
+              for every service
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  "iot-core": {
+    title: "AWS IoT Core",
+    subtitle: "Managed MQTT broker plus device identity, policy, and routing",
+    accentColor: "#a78bfa",
+    sections: [
+      {
+        title: "What AWS IoT Core gives you",
+        accent: "#a78bfa",
+        content: (
+          <>
+            <p>
+              AWS IoT Core is more than just a broker. It provides the managed
+              MQTT endpoint, Thing identities, certificate-based device auth,
+              IoT policies, reserved shadow topics, and the rules engine that
+              routes messages into other AWS services.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              Devices typically connect with mutual TLS on port 8883. When that
+              is difficult, clients can also use MQTT over WebSockets on port
+              443 with SigV4-backed auth.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Important setup points",
+        accent: "#f59e0b",
+        content: (
+          <ul>
+            <li>
+              Create a Thing or a provisioning strategy for each device class
+            </li>
+            <li>Provision X.509 certs and attach narrow IoT policies</li>
+            <li>
+              Design topic names so tenants, devices, and actions are clear
+            </li>
+            <li>
+              Use IoT Rules to fan topics into downstream services instead of
+              teaching devices about those systems
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+
+  "device-shadow": {
+    title: "Device Shadow",
+    subtitle: "Desired and reported state for online or offline devices",
+    accentColor: "#60a5fa",
+    sections: [
+      {
+        title: "Why it matters",
+        accent: "#60a5fa",
+        content: (
+          <>
+            <p>
+              Device Shadow stores a JSON document with a device's
+              <strong> desired state </strong>
+              from the cloud and
+              <strong> reported state </strong>
+              from the device. AWS IoT Core computes the delta between them.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              This means cloud systems can request a state change even when the
+              device is offline. When the device reconnects, it receives the
+              delta and can reconcile itself.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "How command flow often works",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>
+              Backend app writes desired state through AWS SDK or IoT Data Plane
+            </li>
+            <li>Shadow computes delta between desired and reported state</li>
+            <li>Device subscribes to reserved shadow topics</li>
+            <li>Device applies the change and updates reported state back</li>
+          </ul>
+        ),
+      },
+      {
+        title: "What shadows are not",
+        accent: "#ef4444",
+        content: (
+          <ul>
+            <li>Not a full historical event store</li>
+            <li>Not a replacement for telemetry storage in Timestream or S3</li>
+            <li>
+              Not the same as fleet-wide operational workflows like firmware
+              rollouts, which usually use IoT Jobs
+            </li>
           </ul>
         ),
       },

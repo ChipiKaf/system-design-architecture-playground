@@ -40,6 +40,24 @@ function lagLabel(ms: number): string {
 }
 
 function schemaLines(state: CommandsQueriesState): string[] {
+  if (state.pattern === "instagram") {
+    if (state.projectionState === "lagging") {
+      return [
+        "── PostgreSQL (Master · ACID) ──",
+        "user | profile | followers: 12.4M",
+        "── Cassandra (behind) ──",
+        "feed | 3.2s stale | activity lag",
+      ];
+    }
+
+    return [
+      "── PostgreSQL (Master · ACID) ──",
+      "user | profile | followers: 12.4M",
+      "── Cassandra (peer-to-peer) ──",
+      "feed | stories | activity | counters",
+    ];
+  }
+
   if (state.pattern === "event-sourcing") {
     if (state.projectionState === "lagging") {
       return [
@@ -219,13 +237,25 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
   }, []);
 
   const pills =
-    pattern === "event-sourcing"
+    pattern === "instagram"
       ? [
           {
-            key: "event-sourcing",
-            label: "Event Sourcing",
-            color: "#fda4af",
-            borderColor: "#f472b6",
+            key: "instagram-postgres",
+            label: "PostgreSQL",
+            color: "#7dd3fc",
+            borderColor: "#38bdf8",
+          },
+          {
+            key: "instagram-cassandra",
+            label: "Cassandra",
+            color: "#86efac",
+            borderColor: "#22c55e",
+          },
+          {
+            key: "instagram-cache",
+            label: "Memcached",
+            color: "#c4b5fd",
+            borderColor: "#a78bfa",
           },
           {
             key: "cqrs",
@@ -234,26 +264,20 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
             borderColor: "#818cf8",
           },
           {
-            key: "materialized-view",
-            label: "Mat View",
-            color: "#86efac",
-            borderColor: "#22c55e",
-          },
-          {
-            key: "message-broker",
-            label: "Event Bus",
-            color: "#93c5fd",
-            borderColor: "#38bdf8",
-          },
-          {
             key: "eventual-consistency",
             label: "Consistency",
             color: "#fdba74",
             borderColor: "#f59e0b",
           },
         ]
-      : pattern === "cqrs"
+      : pattern === "event-sourcing"
         ? [
+            {
+              key: "event-sourcing",
+              label: "Event Sourcing",
+              color: "#fda4af",
+              borderColor: "#f472b6",
+            },
             {
               key: "cqrs",
               label: "CQRS",
@@ -261,14 +285,8 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
               borderColor: "#818cf8",
             },
             {
-              key: "command-model",
-              label: "Command Model",
-              color: "#7dd3fc",
-              borderColor: "#38bdf8",
-            },
-            {
-              key: "query-model",
-              label: "Query Model",
+              key: "materialized-view",
+              label: "Mat View",
               color: "#86efac",
               borderColor: "#22c55e",
             },
@@ -279,56 +297,89 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
               borderColor: "#38bdf8",
             },
             {
-              key: "projection",
-              label: "Sync Worker",
-              color: "#fdba74",
-              borderColor: "#f59e0b",
-            },
-            {
               key: "eventual-consistency",
               label: "Consistency",
               color: "#fdba74",
               borderColor: "#f59e0b",
             },
           ]
-        : [
-            {
-              key: "materialized-view",
-              label: "Mat View",
-              color: "#86efac",
-              borderColor: "#22c55e",
-            },
-            {
-              key: "command-model",
-              label: "Command Model",
-              color: "#7dd3fc",
-              borderColor: "#38bdf8",
-            },
-            {
-              key: "query-model",
-              label: "Query Model",
-              color: "#86efac",
-              borderColor: "#22c55e",
-            },
-            {
-              key: "projection",
-              label: "Projector",
-              color: "#fdba74",
-              borderColor: "#f59e0b",
-            },
-            {
-              key: "message-broker",
-              label: "Broker",
-              color: "#93c5fd",
-              borderColor: "#38bdf8",
-            },
-            {
-              key: "eventual-consistency",
-              label: "Consistency",
-              color: "#fdba74",
-              borderColor: "#f59e0b",
-            },
-          ];
+        : pattern === "cqrs"
+          ? [
+              {
+                key: "cqrs",
+                label: "CQRS",
+                color: "#c4b5fd",
+                borderColor: "#818cf8",
+              },
+              {
+                key: "command-model",
+                label: "Command Model",
+                color: "#7dd3fc",
+                borderColor: "#38bdf8",
+              },
+              {
+                key: "query-model",
+                label: "Query Model",
+                color: "#86efac",
+                borderColor: "#22c55e",
+              },
+              {
+                key: "message-broker",
+                label: "Event Bus",
+                color: "#93c5fd",
+                borderColor: "#38bdf8",
+              },
+              {
+                key: "projection",
+                label: "Sync Worker",
+                color: "#fdba74",
+                borderColor: "#f59e0b",
+              },
+              {
+                key: "eventual-consistency",
+                label: "Consistency",
+                color: "#fdba74",
+                borderColor: "#f59e0b",
+              },
+            ]
+          : [
+              {
+                key: "materialized-view",
+                label: "Mat View",
+                color: "#86efac",
+                borderColor: "#22c55e",
+              },
+              {
+                key: "command-model",
+                label: "Command Model",
+                color: "#7dd3fc",
+                borderColor: "#38bdf8",
+              },
+              {
+                key: "query-model",
+                label: "Query Model",
+                color: "#86efac",
+                borderColor: "#22c55e",
+              },
+              {
+                key: "projection",
+                label: "Projector",
+                color: "#fdba74",
+                borderColor: "#f59e0b",
+              },
+              {
+                key: "message-broker",
+                label: "Broker",
+                color: "#93c5fd",
+                borderColor: "#38bdf8",
+              },
+              {
+                key: "eventual-consistency",
+                label: "Consistency",
+                color: "#fdba74",
+                borderColor: "#f59e0b",
+              },
+            ];
 
   return (
     <div className={`commands-queries-root commands-queries-phase--${phase}`}>
@@ -339,11 +390,13 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
             <StageHeader
               title="Commands and Queries Lab"
               subtitle={
-                pattern === "event-sourcing"
-                  ? `${profile.label} | append-only events as source of truth`
-                  : pattern === "cqrs"
-                    ? `${profile.label} | separate commands from queries, optimize each independently`
-                    : `${profile.label} | keep reads local, keep writes authoritative`
+                pattern === "instagram"
+                  ? `${profile.label} | polyglot persistence at global scale`
+                  : pattern === "event-sourcing"
+                    ? `${profile.label} | append-only events as source of truth`
+                    : pattern === "cqrs"
+                      ? `${profile.label} | separate commands from queries, optimize each independently`
+                      : `${profile.label} | keep reads local, keep writes authoritative`
               }
             >
               {badges.map((badge) => (
@@ -402,7 +455,38 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
 
             <SideCard label="Key Considerations" variant="info">
               <dl className="commands-queries-facts">
-                {pattern === "event-sourcing" ? (
+                {pattern === "instagram" ? (
+                  <>
+                    <div className="commands-queries-facts__item">
+                      <dt>Polyglot persistence</dt>
+                      <dd>
+                        PostgreSQL (ACID) for writes, Cassandra (AP) for reads,
+                        Memcached for caching — each database chosen for its
+                        strengths.
+                      </dd>
+                    </div>
+                    <div className="commands-queries-facts__item">
+                      <dt>CAP theorem in action</dt>
+                      <dd>
+                        Cassandra trades consistency for availability +
+                        partition tolerance (AP). PostgreSQL provides strong
+                        consistency for core writes.
+                      </dd>
+                    </div>
+                    <div className="commands-queries-facts__item">
+                      <dt>Master-Replica vs Peer-to-peer</dt>
+                      <dd>
+                        PostgreSQL uses master-replica for read scaling.
+                        Cassandra uses peer-to-peer with no single point of
+                        failure across data centers.
+                      </dd>
+                    </div>
+                    <div className="commands-queries-facts__item">
+                      <dt>Async synchronization</dt>
+                      <dd>{synchronizationLabel(state)}</dd>
+                    </div>
+                  </>
+                ) : pattern === "event-sourcing" ? (
                   <>
                     <div className="commands-queries-facts__item">
                       <dt>Immutable event log</dt>
@@ -514,7 +598,9 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
                   <span>
                     {pattern === "materialized-view"
                       ? "Projection lag"
-                      : "Sync lag"}
+                      : pattern === "instagram"
+                        ? "Replication lag"
+                        : "Sync lag"}
                   </span>
                   <strong
                     style={{ color: state.staleRisk ? "#f59e0b" : "#22c55e" }}
@@ -533,11 +619,13 @@ const CommandsQueriesVisualization: React.FC<Props> = ({
 
             <SideCard
               label={
-                pattern === "event-sourcing"
-                  ? "Event Log vs Read Model"
-                  : pattern === "cqrs"
-                    ? "Data Model Comparison"
-                    : "Read Model Example"
+                pattern === "instagram"
+                  ? "Database Technologies"
+                  : pattern === "event-sourcing"
+                    ? "Event Log vs Read Model"
+                    : pattern === "cqrs"
+                      ? "Data Model Comparison"
+                      : "Read Model Example"
               }
               variant="info"
             >

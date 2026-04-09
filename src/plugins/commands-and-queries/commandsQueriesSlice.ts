@@ -3,7 +3,11 @@ import type { LabState } from "../../lib/lab-engine";
 import { getAdapter } from "./pattern-adapters";
 import type { PatternProfile } from "./pattern-adapters";
 
-export type PatternKey = "materialized-view" | "cqrs" | "event-sourcing";
+export type PatternKey =
+  | "materialized-view"
+  | "cqrs"
+  | "event-sourcing"
+  | "instagram";
 export type ProjectionState = "caught-up" | "lagging";
 
 export interface CommandsQueriesState extends LabState {
@@ -21,6 +25,7 @@ export const PATTERN_PROFILES: Record<PatternKey, PatternProfile> = {
   "materialized-view": getAdapter("materialized-view").profile,
   cqrs: getAdapter("cqrs").profile,
   "event-sourcing": getAdapter("event-sourcing").profile,
+  instagram: getAdapter("instagram").profile,
 };
 
 export function computeMetrics(state: CommandsQueriesState) {

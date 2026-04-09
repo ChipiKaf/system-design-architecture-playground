@@ -13,7 +13,7 @@ import {
    Microservice Communication Lab — Declarative Flow Engine
 
    Each protocol has a UNIQUE step sequence targeting its
-   own node IDs — HTTP/REST, gRPC, GraphQL, AMQP, Kafka.
+  own node IDs — HTTP/REST, gRPC, GraphQL, AMQP, MQTT, Kafka.
    ══════════════════════════════════════════════════════════ */
 
 /* ── Specialised type aliases ──────────────────────────── */
@@ -35,6 +35,7 @@ export function expandToken(
   token: string,
   _state: MicroserviceCommState,
 ): string[] {
+  void _state;
   return [token];
 }
 
@@ -74,6 +75,16 @@ export type StepKey =
   | "amqp-consume-a"
   | "amqp-consume-b"
   | "amqp-dlq-fallback"
+  /* MQTT */
+  | "mqtt-device-connect"
+  | "mqtt-publish-telemetry"
+  | "mqtt-rules-match"
+  | "mqtt-route-lambda"
+  | "mqtt-store-timestream"
+  | "mqtt-update-shadow"
+  | "mqtt-backend-desired"
+  | "mqtt-shadow-delta"
+  | "mqtt-command-delivery"
   /* Kafka */
   | "kafka-client-to-producer"
   | "kafka-append-partitions"
@@ -648,6 +659,190 @@ export const STEPS: StepDef[] = [
     recalcMetrics: true,
     explain:
       "Failed messages after max retries go to Dead Letter Queue (SQS). CloudWatch monitors queue depth & DLQ count.",
+  },
+
+  /* ══════ MQTT ══════════════════════════════════════ */
+
+  {
+    key: "mqtt-device-connect",
+    label: "Device → IoT Core Connect",
+    when: is("mqtt"),
+    phase: "connect",
+    processingText: "Establishing MQTT session...",
+    flow: [
+      {
+        from: "iot-device",
+        to: "iot-core",
+        duration: 500,
+        color: "#a78bfa",
+        explain:
+          "An IoT device opens a long-lived MQTT connection to AWS IoT Core using mutual TLS and its X.509 certificate.",
+      },
+    ],
+    finalHotZones: ["iot-device", "iot-core"],
+    explain:
+      "AWS IoT Core gives each account a managed device endpoint. Devices usually connect on MQTT over TLS port 8883, or on port 443 when MQTT rides WebSockets. Authentication and authorization come from certificates plus IoT policies.",
+  },
+  {
+    key: "mqtt-publish-telemetry",
+    label: "Publish Telemetry Topic",
+    when: is("mqtt"),
+    phase: "publish",
+    processingText: "Publishing telemetry...",
+    flow: [
+      {
+        from: "iot-device",
+        to: "iot-core",
+        duration: 450,
+        color: "#a78bfa",
+        explain:
+          "The device publishes telemetry such as devices/thermostat-42/telemetry to AWS IoT Core.",
+      },
+    ],
+    finalHotZones: ["iot-device", "iot-core"],
+    explain:
+      "MQTT is topic-based. The device does not need to know which downstream systems will process the payload. It only needs a topic namespace and permission to publish there.",
+  },
+  {
+    key: "mqtt-rules-match",
+    label: "IoT Core → Rules Engine",
+    when: is("mqtt"),
+    phase: "routing",
+    processingText: "Matching topic rule...",
+    flow: [
+      {
+        from: "iot-core",
+        to: "iot-rules",
+        duration: 500,
+        color: "#f59e0b",
+        explain:
+          "AWS IoT Core matches the incoming topic against an IoT Rule and forwards the message to the rules engine.",
+      },
+    ],
+    finalHotZones: ["iot-core", "iot-rules"],
+    explain:
+      "IoT Rules are AWS-native routing rules. They can filter, enrich, and fan messages out to Lambda, Timestream, Kinesis, SQS, EventBridge, and many other AWS targets.",
+  },
+  {
+    key: "mqtt-route-lambda",
+    label: "Rule → Lambda",
+    when: is("mqtt"),
+    phase: "ingest",
+    processingText: "Invoking Lambda...",
+    flow: [
+      {
+        from: "iot-rules",
+        to: "lambda-ingest",
+        duration: 500,
+        color: "#f59e0b",
+        explain:
+          "The matching rule invokes Lambda to validate, enrich, or normalize the device payload before downstream storage or alerting.",
+      },
+    ],
+    finalHotZones: ["iot-rules", "lambda-ingest"],
+    explain:
+      "This is where AWS-native serverless processing usually happens. Lambda can enrich telemetry, check thresholds, map device IDs to tenants, or trigger alarms without making the device aware of those workflows.",
+  },
+  {
+    key: "mqtt-store-timestream",
+    label: "Lambda → Timestream",
+    when: is("mqtt"),
+    phase: "data-access",
+    processingText: "Persisting telemetry...",
+    flow: [
+      {
+        from: "lambda-ingest",
+        to: "timestream",
+        duration: 450,
+        color: "#22c55e",
+        explain:
+          "Lambda stores the telemetry in Amazon Timestream so dashboards, anomaly detection, and analytics can query historical sensor readings efficiently.",
+      },
+    ],
+    finalHotZones: ["lambda-ingest", "timestream"],
+    explain:
+      "Time-series workloads are common in IoT. Timestream is a good AWS-native fit for sensor values, timestamps, dimensions, and retention policies.",
+  },
+  {
+    key: "mqtt-update-shadow",
+    label: "Update Reported Shadow",
+    when: is("mqtt"),
+    phase: "shadow",
+    processingText: "Updating device state...",
+    flow: [
+      {
+        from: "iot-core",
+        to: "device-shadow",
+        duration: 450,
+        color: "#60a5fa",
+        explain:
+          "AWS IoT Core updates the device's reported shadow state so cloud applications can see the latest known device status even if the device disconnects later.",
+      },
+    ],
+    finalHotZones: ["iot-core", "device-shadow"],
+    explain:
+      "Device Shadow is AWS IoT Core's digital-twin feature. It stores desired and reported state documents so the cloud and the device do not need to be online at the exact same moment to stay synchronized.",
+  },
+  {
+    key: "mqtt-backend-desired",
+    label: "Backend Writes Desired State",
+    when: is("mqtt"),
+    phase: "command",
+    processingText: "Publishing desired state...",
+    flow: [
+      {
+        from: "ops-app",
+        to: "device-shadow",
+        duration: 450,
+        color: "#60a5fa",
+        explain:
+          "An operations app or backend service writes desired state through the AWS SDK or IoT Data Plane API instead of talking directly to the device.",
+      },
+    ],
+    finalHotZones: ["ops-app", "device-shadow"],
+    explain:
+      "This is a very AWS-native command path. Cloud applications often update desired state in the shadow and let AWS IoT Core calculate the delta the device still needs to apply.",
+  },
+  {
+    key: "mqtt-shadow-delta",
+    label: "Shadow Delta → IoT Core",
+    when: is("mqtt"),
+    phase: "shadow",
+    processingText: "Generating delta event...",
+    flow: [
+      {
+        from: "device-shadow",
+        to: "iot-core",
+        duration: 420,
+        color: "#60a5fa",
+        explain:
+          "The shadow service generates a delta between desired and reported state and makes that delta available through AWS IoT reserved shadow topics.",
+      },
+    ],
+    finalHotZones: ["device-shadow", "iot-core"],
+    explain:
+      "Reserved topics like $aws/things/{thingName}/shadow/update/delta let AWS IoT Core tell the device exactly what state still needs to change.",
+  },
+  {
+    key: "mqtt-command-delivery",
+    label: "IoT Core → Device",
+    when: is("mqtt"),
+    phase: "delivery",
+    processingText: "Delivering cloud command...",
+    flow: [
+      {
+        from: "iot-core",
+        to: "iot-device",
+        duration: 500,
+        color: "#22c55e",
+        explain:
+          "Because the device already has a live MQTT session, AWS IoT Core can immediately deliver the command or shadow delta back down to the subscribed device topic.",
+      },
+    ],
+    finalHotZones: ["iot-core", "iot-device", "device-shadow"],
+    recalcMetrics: true,
+    explain:
+      "This is the key IoT difference: MQTT is not just telemetry up to the cloud. It also supports low-overhead cloud-to-device messaging over the same long-lived brokered connection.",
   },
 
   /* ══════ Kafka ══════════════════════════════════════ */

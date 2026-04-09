@@ -5,7 +5,13 @@ import type { LabState } from "../../lib/lab-engine";
 
 export type CommType = "sync" | "async";
 
-export type ProtocolKey = "http-rest" | "grpc" | "graphql" | "amqp" | "kafka";
+export type ProtocolKey =
+  | "http-rest"
+  | "grpc"
+  | "graphql"
+  | "amqp"
+  | "mqtt"
+  | "kafka";
 
 export type VariantKey = ProtocolKey;
 
@@ -176,6 +182,59 @@ export const VARIANT_PROFILES: Record<ProtocolKey, VariantProfile> = {
       "dlq",
     ],
   },
+  mqtt: {
+    key: "mqtt",
+    commType: "async",
+    label: "MQTT (AWS IoT Core)",
+    color: "#a78bfa",
+    description:
+      "AWS-native MQTT for IoT fleets: devices keep long-lived MQTT connections to AWS IoT Core, publish telemetry on topics, and let IoT rules, shadows, and downstream AWS services handle cloud-side processing.",
+    format: "MQTT packets + JSON payload",
+    coupling: "loose",
+    strengths: [
+      "Excellent for constrained devices and flaky networks",
+      "Long-lived bidirectional device-cloud connection",
+      "Brokered pub/sub decouples devices from backend services",
+      "AWS IoT Core rules and shadows fit telemetry plus command flows",
+    ],
+    weaknesses: [
+      "No replayable log like Kafka",
+      "Per-device certs, policies, and topic permissions need governance",
+      "Topic design and fleet identity strategy matter a lot",
+      "Best for device messaging, not as a general enterprise event bus",
+    ],
+    awsServices: [
+      {
+        name: "AWS IoT Core",
+        role: "Managed MQTT broker, thing registry, certificates, and policies",
+      },
+      {
+        name: "IoT Rules Engine",
+        role: "Routes topic-matched telemetry to downstream AWS services",
+      },
+      {
+        name: "Lambda",
+        role: "Transforms, validates, or enriches device messages",
+      },
+      {
+        name: "Timestream",
+        role: "Stores time-series telemetry for querying and dashboards",
+      },
+      {
+        name: "Device Shadow",
+        role: "Keeps desired and reported state in sync for connected or offline devices",
+      },
+    ],
+    nodes: [
+      "iot-device",
+      "iot-core",
+      "iot-rules",
+      "lambda-ingest",
+      "timestream",
+      "device-shadow",
+      "ops-app",
+    ],
+  },
   kafka: {
     key: "kafka",
     commType: "async",
@@ -217,7 +276,7 @@ export const VARIANT_PROFILES: Record<ProtocolKey, VariantProfile> = {
 };
 
 export const SYNC_PROTOCOLS: ProtocolKey[] = ["http-rest", "grpc", "graphql"];
-export const ASYNC_PROTOCOLS: ProtocolKey[] = ["amqp", "kafka"];
+export const ASYNC_PROTOCOLS: ProtocolKey[] = ["amqp", "mqtt", "kafka"];
 
 /* ── State shape ─────────────────────────────────────── */
 
@@ -267,6 +326,12 @@ export function computeMetrics(state: MicroserviceCommState) {
       state.payloadSize = "~0.5 KB";
       state.replayable = false;
       break;
+    case "mqtt":
+      state.latencyMs = 3;
+      state.throughputRps = 75_000;
+      state.payloadSize = "~96 B";
+      state.replayable = false;
+      break;
     case "kafka":
       state.latencyMs = 8;
       state.throughputRps = 120_000;
@@ -288,7 +353,7 @@ export const initialState: MicroserviceCommState = {
 
   hotZones: [],
   explanation:
-    "Choose a communication protocol and step through to see how microservices interact. Compare public APIs (REST, GraphQL) with backend APIs (gRPC) and async messaging (AMQP, Kafka).",
+    "Choose a communication protocol and step through to see how systems interact. Compare public APIs (REST, GraphQL) with backend APIs (gRPC) and async messaging (AMQP, MQTT, Kafka).",
   phase: "overview",
 };
 

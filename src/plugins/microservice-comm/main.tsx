@@ -738,6 +738,175 @@ function buildAmqpScene(b: Builder, hot: HotFn, signals: Signal[]) {
   });
 }
 
+function buildMqttScene(b: Builder, hot: HotFn, signals: Signal[]) {
+  /*  Layout:
+      IoT Device → AWS IoT Core → IoT Rules → Lambda → Timestream
+                               └→ Device Shadow ← Ops / Backend
+      Downlink: Device Shadow → IoT Core → IoT Device  */
+
+  darkNode(b, "iot-device", 40, 220, 110, 50, "IoT Device", hot, "#a78bfa", {
+    fontSize: 10,
+  });
+  brokerNode(b, "iot-core", 220, 218, 132, 56, "AWS IoT Core", hot, "#a78bfa");
+  awsNode(b, "iot-rules", 430, 120, "IoT Rules", hot, "#f59e0b");
+  awsNode(b, "lambda-ingest", 600, 120, "Lambda", hot, "#f59e0b");
+  awsNode(b, "timestream", 770, 120, "Timestream", hot, "#22c55e");
+  darkNode(
+    b,
+    "device-shadow",
+    450,
+    330,
+    130,
+    46,
+    "Device Shadow",
+    hot,
+    "#60a5fa",
+    { fontSize: 10 },
+  );
+  darkNode(b, "ops-app", 690, 330, 130, 46, "Ops / Backend", hot, "#60a5fa", {
+    fontSize: 10,
+  });
+
+  b.edge("iot-device", "iot-core", "e-mqtt-connect")
+    .stroke("#a78bfa", 2)
+    .arrow(true)
+    .label("MQTT/TLS", { fill: "#c4b5fd", fontSize: 8 });
+  b.edge("iot-core", "iot-rules", "e-mqtt-rules")
+    .stroke("#f59e0b", 1.8)
+    .arrow(true)
+    .label("devices/+/telemetry", { fill: "#fbbf24", fontSize: 7 });
+  b.edge("iot-rules", "lambda-ingest", "e-mqtt-lambda")
+    .stroke("#f59e0b", 1.8)
+    .arrow(true)
+    .label("rule action", { fill: "#fbbf24", fontSize: 7 });
+  b.edge("lambda-ingest", "timestream", "e-mqtt-store")
+    .stroke("#22c55e", 1.8)
+    .arrow(true)
+    .label("write telemetry", { fill: "#4ade80", fontSize: 7 });
+  b.edge("iot-core", "device-shadow", "e-mqtt-shadow-report")
+    .stroke("#60a5fa", 1.6)
+    .arrow(true)
+    .label("reported state", { fill: "#93c5fd", fontSize: 7 });
+  b.edge("ops-app", "device-shadow", "e-mqtt-shadow-desired")
+    .stroke("#60a5fa", 1.6)
+    .arrow(true)
+    .label("desired state", { fill: "#93c5fd", fontSize: 7 });
+  b.edge("device-shadow", "iot-core", "e-mqtt-delta")
+    .stroke("#60a5fa", 1.5)
+    .arrow(true)
+    .dashed()
+    .label("shadow delta", { fill: "#93c5fd", fontSize: 7 });
+  b.edge("iot-core", "iot-device", "e-mqtt-downlink")
+    .stroke("#22c55e", 1.5)
+    .arrow(true)
+    .dashed()
+    .label("command / delta", { fill: "#4ade80", fontSize: 7 });
+
+  b.overlay((o) => {
+    o.add(
+      "rect",
+      {
+        x: W - 132,
+        y: 16,
+        w: 112,
+        h: 24,
+        rx: 8,
+        ry: 8,
+        fill: "rgba(0,0,0,0.5)",
+        stroke: "#a78bfa",
+        strokeWidth: 1.5,
+        opacity: 1,
+      },
+      { key: "badge-bg" },
+    );
+    o.add(
+      "text",
+      {
+        x: W - 76,
+        y: 32,
+        text: "ASYNC · MQTT",
+        fill: "#a78bfa",
+        fontSize: 11,
+        fontWeight: "bold",
+      },
+      { key: "badge" },
+    );
+    o.add(
+      "text",
+      {
+        x: W / 2,
+        y: H - 16,
+        text: "MQTT over TLS · IoT Rules · Device Shadow · Cloud-to-device",
+        fill: "#475569",
+        fontSize: 9,
+      },
+      { key: "footer" },
+    );
+    o.add(
+      "text",
+      {
+        x: 82,
+        y: 205,
+        text: "X.509 cert + IoT policy",
+        fill: "#c4b5fd",
+        fontSize: 7,
+      },
+      { key: "mqtt-auth" },
+    );
+    o.add(
+      "text",
+      {
+        x: 220,
+        y: 198,
+        text: "☁ AWS IoT Core endpoint",
+        fill: "#334155",
+        fontSize: 7,
+      },
+      { key: "aws-iot-core" },
+    );
+    o.add(
+      "text",
+      {
+        x: 430,
+        y: 102,
+        text: "SQL-like topic filters",
+        fill: "#fbbf24",
+        fontSize: 7,
+      },
+      { key: "mqtt-rules-note" },
+    );
+    o.add(
+      "text",
+      {
+        x: 450,
+        y: 316,
+        text: "$aws/things/{thing}/shadow/...",
+        fill: "#93c5fd",
+        fontSize: 7,
+      },
+      { key: "mqtt-shadow-note" },
+    );
+    o.add(
+      "text",
+      {
+        x: 690,
+        y: 316,
+        text: "AWS SDK / IoT Data Plane",
+        fill: "#93c5fd",
+        fontSize: 7,
+      },
+      { key: "mqtt-backend-note" },
+    );
+    signals.forEach((sig) => {
+      const { id, colorClass, ...params } = sig;
+      o.add("signal", params as SignalOverlayParams, {
+        key: id,
+        className: colorClass,
+      });
+    });
+  });
+}
+
 function buildKafkaScene(b: Builder, hot: HotFn, signals: Signal[]) {
   /*  Layout:
       Client → Producer → ┌ Partition 0 ┐
@@ -923,6 +1092,7 @@ const SCENE_BUILDERS: Record<
   grpc: buildGrpcScene,
   graphql: buildGraphqlScene,
   amqp: buildAmqpScene,
+  mqtt: buildMqttScene,
   kafka: buildKafkaScene,
 };
 
@@ -949,13 +1119,26 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
   const profile = VARIANT_PROFILES[variant];
   const isAsync = profile.commType === "async";
   const hot = (zone: string) => hotZones.includes(zone);
-  const apiSurfaceSummary = isAsync
-    ? "Async messaging removes the request/response split: producers publish and continue immediately while consumers process later."
-    : variant === "grpc"
-      ? "Backend API: gRPC is optimized for service-to-service traffic where payload size and latency matter."
-      : variant === "graphql"
-        ? "Public API: GraphQL exposes one client-facing endpoint and fans out internally through resolvers."
-        : "Public API: REST is the usual edge-facing choice for client apps, with API Gateway as the front door.";
+  const apiSurfaceSummary =
+    variant === "mqtt"
+      ? "Device-facing async protocol: IoT devices keep long-lived MQTT/TLS sessions to AWS IoT Core. Cloud apps usually interact through rules, shadows, and the IoT Data Plane rather than direct request/response calls."
+      : isAsync
+        ? "Async messaging removes the request/response split: producers publish and continue immediately while consumers process later."
+        : variant === "grpc"
+          ? "Backend API: gRPC is optimized for service-to-service traffic where payload size and latency matter."
+          : variant === "graphql"
+            ? "Public API: GraphQL exposes one client-facing endpoint and fans out internally through resolvers."
+            : "Public API: REST is the usual edge-facing choice for client apps, with API Gateway as the front door.";
+  const mqttSetupNotes =
+    variant === "mqtt"
+      ? [
+          "Provision each device with a Thing identity, X.509 certificate, and an IoT policy that only allows the right topics.",
+          "Devices usually connect to the account-specific AWS IoT Core endpoint over MQTT/TLS on port 8883, or over WebSockets on 443 when needed.",
+          "Use IoT Rules to fan telemetry into Lambda, Timestream, SQS, EventBridge, Kinesis, or other AWS targets without teaching the device about those services.",
+          "Use Device Shadow for desired and reported state so cloud apps can manage devices even when they disconnect.",
+          "If you later need fleet-wide remote actions like firmware rollout, AWS IoT Jobs usually complements shadows instead of replacing them.",
+        ]
+      : null;
 
   /* ── Build VizCraft scene ─────────────────────────────── */
   const scene = (() => {
@@ -1027,7 +1210,20 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
       borderColor: "#e535ab",
     },
     { key: "amqp", label: "AMQP", color: "#fcd34d", borderColor: "#f59e0b" },
+    { key: "mqtt", label: "MQTT", color: "#c4b5fd", borderColor: "#a78bfa" },
     { key: "kafka", label: "Kafka", color: "#c4b5fd", borderColor: "#8b5cf6" },
+    {
+      key: "iot-core",
+      label: "IoT Core",
+      color: "#ddd6fe",
+      borderColor: "#a78bfa",
+    },
+    {
+      key: "device-shadow",
+      label: "Device Shadow",
+      color: "#93c5fd",
+      borderColor: "#60a5fa",
+    },
     {
       key: "temporal-coupling",
       label: "Coupling",
@@ -1093,7 +1289,7 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
             <SideCard label="What's happening" variant="explanation">
               <p>{explanation}</p>
             </SideCard>
-            <SideCard label="Public vs Backend APIs" variant="info">
+            <SideCard label="Communication Surface" variant="info">
               <p style={{ fontSize: "0.78rem", color: "#cbd5e1" }}>
                 {apiSurfaceSummary}
               </p>
@@ -1152,6 +1348,22 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
                 ))}
               </div>
             </SideCard>
+            {mqttSetupNotes ? (
+              <SideCard label="AWS IoT Setup" variant="info">
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 16,
+                    color: "#cbd5e1",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  {mqttSetupNotes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              </SideCard>
+            ) : null}
             <SideCard label="Metrics" variant="info">
               <div
                 style={{

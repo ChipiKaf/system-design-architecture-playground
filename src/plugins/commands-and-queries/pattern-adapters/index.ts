@@ -10,11 +10,13 @@ import type { PatternAdapter } from "./types";
 import { materializedViewAdapter } from "./materialized-view";
 import { cqrsAdapter } from "./cqrs";
 import { eventSourcingAdapter } from "./event-sourcing";
+import { instagramAdapter } from "./instagram";
 
 const ADAPTERS: Record<PatternKey, PatternAdapter> = {
   "materialized-view": materializedViewAdapter,
   cqrs: cqrsAdapter,
   "event-sourcing": eventSourcingAdapter,
+  instagram: instagramAdapter,
 };
 
 export function getAdapter(pattern: PatternKey): PatternAdapter {

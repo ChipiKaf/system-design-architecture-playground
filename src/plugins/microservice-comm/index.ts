@@ -20,7 +20,7 @@ const MicroserviceCommPlugin: DemoPlugin<
   id: "microservice-comm",
   name: "Communication Protocols Lab",
   description:
-    "Compare microservice communication protocols — HTTP/REST, gRPC, GraphQL (sync) vs AMQP, Kafka (async). See how coupling, latency, and flow differ.",
+    "Compare communication protocols — HTTP/REST, gRPC, GraphQL (sync) vs AMQP, MQTT, Kafka (async). See how coupling, latency, AWS services, and flow differ.",
   initialState,
   reducer: microserviceCommReducer,
   Component: MicroserviceCommVisualization,

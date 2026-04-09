@@ -997,55 +997,203 @@ function buildMicroScene(
   });
 }
 
-/** Serverless: 12 function nodes in a grid (no DBs — managed services) */
+/**
+ * Serverless decomposition — ghost microservice boxes on the left show the
+ * events each service used to handle, dashed fan-out arrows decompose each
+ * into individual Lambda function circles on the right.
+ */
+const SERVERLESS_GROUPS = [
+  {
+    svc: "Identity",
+    fns: [
+      { id: "fn-0", label: "auth", event: "AuthRequest" },
+      { id: "fn-1", label: "user", event: "UserUpdate" },
+    ],
+  },
+  {
+    svc: "Catalog",
+    fns: [
+      { id: "fn-2", label: "catalog", event: "CatalogQuery" },
+      { id: "fn-3", label: "search", event: "SearchIndex" },
+    ],
+  },
+  {
+    svc: "Ordering",
+    fns: [
+      { id: "fn-4", label: "order", event: "OrderPlaced" },
+      { id: "fn-5", label: "cart", event: "CartUpdate" },
+    ],
+  },
+  {
+    svc: "Basket",
+    fns: [
+      { id: "fn-6", label: "pay", event: "PaymentInit" },
+      { id: "fn-7", label: "review", event: "ReviewPost" },
+    ],
+  },
+  {
+    svc: "Payment",
+    fns: [
+      { id: "fn-8", label: "email", event: "EmailSend" },
+      { id: "fn-9", label: "notify", event: "PushNotify" },
+    ],
+  },
+  {
+    svc: "Shipment",
+    fns: [
+      { id: "fn-10", label: "ship", event: "ShipStart" },
+      { id: "fn-11", label: "report", event: "ReportGen" },
+    ],
+  },
+];
+
 function buildServerlessScene(
   b: ReturnType<typeof viz>,
   hot: (id: string) => boolean,
   variant: VariantKey,
 ) {
   const color = VARIANT_PROFILES[variant].color;
-  const cols = 4;
-  const rows = 3;
-  const startX = SERVICES_START_X + 20;
-  const startY = GATEWAY_Y - 130;
-  const spacingX = 130;
-  const spacingY = 95;
-  const fnLabels = [
-    "auth",
-    "order",
-    "user",
-    "catalog",
-    "pay",
-    "notify",
-    "email",
-    "search",
-    "report",
-    "cart",
-    "review",
-    "ship",
-  ];
+  const svcColor = "#a78bfa";
 
-  for (let i = 0; i < 12; i++) {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const fnId = `fn-${i}`;
-    const x = startX + col * spacingX;
-    const y = startY + row * spacingY;
+  /* ── Layout: ghost column → fan-out → lambda column ── */
+  const ghostX = 440;
+  const fnXa = 670;
+  const fnXb = 780;
+  const rowSpacing = 60;
+  const topY = GATEWAY_Y - 148;
 
-    b.node(fnId)
-      .at(x, y)
-      .circle(28)
-      .fill(hot(fnId) ? "#1e3a1f" : DARK_BG)
-      .stroke(hot(fnId) ? color : "#334155", 1.5)
-      .label(`ƒ\n${fnLabels[i]}`, {
-        fill: hot(fnId) ? color : TEXT_DIM,
-        fontSize: 8,
+  SERVERLESS_GROUPS.forEach((group, gi) => {
+    const y = topY + gi * rowSpacing;
+    const ghostId = `ghost-${gi}`;
+    const evtList = group.fns.map((f) => f.event).join(", ");
+
+    /* Ghost microservice node — the "before" */
+    b.node(ghostId)
+      .at(ghostX, y)
+      .rect(130, 38, 6)
+      .fill("#0f172a")
+      .stroke(svcColor, 1)
+      .label(`${group.svc}\n${evtList}`, {
+        fill: svcColor,
+        fontSize: 7,
+        fontWeight: "bold",
       });
 
-    b.edge("gateway", fnId, `e-gw-${fnId}`).stroke("#1e293b", 1).arrow(true);
-  }
+    /* Gateway → ghost (thin, represents original routing) */
+    b.edge("gateway", ghostId, `e-gw-ghost-${gi}`)
+      .stroke("#1e293b", 0.8)
+      .arrow(true);
 
-  void rows; // satisfy linter
+    /* Lambda function nodes */
+    group.fns.forEach((fn, fi) => {
+      const x = fi === 0 ? fnXa : fnXb;
+
+      b.node(fn.id)
+        .at(x, y)
+        .circle(26)
+        .fill(hot(fn.id) ? "#1e3a1f" : DARK_BG)
+        .stroke(hot(fn.id) ? color : "#334155", 1.5)
+        .label(`ƒ ${fn.label}`, {
+          fill: hot(fn.id) ? color : TEXT_DIM,
+          fontSize: 8,
+        });
+
+      /* Decomposition arrow: ghost service → lambda fn (dashed purple) */
+      b.edge(ghostId, fn.id, `e-decomp-${fn.id}`)
+        .stroke(svcColor, 1.2)
+        .arrow(true)
+        .dashed();
+
+      /* Hidden edge for flow-engine signal routing (gateway → fn) */
+      b.edge("gateway", fn.id, `e-gw-${fn.id}`)
+        .stroke("transparent", 0)
+        .arrow(false);
+    });
+  });
+
+  /* ── Overlay: event labels, column headers, legend ── */
+  b.overlay((o) => {
+    const headerY = topY - 28;
+
+    /* Column headers */
+    o.add(
+      "text",
+      {
+        x: ghostX,
+        y: headerY,
+        text: "Microservice (before)",
+        fill: svcColor,
+        fontSize: 10,
+        fontWeight: 700,
+        textAnchor: "middle",
+      },
+      { key: "col-svc-header" },
+    );
+    o.add(
+      "text",
+      {
+        x: (fnXa + fnXb) / 2,
+        y: headerY,
+        text: "Lambda Functions (after)",
+        fill: color,
+        fontSize: 10,
+        fontWeight: 700,
+        textAnchor: "middle",
+      },
+      { key: "col-fn-header" },
+    );
+
+    /* Decomposition arrow symbol between columns */
+    o.add(
+      "text",
+      {
+        x: (ghostX + fnXa) / 2,
+        y: headerY,
+        text: "→",
+        fill: TEXT_DIM,
+        fontSize: 16,
+        fontWeight: 700,
+        textAnchor: "middle",
+      },
+      { key: "decompose-arrow" },
+    );
+
+    /* Event name beneath each lambda circle */
+    SERVERLESS_GROUPS.forEach((group, gi) => {
+      const y = topY + gi * rowSpacing;
+      group.fns.forEach((fn, fi) => {
+        const x = fi === 0 ? fnXa : fnXb;
+        o.add(
+          "text",
+          {
+            x,
+            y: y + 36,
+            text: fn.event,
+            fill: "#6ee7b7",
+            fontSize: 6.5,
+            textAnchor: "middle",
+            opacity: 0.85,
+          },
+          { key: `evt-${fn.id}` },
+        );
+      });
+    });
+
+    /* Title */
+    o.add(
+      "text",
+      {
+        x: (ghostX + fnXb) / 2,
+        y: headerY - 18,
+        text: "1 Event → 1 Lambda",
+        fill: TEXT_MAIN,
+        fontSize: 12,
+        fontWeight: 700,
+        textAnchor: "middle",
+      },
+      { key: "serverless-title" },
+    );
+  });
 }
 
 /* ════════════════════════════════════════════════════════

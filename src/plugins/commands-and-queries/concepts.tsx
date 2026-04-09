@@ -9,7 +9,10 @@ export type ConceptKey =
   | "query-model"
   | "projection"
   | "message-broker"
-  | "eventual-consistency";
+  | "eventual-consistency"
+  | "instagram-postgres"
+  | "instagram-cassandra"
+  | "instagram-cache";
 
 interface ConceptDefinition {
   title: string;
@@ -427,6 +430,118 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             live cross-service composition on every query. Whether that trade is
             acceptable depends on how much freshness the user experience needs.
           </p>
+        ),
+      },
+    ],
+  },
+  "instagram-postgres": {
+    title: "PostgreSQL (Relational)",
+    subtitle: "Instagram's write-side database for core data",
+    accentColor: "#38bdf8",
+    sections: [
+      {
+        title: "Why PostgreSQL",
+        accent: "#38bdf8",
+        content: (
+          <p>
+            PostgreSQL handles data requiring strong consistency, relational
+            integrity, and complex transactions. It ensures data integrity for
+            core user data and metadata.
+          </p>
+        ),
+      },
+      {
+        title: "Master-Replica architecture",
+        accent: "#818cf8",
+        content: (
+          <ul>
+            <li>All writes go to the Master — single source of truth.</li>
+            <li>Reads can be distributed to replicas for load balancing.</li>
+            <li>Master provides strong consistency for write operations.</li>
+          </ul>
+        ),
+      },
+      {
+        title: "Data stored",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>User information (profiles, credentials).</li>
+            <li>User relationships (friendships, followers).</li>
+            <li>Media metadata and core content references.</li>
+          </ul>
+        ),
+      },
+    ],
+  },
+  "instagram-cassandra": {
+    title: "Cassandra (NoSQL Wide-Column)",
+    subtitle: "Instagram's read-side database for massive-scale data",
+    accentColor: "#22c55e",
+    sections: [
+      {
+        title: "Why Cassandra",
+        accent: "#22c55e",
+        content: (
+          <p>
+            Cassandra handles massive scale, high write throughput, and high
+            availability for read-heavy, eventually consistent data. It is
+            optimized for workloads where eventual consistency is acceptable.
+          </p>
+        ),
+      },
+      {
+        title: "Peer-to-peer architecture",
+        accent: "#818cf8",
+        content: (
+          <ul>
+            <li>
+              Masterless / multi-master — every node can handle reads and
+              writes.
+            </li>
+            <li>Extreme horizontal scalability with built-in sharding.</li>
+            <li>No single point of failure — high fault tolerance.</li>
+          </ul>
+        ),
+      },
+      {
+        title: "Data stored",
+        accent: "#f59e0b",
+        content: (
+          <ul>
+            <li>User feeds and activity feeds/stories.</li>
+            <li>Counters (likes, views).</li>
+            <li>Direct messaging data.</li>
+          </ul>
+        ),
+      },
+    ],
+  },
+  "instagram-cache": {
+    title: "Memcached",
+    subtitle: "Caching layer for hot read data",
+    accentColor: "#c4b5fd",
+    sections: [
+      {
+        title: "Role in the architecture",
+        accent: "#c4b5fd",
+        content: (
+          <p>
+            Memcached sits in front of the read databases to cache the
+            most-requested data. Sub-millisecond response times for hot data
+            reduce load on Cassandra and PostgreSQL replicas.
+          </p>
+        ),
+      },
+      {
+        title: "What it caches",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>Frequently accessed user profiles and session data.</li>
+            <li>Hot feed items and popular content metadata.</li>
+            <li>Computed aggregates (follower counts, like counts).</li>
+          </ul>
         ),
       },
     ],

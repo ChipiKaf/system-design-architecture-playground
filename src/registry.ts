@@ -27,6 +27,8 @@ import DataManagementPlugin from "./plugins/data-management";
 import DatabaseSelectionPlugin from "./plugins/database-selection";
 import CommandsQueriesPlugin from "./plugins/commands-and-queries";
 import CiCdBuildPlugin from "./plugins/ci-cd-build";
+import EcommerceCapPlugin from "./plugins/ecommerce-cap";
+import DistributedTransactionsPlugin from "./plugins/distributed-transactions";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -72,8 +74,7 @@ export const categories: PluginCategory[] = [
       ShardingPlugin,
       DbTradeoffPlugin,
       CapAcidPlugin,
-      CiCdBuildPlugin,
-    ],
+      CiCdBuildPlugin, EcommerceCapPlugin],
   },
   {
     id: "architecture",
@@ -124,8 +125,7 @@ export const categories: PluginCategory[] = [
       SyncVsEventDrivenPlugin,
       DataManagementPlugin,
       CommandsQueriesPlugin,
-      DatabaseSelectionPlugin,
-    ],
+      DatabaseSelectionPlugin, DistributedTransactionsPlugin],
   },
 ];
 
