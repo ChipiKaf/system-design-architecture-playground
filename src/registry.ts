@@ -30,6 +30,7 @@ import CiCdBuildPlugin from "./plugins/ci-cd-build";
 import EcommerceCapPlugin from "./plugins/ecommerce-cap";
 import DistributedTransactionsPlugin from "./plugins/distributed-transactions";
 import AngularPlugin from "./plugins/angular";
+import SolidPlugin from "./plugins/solid";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -101,7 +102,7 @@ export const categories: PluginCategory[] = [
     description:
       "How code actually runs — event loops, call stacks, queues, rendering, and other runtime mechanics.",
     accent: "#14b8a6",
-    plugins: [EventLoopPlugin, AngularPlugin],
+    plugins: [EventLoopPlugin, AngularPlugin, SolidPlugin],
   },
   {
     id: "iot",
