@@ -21,6 +21,10 @@ import { defaultCdAdapter } from "./default-cd";
 import { onpushCdAdapter } from "./onpush-cd";
 import { writableSignalAdapter } from "./writable-signal";
 import { behaviorSubjectAdapter } from "./behavior-subject";
+import { hoSwitchmapAdapter } from "./ho-switchmap";
+import { hoMergemapAdapter } from "./ho-mergemap";
+import { hoConcatmapAdapter } from "./ho-concatmap";
+import { hoExhaustmapAdapter } from "./ho-exhaustmap";
 
 /* ── Topic definitions ────────────────────────────────── */
 
@@ -30,7 +34,8 @@ export type TopicKey =
   | "standalone-vs-ngmodule"
   | "change-detection"
   | "hierarchical-di"
-  | "signals-vs-rxjs";
+  | "signals-vs-rxjs"
+  | "rxjs-ho-operators";
 
 export interface TopicDef {
   id: TopicKey;
@@ -76,6 +81,12 @@ export const TOPICS: TopicDef[] = [
     variants: ["writable-signal", "behavior-subject"],
     defaultVariant: "writable-signal",
   },
+  {
+    id: "rxjs-ho-operators",
+    label: "Q12 — Higher-Order Mapping",
+    variants: ["ho-switchmap", "ho-mergemap", "ho-concatmap", "ho-exhaustmap"],
+    defaultVariant: "ho-switchmap",
+  },
 ];
 
 /* ── Adapter registry ─────────────────────────────────── */
@@ -94,6 +105,10 @@ const ADAPTERS: Record<VariantKey, AngularAdapter> = {
   "onpush-cd": onpushCdAdapter,
   "writable-signal": writableSignalAdapter,
   "behavior-subject": behaviorSubjectAdapter,
+  "ho-switchmap": hoSwitchmapAdapter,
+  "ho-mergemap": hoMergemapAdapter,
+  "ho-concatmap": hoConcatmapAdapter,
+  "ho-exhaustmap": hoExhaustmapAdapter,
 };
 
 export function getAdapter(key: VariantKey): AngularAdapter {

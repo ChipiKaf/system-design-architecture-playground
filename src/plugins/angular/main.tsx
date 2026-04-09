@@ -71,10 +71,21 @@ const Q5_PILLS: { key: ConceptKey; label: string }[] = [
 /* ── Q9 concept pills ───────────────────────────────── */
 const Q9_PILLS: { key: ConceptKey; label: string }[] = [
   { key: "sig-overview", label: "Reactivity" },
+  { key: "sig-primitive", label: "Primitive" },
   { key: "sig-writable", label: "Signal" },
   { key: "sig-glitch-free", label: "Glitch-free" },
   { key: "sig-behaviorsubject", label: "BehaviorSubject" },
   { key: "sig-when-to-use", label: "When to Use" },
+];
+
+/* ── Q12 concept pills ──────────────────────────────── */
+const Q12_PILLS: { key: ConceptKey; label: string }[] = [
+  { key: "ho-overview", label: "HO Mapping" },
+  { key: "ho-switchmap", label: "switchMap" },
+  { key: "ho-mergemap", label: "mergeMap" },
+  { key: "ho-concatmap", label: "concatMap" },
+  { key: "ho-exhaustmap", label: "exhaustMap" },
+  { key: "ho-when-to-use", label: "Which When?" },
 ];
 
 /* ── Interview question per topic ────────────────────── */
@@ -91,6 +102,8 @@ const TOPIC_QUESTIONS: Record<TopicKey, string> = {
     "Explain hierarchical dependency injection and how providers are resolved.",
   "signals-vs-rxjs":
     "What are Angular Signals? How do they differ from BehaviorSubject?",
+  "rxjs-ho-operators":
+    "Explain the main RxJS higher-order mapping operators (switchMap, mergeMap, concatMap, exhaustMap) and when to use each.",
 };
 
 /* ── Code examples per variant ───────────────────────── */
@@ -442,6 +455,106 @@ export class CounterComponent
 // → Async pipe required ⚠
 // → Powerful operators ✓`,
   },
+  "ho-switchmap": {
+    label: "🔄 switchMap — cancel previous",
+    code: `// Search autocomplete — only latest result:
+this.searchInput.valueChanges.pipe(
+  debounceTime(300),
+  distinctUntilChanged(),
+  switchMap(term =>
+    this.http.get(\`/api/search?q=\${term}\`)
+  )
+).subscribe(results => {
+  this.results = results;
+});
+
+// Route params — reload on navigation:
+this.route.params.pipe(
+  switchMap(params =>
+    this.http.get(\`/api/users/\${params['id']}\`)
+  )
+).subscribe(user => this.user = user);
+
+// → Cancels in-flight request ✓
+// → No stale results ✓
+// → 1 inner at a time ✓`,
+  },
+  "ho-mergemap": {
+    label: "🔀 mergeMap — parallel execution",
+    code: `// Upload multiple files in parallel:
+from(this.selectedFiles).pipe(
+  mergeMap(file =>
+    this.uploadService.upload(file)
+  )
+).subscribe(response => {
+  this.uploaded.push(response);
+});
+
+// With concurrency limit:
+from(urls).pipe(
+  mergeMap(
+    url => this.http.get(url),
+    3  // max 3 concurrent requests
+  )
+).subscribe(data => {
+  this.results.push(data);
+});
+
+// → All run simultaneously ✓
+// → Results arrive in any order ⚠
+// → No cancellation ⚠`,
+  },
+  "ho-concatmap": {
+    label: "📥 concatMap — sequential queue",
+    code: `// Ordered API calls:
+this.actions$.pipe(
+  concatMap(action =>
+    this.http.post('/api/process', action)
+  )
+).subscribe(result => {
+  this.processedResults.push(result);
+});
+
+// Sequential writes:
+from(updates).pipe(
+  concatMap(update =>
+    this.http.put(
+      \`/api/items/\${update.id}\`,
+      update
+    )
+  )
+).subscribe(saved => {
+  console.log('Saved:', saved.id);
+});
+
+// → Strict order guaranteed ✓
+// → Waits for each to complete ✓
+// → Slower than mergeMap ⚠`,
+  },
+  "ho-exhaustmap": {
+    label: "🛡 exhaustMap — ignore while busy",
+    code: `// Prevent double form submission:
+this.submitBtn.click$.pipe(
+  exhaustMap(() =>
+    this.http.post('/api/submit', this.form)
+  )
+).subscribe(response => {
+  this.router.navigate(['/success']);
+});
+
+// Ignore rapid refresh clicks:
+this.refreshBtn.click$.pipe(
+  exhaustMap(() =>
+    this.http.get('/api/data')
+  )
+).subscribe(data => {
+  this.data = data;
+});
+
+// → No double-submit ✓
+// → No extra flags needed ✓
+// → Dropped emissions are silent ⚠`,
+  },
 };
 
 const AngularVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
@@ -471,7 +584,9 @@ const AngularVisualization: React.FC<Props> = ({ onAnimationComplete }) => {
             ? Q5_PILLS
             : topic === "signals-vs-rxjs"
               ? Q9_PILLS
-              : Q3_PILLS;
+              : topic === "rxjs-ho-operators"
+                ? Q12_PILLS
+                : Q3_PILLS;
 
   /* ── Build VizCraft scene ─────────────────────────────── */
   const scene = (() => {

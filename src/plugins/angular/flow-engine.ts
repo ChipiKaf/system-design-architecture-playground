@@ -64,9 +64,17 @@ export type StepKey =
   /* Q9 — Signals vs BehaviorSubject */
   | "sig-overview"
   | "sig-create"
-  | "sig-read"
+  | "sig-derive"
+  | "sig-consume"
   | "sig-update"
-  | "sig-summary";
+  | "sig-summary"
+  /* Q12 — Higher-Order Mapping Operators */
+  | "ho-overview"
+  | "ho-source"
+  | "ho-map"
+  | "ho-inner"
+  | "ho-output"
+  | "ho-summary";
 
 /* ── Step Configuration ──────────────────────────────── */
 
@@ -76,6 +84,7 @@ const isQ3 = (s: AngularState) => s.topic === "standalone-vs-ngmodule";
 const isQ4 = (s: AngularState) => s.topic === "change-detection";
 const isQ5 = (s: AngularState) => s.topic === "hierarchical-di";
 const isQ9 = (s: AngularState) => s.topic === "signals-vs-rxjs";
+const isQ12 = (s: AngularState) => s.topic === "rxjs-ho-operators";
 
 export const STEPS: StepDef[] = [
   /* ═══ Q1 — Constructor vs ngOnInit ═══════════════════ */
@@ -582,21 +591,35 @@ export const STEPS: StepDef[] = [
         : "new BehaviorSubject(0) creates an observable that holds value 0. Read via .value property or .subscribe(). It's part of the RxJS library.",
   },
   {
-    key: "sig-read",
-    label: "Derive & Consume",
+    key: "sig-derive",
+    label: "Derive",
     when: isQ9,
-    phase: "sig-read",
+    phase: "sig-derive",
     processingText: "Deriving...",
     flow: (s) =>
       s.variant === "writable-signal"
-        ? [
-            { from: "signal", to: "computed", duration: 500 },
-            { from: "signal", to: "effect", duration: 500 },
-          ]
-        : [
-            { from: "subject", to: "pipe", duration: 500 },
-            { from: "subject", to: "subscribe", duration: 500 },
-          ],
+        ? [{ from: "signal", to: "computed", duration: 600 }]
+        : [{ from: "subject", to: "pipe", duration: 600 }],
+    recalcMetrics: true,
+    finalHotZones: (s) =>
+      s.variant === "writable-signal"
+        ? ["signal", "computed"]
+        : ["subject", "pipe"],
+    explain: (s) =>
+      s.variant === "writable-signal"
+        ? "computed() creates a derived signal that auto-updates when its dependencies change. It's lazy and cached — only recalculates when a tracked signal changes. No explicit dependency list needed."
+        : ".pipe() chains RxJS operators (map, filter, switchMap) for powerful async transformations. Operators are composable — you can build complex data pipelines declaratively.",
+  },
+  {
+    key: "sig-consume",
+    label: "Consume",
+    when: isQ9,
+    phase: "sig-consume",
+    processingText: "Consuming...",
+    flow: (s) =>
+      s.variant === "writable-signal"
+        ? [{ from: "signal", to: "effect", duration: 600 }]
+        : [{ from: "subject", to: "subscribe", duration: 600 }],
     recalcMetrics: true,
     finalHotZones: (s) =>
       s.variant === "writable-signal"
@@ -604,8 +627,8 @@ export const STEPS: StepDef[] = [
         : ["subject", "pipe", "subscribe"],
     explain: (s) =>
       s.variant === "writable-signal"
-        ? "computed() creates a derived signal that auto-updates when dependencies change. effect() runs side-effects when tracked signals change. Both are auto-tracked — no explicit dependency list needed."
-        : ".pipe() chains RxJS operators (map, filter, switchMap) for powerful transformations. .subscribe() listens for new values — but you MUST unsubscribe in ngOnDestroy or use takeUntilDestroyed().",
+        ? "effect() runs a side-effect whenever tracked signals change. It auto-tracks which signals are read inside the callback — no explicit dependency list. Perfect for logging, analytics, or syncing with external systems."
+        : ".subscribe() listens for new values pushed by the BehaviorSubject. Every subscription MUST be cleaned up — use takeUntilDestroyed() (Angular 16+), or store the subscription and call .unsubscribe() in ngOnDestroy.",
   },
   {
     key: "sig-update",
@@ -650,6 +673,174 @@ export const STEPS: StepDef[] = [
       s.variant === "writable-signal"
         ? "🟣 Signals = synchronous, glitch-free, auto-tracked. Ideal for local/UI state. No subscriptions, no async pipe, no Zone.js needed. The future of Angular reactivity."
         : "🟠 BehaviorSubject = powerful async pipelines with RxJS operators. Ideal for complex streams (HTTP, WebSockets, multi-step transforms). Trade-off: manual subscription management and Zone.js dependency.",
+  },
+
+  /* ═══ Q12 — Higher-Order Mapping Operators ═══════════ */
+  {
+    key: "ho-overview",
+    label: "Operator Overview",
+    when: isQ12,
+    nextButton: "Begin →",
+    action: "resetRun",
+    explain: (s) => {
+      const labels: Record<string, string> = {
+        "ho-switchmap":
+          "🔄 switchMap — Maps each outer value to an inner observable (e.g. http.get()), auto-subscribes, and cancels the previous inner when a new value arrives. Only the latest inner runs.",
+        "ho-mergemap":
+          "🔀 mergeMap — Subscribes to all inner observables in parallel. No cancellation, no queuing. Good for fire-and-forget operations like parallel uploads.",
+        "ho-concatmap":
+          "📥 concatMap — Queues inner observables and runs them one at a time in order. Waits for the current inner to complete before starting the next.",
+        "ho-exhaustmap":
+          "🛡 exhaustMap — Ignores new source emissions while an inner observable is still running. Prevents duplicate submissions.",
+      };
+      return (
+        labels[s.variant] ??
+        "Step through to see how this operator handles inner observables."
+      );
+    },
+  },
+  {
+    key: "ho-source",
+    label: "Source Emits",
+    when: isQ12,
+    phase: "ho-source",
+    processingText: "Source emitting...",
+    flow: [{ from: "source", to: "operator", duration: 550 }],
+    finalHotZones: ["source", "operator"],
+    explain: (s) => {
+      const ctx: Record<string, string> = {
+        "ho-switchmap":
+          "The outer observable (e.g. searchInput.valueChanges) emits a value. switchMap receives it and will map it to a new inner observable — like http.get() — subscribing automatically.",
+        "ho-mergemap":
+          "The source observable emits a value (e.g. a file to upload). mergeMap receives it and will subscribe to a new inner observable without waiting.",
+        "ho-concatmap":
+          "The source observable emits a value (e.g. an action to process). concatMap receives it and adds it to the queue.",
+        "ho-exhaustmap":
+          "The source observable emits a value (e.g. a form submit click). exhaustMap checks if an inner observable is already running.",
+      };
+      return (
+        ctx[s.variant] ?? "The source observable emits a value to the operator."
+      );
+    },
+  },
+  {
+    key: "ho-map",
+    label: "Map to Inner",
+    when: isQ12,
+    phase: "ho-map",
+    processingText: "Mapping...",
+    flow: [
+      { from: "operator", to: "inner1", duration: 500 },
+      { from: "operator", to: "inner2", duration: 500 },
+    ],
+    recalcMetrics: true,
+    finalHotZones: ["operator", "inner1", "inner2"],
+    explain: (s) => {
+      const ctx: Record<string, string> = {
+        "ho-switchmap":
+          "switchMap unsubscribes from Inner #1 (cancels the in-flight request) and auto-subscribes to Inner #2. You never call .subscribe() yourself — the operator handles it. Only one inner at a time.",
+        "ho-mergemap":
+          "mergeMap subscribes to BOTH inner observables simultaneously. All inners run in parallel with no limit on concurrency.",
+        "ho-concatmap":
+          "concatMap subscribes to Inner #1 first. Inner #2 is queued — it won't start until Inner #1 completes. Order is preserved.",
+        "ho-exhaustmap":
+          "exhaustMap is already busy with Inner #1. The new emission that would create Inner #2 is completely ignored — dropped on the floor.",
+      };
+      return (
+        ctx[s.variant] ??
+        "The operator maps the source value to inner observable(s)."
+      );
+    },
+  },
+  {
+    key: "ho-inner",
+    label: "Inner Runs",
+    when: isQ12,
+    phase: "ho-inner",
+    processingText: "Inner working...",
+    flow: (s) => {
+      if (s.variant === "ho-switchmap")
+        return [{ from: "inner2", to: "output", duration: 600 }];
+      if (s.variant === "ho-mergemap")
+        return [
+          { from: "inner1", to: "output", duration: 600 },
+          { from: "inner2", to: "output", duration: 600 },
+        ];
+      if (s.variant === "ho-concatmap")
+        return [
+          { from: "inner1", to: "output", duration: 600 },
+          { from: "inner2", to: "output", duration: 600 },
+        ];
+      return [{ from: "inner1", to: "output", duration: 600 }];
+    },
+    recalcMetrics: true,
+    finalHotZones: (s) => {
+      if (s.variant === "ho-switchmap") return ["inner2", "output"];
+      if (s.variant === "ho-exhaustmap") return ["inner1", "output"];
+      return ["inner1", "inner2", "output"];
+    },
+    explain: (s) => {
+      const ctx: Record<string, string> = {
+        "ho-switchmap":
+          "Only Inner #2 runs — Inner #1 was cancelled. The output is flattened: you get the inner's values directly, not an Observable of Observables.",
+        "ho-mergemap":
+          "Both Inner #1 and Inner #2 run concurrently. Results arrive in whatever order they complete — interleaved in the output stream.",
+        "ho-concatmap":
+          "Inner #1 completes first, its results go to output. Then Inner #2 starts and its results follow. Strict sequential order.",
+        "ho-exhaustmap":
+          "Only Inner #1 produces output. Inner #2 was never subscribed to — the emission was silently ignored because Inner #1 was still active.",
+      };
+      return (
+        ctx[s.variant] ?? "The inner observable(s) execute and emit values."
+      );
+    },
+  },
+  {
+    key: "ho-output",
+    label: "Output Result",
+    when: isQ12,
+    phase: "ho-output",
+    processingText: "Emitting result...",
+    flow: (s) => getAdapter(s.variant).getFlowBeats(s),
+    recalcMetrics: true,
+    finalHotZones: ["output", "result"],
+    explain: (s) => {
+      const ctx: Record<string, string> = {
+        "ho-switchmap":
+          "✓ Only the latest result arrives. Stale responses from cancelled http.get() calls are never delivered. Think: user types a→ab→abc, only 'abc' results come through.",
+        "ho-mergemap":
+          "✓ The output contains results from ALL inner observables. Order depends on completion time. Use when order doesn't matter.",
+        "ho-concatmap":
+          "✓ The output contains results in strict source order. Inner #1's result comes first, then Inner #2's. Guaranteed ordering.",
+        "ho-exhaustmap":
+          "✓ The output contains only Inner #1's result. The duplicate click was safely ignored — no double-submit, no duplicate API call.",
+      };
+      return ctx[s.variant] ?? "Results flow to the output stream.";
+    },
+  },
+  {
+    key: "ho-summary",
+    label: "Key Takeaway",
+    when: isQ12,
+    phase: "ho-summary",
+    recalcMetrics: true,
+    finalHotZones: ["source", "operator", "output", "result"],
+    explain: (s) => {
+      const ctx: Record<string, string> = {
+        "ho-switchmap":
+          "🔄 switchMap = map outer value → inner observable, auto-subscribe, cancel previous. Use for: search autocomplete, route params, any 'latest wins' scenario. Most commonly used HO operator.",
+        "ho-mergemap":
+          "🔀 mergeMap = run all in parallel. Use for: parallel file uploads, logging events, fire-and-forget side effects. Be careful with unlimited concurrency on large lists.",
+        "ho-concatmap":
+          "📥 concatMap = queue sequentially. Use for: ordered API calls, write operations that must happen in sequence, anything where ORDER matters more than speed.",
+        "ho-exhaustmap":
+          "🛡 exhaustMap = ignore while busy. Use for: form submits, login buttons, refresh actions — anywhere duplicate requests would cause problems.",
+      };
+      return (
+        ctx[s.variant] ??
+        "Each operator handles inner observable concurrency differently."
+      );
+    },
   },
 ];
 

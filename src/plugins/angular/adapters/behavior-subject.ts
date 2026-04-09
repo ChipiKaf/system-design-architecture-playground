@@ -26,7 +26,8 @@ export const behaviorSubjectAdapter: AngularAdapter = {
     const p = state.phase;
     const active =
       p === "sig-create" ||
-      p === "sig-read" ||
+      p === "sig-derive" ||
+      p === "sig-consume" ||
       p === "sig-update" ||
       p === "sig-summary";
     state.reactiveModel = active ? "rxjs" : "none";

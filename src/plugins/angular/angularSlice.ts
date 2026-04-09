@@ -16,7 +16,11 @@ export type VariantKey =
   | "default-cd"
   | "onpush-cd"
   | "writable-signal"
-  | "behavior-subject";
+  | "behavior-subject"
+  | "ho-switchmap"
+  | "ho-mergemap"
+  | "ho-concatmap"
+  | "ho-exhaustmap";
 
 export { type TopicKey };
 
@@ -55,6 +59,11 @@ export interface AngularState extends LabState {
   reactiveModel: "none" | "signal" | "rxjs";
   subscriptionMgmt: "none" | "auto" | "manual";
   glitchFree: boolean;
+
+  /* Q12 — higher-order mapping operators */
+  innerStrategy: "none" | "cancel" | "merge" | "queue" | "ignore";
+  concurrency: "none" | "single" | "unlimited" | "sequential";
+  duplicateGuard: boolean;
 }
 
 /* ── Metrics model (delegates to adapter) ────────────── */
@@ -83,6 +92,9 @@ function resetFlags(state: AngularState) {
   state.reactiveModel = "none";
   state.subscriptionMgmt = "none";
   state.glitchFree = false;
+  state.innerStrategy = "none";
+  state.concurrency = "none";
+  state.duplicateGuard = false;
 }
 
 export const initialState: AngularState = {
@@ -113,6 +125,10 @@ export const initialState: AngularState = {
   reactiveModel: "none",
   subscriptionMgmt: "none",
   glitchFree: false,
+
+  innerStrategy: "none",
+  concurrency: "none",
+  duplicateGuard: false,
 
   hotZones: [],
   explanation:

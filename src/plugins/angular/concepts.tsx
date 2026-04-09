@@ -28,10 +28,18 @@ export type ConceptKey =
   | "environment-injector"
   /* Q9 — Signals vs BehaviorSubject */
   | "sig-overview"
+  | "sig-primitive"
   | "sig-writable"
   | "sig-glitch-free"
   | "sig-behaviorsubject"
-  | "sig-when-to-use";
+  | "sig-when-to-use"
+  /* Q12 — Higher-Order Mapping Operators */
+  | "ho-overview"
+  | "ho-switchmap"
+  | "ho-mergemap"
+  | "ho-concatmap"
+  | "ho-exhaustmap"
+  | "ho-when-to-use";
 
 interface ConceptDefinition {
   title: string;
@@ -993,6 +1001,67 @@ export class FeatureModule {}`}
 
   /* ── Q9 — Signals vs BehaviorSubject ───────────────── */
 
+  "sig-primitive": {
+    title: "What Is a Primitive?",
+    subtitle: "The basic building block everything else is built on",
+    accentColor: "#f59e0b",
+    sections: [
+      {
+        title: "Definition",
+        accent: "#f59e0b",
+        content: (
+          <>
+            <p>
+              A <strong>primitive</strong> is a{" "}
+              <strong>basic building block</strong> provided by a system. It's
+              not made from other higher-level abstractions — everything else is
+              built on top of it.
+            </p>
+            <p>
+              Think of it like atoms in chemistry: atoms are primitives,
+              molecules are built from atoms.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "signal() as a Primitive",
+        accent: "#a78bfa",
+        content: (
+          <>
+            <p>
+              <code>signal()</code> is a primitive because it's the{" "}
+              <strong>core reactive unit</strong> Angular gives you. You don't
+              build it from other Angular APIs — instead, you build everything
+              else from it:
+            </p>
+            <p>
+              • <code>computed()</code> — derived from signals
+            </p>
+            <p>
+              • <code>effect()</code> — reacts to signals
+            </p>
+            <p>• Template bindings — read signals directly</p>
+          </>
+        ),
+      },
+      {
+        title: "Why It Matters",
+        accent: "#14b8a6",
+        content: (
+          <>
+            <p>
+              Understanding that <code>signal()</code> is a primitive tells you
+              it's <strong>intentionally simple</strong>. It does one thing:
+              hold a reactive value. All complexity (derivation, effects,
+              template integration) is layered on top.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
   "sig-overview": {
     title: "Angular Reactivity",
     subtitle: "Signals and RxJS — two reactive models",
@@ -1004,16 +1073,15 @@ export class FeatureModule {}`}
         content: (
           <>
             <p>
-              Angular now has <strong>two reactive primitives</strong>:
-              Signals (built-in since v16) and RxJS Observables (used since
-              Angular 2).
+              Angular now has <strong>two reactive primitives</strong>: Signals
+              (built-in since v16) and RxJS Observables (used since Angular 2).
             </p>
             <p>
               They solve different problems. Signals are{" "}
               <strong>synchronous and pull-based</strong> — you read the value
               when you need it. Observables are{" "}
-              <strong>asynchronous and push-based</strong> — values arrive
-              over time.
+              <strong>asynchronous and push-based</strong> — values arrive over
+              time.
             </p>
           </>
         ),
@@ -1030,9 +1098,8 @@ export class FeatureModule {}`}
               showing an inconsistent intermediate state.
             </p>
             <p>
-              Observables can emit intermediate values between operators,
-              which may briefly cause inconsistent UI states in complex
-              pipelines.
+              Observables can emit intermediate values between operators, which
+              may briefly cause inconsistent UI states in complex pipelines.
             </p>
           </>
         ),
@@ -1075,8 +1142,8 @@ export class FeatureModule {}`}
             </p>
             <p>
               <code>effect(() =&gt; console.log(count()))</code> runs a
-              side-effect whenever tracked signals change. It auto-tracks
-              which signals are read — no explicit dependency list.
+              side-effect whenever tracked signals change. It auto-tracks which
+              signals are read — no explicit dependency list.
             </p>
           </>
         ),
@@ -1102,9 +1169,8 @@ export class FeatureModule {}`}
             <pre style={{ color: "#fca5a5", fontSize: "0.8rem" }}>{`count = 2
 double = 2   ← stale! should be 4`}</pre>
             <p>
-              The UI can momentarily show <strong>partial updates</strong>:
-              one value has changed, but the derived value has not caught up
-              yet.
+              The UI can momentarily show <strong>partial updates</strong>: one
+              value has changed, but the derived value has not caught up yet.
             </p>
           </>
         ),
@@ -1122,8 +1188,8 @@ double = 2   ← stale! should be 4`}</pre>
             <pre style={{ color: "#86efac", fontSize: "0.8rem" }}>{`count = 2
 double = 4   ✓ always consistent`}</pre>
             <p>
-              All dependent values update <strong>atomically</strong>, so the
-              UI always sees a coherent snapshot.
+              All dependent values update <strong>atomically</strong>, so the UI
+              always sees a coherent snapshot.
             </p>
           </>
         ),
@@ -1134,8 +1200,9 @@ double = 4   ✓ always consistent`}</pre>
         content: (
           <>
             <p>
-              Glitch-free means <strong>you never observe partial updates</strong>
-              — everything stays consistent at all times.
+              Glitch-free means{" "}
+              <strong>you never observe partial updates</strong>— everything
+              stays consistent at all times.
             </p>
           </>
         ),
@@ -1159,8 +1226,8 @@ double = 4   ✓ always consistent`}</pre>
             </p>
             <p>
               Emit a new value with <code>.next(5)</code>. Consumers receive
-              updates via <code>.subscribe()</code> or the{" "}
-              <code>async</code> pipe in templates.
+              updates via <code>.subscribe()</code> or the <code>async</code>{" "}
+              pipe in templates.
             </p>
           </>
         ),
@@ -1202,15 +1269,14 @@ double = 4   ✓ always consistent`}</pre>
         content: (
           <>
             <p>
-              • <strong>Local component state</strong> (counters, toggles,
-              form state)
+              • <strong>Local component state</strong> (counters, toggles, form
+              state)
             </p>
             <p>
               • <strong>Derived / computed values</strong> in templates
             </p>
             <p>
-              • <strong>Simple parent→child data flow</strong> via input
-              signals
+              • <strong>Simple parent→child data flow</strong> via input signals
             </p>
             <p>
               • When you want <strong>no subscription management</strong> and
@@ -1239,6 +1305,367 @@ double = 4   ✓ always consistent`}</pre>
             <p>
               • When you need <strong>backpressure</strong> or{" "}
               <strong>cancellation</strong> semantics
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  /* ═══ Q12 Concepts ═════════════════════════════════════ */
+  "ho-overview": {
+    title: "Higher-Order Mapping",
+    subtitle: "Operators that map values to inner Observables",
+    accentColor: "#a78bfa",
+    sections: [
+      {
+        title: "What Is an Inner Observable?",
+        accent: "#a78bfa",
+        content: (
+          <>
+            <p>
+              An <strong>inner observable</strong> is an observable created{" "}
+              <em>inside</em> another observable's pipeline. For example,{" "}
+              <code>http.get()</code> returns an Observable — when you call it
+              inside <code>switchMap</code>, that HTTP request becomes the{" "}
+              <strong>inner observable</strong>.
+            </p>
+            <p>
+              The <strong>outer observable</strong> (e.g.{" "}
+              <code>searchInput.valueChanges</code>) emits values. The function
+              you pass to the operator <strong>transforms</strong> each value
+              into a new inner observable.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Why 'Map'?",
+        accent: "#3b82f6",
+        content: (
+          <>
+            <p>
+              It's called a <strong>map</strong> because it <em>transforms</em>{" "}
+              each outer value into an inner observable — just like{" "}
+              <code>Array.map()</code> transforms each element.
+            </p>
+            <p>
+              But unlike a regular <code>map</code>, the return value is an{" "}
+              <strong>Observable</strong>. So the operator also{" "}
+              <strong>automatically subscribes</strong> to the inner observable
+              and <strong>flattens</strong> its values into the output stream.
+              You never subscribe manually — the operator handles it.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Why Not Just Use .subscribe() Inside?",
+        accent: "#f87171",
+        content: (
+          <>
+            <p>
+              Nesting <code>.subscribe()</code> calls creates{" "}
+              <strong>callback hell</strong> and makes it impossible to cancel
+              or manage inner subscriptions properly. Higher-order operators
+              flatten the Observable-of-Observables into a single stream.
+            </p>
+            <p>
+              They also handle <strong>unsubscription</strong> for you — when
+              the outer Observable completes or errors, inner subscriptions are
+              cleaned up automatically.
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  "ho-switchmap": {
+    title: "switchMap",
+    subtitle: "Cancel previous, switch to latest inner",
+    accentColor: "#a78bfa",
+    sections: [
+      {
+        title: "The Mental Model",
+        accent: "#a78bfa",
+        content: (
+          <>
+            <p>
+              The outer observable emits values. Each value is{" "}
+              <strong>mapped</strong> to a new <strong>inner observable</strong>{" "}
+              (e.g. an <code>http.get()</code> call). switchMap{" "}
+              <strong>auto-subscribes</strong> to that inner — you never call{" "}
+              <code>.subscribe()</code> yourself.
+            </p>
+            <p>
+              When a <em>new</em> outer value arrives, switchMap{" "}
+              <strong>unsubscribes from the previous inner</strong> (cancelling
+              it) and subscribes to the new one. Only{" "}
+              <strong>one inner observable is active at a time</strong>.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Search Example — Step by Step",
+        accent: "#3b82f6",
+        content: (
+          <>
+            <pre style={{ color: "#93c5fd", fontSize: "0.8rem" }}>
+              {`search$.pipe(
+  switchMap(term => http.get(\`/api?q=\${term}\`))
+)`}
+            </pre>
+            <p>
+              User types: <strong>a → ab → abc</strong>
+            </p>
+            <p>
+              • <code>"a"</code> → <code>http.get("/api?q=a")</code> starts… ❌
+              cancelled when "ab" arrives
+            </p>
+            <p>
+              • <code>"ab"</code> → <code>http.get("/api?q=ab")</code> starts…
+              ❌ cancelled when "abc" arrives
+            </p>
+            <p>
+              • <code>"abc"</code> → <code>http.get("/api?q=abc")</code> ✅{" "}
+              <strong>only this one completes</strong>
+            </p>
+            <p>
+              The stale responses for "a" and "ab" are never delivered. No race
+              conditions.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Why It's Called switchMap",
+        accent: "#f59e0b",
+        content: (
+          <>
+            <p>
+              <strong>Map</strong> = it transforms each outer value into an
+              inner observable (like <code>Array.map</code>, but returning an
+              Observable).
+            </p>
+            <p>
+              <strong>Switch</strong> = it <em>switches</em> to the new inner
+              and kills the old one. New emission → unsubscribe previous →
+              subscribe to new.
+            </p>
+            <p>
+              The output stream is <strong>flattened</strong> — you get the
+              inner observable's values directly, not an Observable of
+              Observables.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "When to Use",
+        accent: "#22c55e",
+        content: (
+          <>
+            <p>
+              • <strong>Search autocomplete</strong> — cancel the previous
+              search when the user types a new character
+            </p>
+            <p>
+              • <strong>Route parameters</strong> — reload data when the route
+              changes, cancelling any in-flight request for the old route
+            </p>
+            <p>
+              • <strong>Any "latest wins"</strong> scenario where stale results
+              are not wanted
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  "ho-mergemap": {
+    title: "mergeMap",
+    subtitle: "Subscribe to all inner Observables in parallel",
+    accentColor: "#3b82f6",
+    sections: [
+      {
+        title: "How It Works",
+        accent: "#3b82f6",
+        content: (
+          <>
+            <p>
+              <code>mergeMap</code> subscribes to every inner Observable{" "}
+              <strong>concurrently</strong> — no cancellation, no queuing.
+              Results arrive in whatever order the inners complete.
+            </p>
+            <p>
+              You can optionally pass a <code>concurrent</code> parameter to
+              limit how many inners run at once: <code>mergeMap(fn, 3)</code>{" "}
+              allows at most 3 simultaneous subscriptions.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "When to Use",
+        accent: "#22c55e",
+        content: (
+          <>
+            <p>
+              • <strong>Parallel file uploads</strong> — upload multiple files
+              simultaneously
+            </p>
+            <p>
+              • <strong>Fire-and-forget</strong> side effects like logging or
+              analytics
+            </p>
+            <p>
+              • Any task where <strong>order doesn't matter</strong> and you
+              want maximum throughput
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  "ho-concatmap": {
+    title: "concatMap",
+    subtitle: "Queue and run one at a time, in order",
+    accentColor: "#22c55e",
+    sections: [
+      {
+        title: "How It Works",
+        accent: "#22c55e",
+        content: (
+          <>
+            <p>
+              <code>concatMap</code> subscribes to the first inner Observable
+              and <strong>waits for it to complete</strong> before subscribing
+              to the next. Inner Observables are queued in source order.
+            </p>
+            <p>
+              This guarantees that results arrive in the{" "}
+              <strong>exact same order</strong> as the source emissions — no
+              interleaving, no race conditions.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "When to Use",
+        accent: "#f59e0b",
+        content: (
+          <>
+            <p>
+              • <strong>Ordered write operations</strong> — API calls that must
+              execute sequentially
+            </p>
+            <p>
+              • <strong>Transactional workflows</strong> — each step depends on
+              the previous one completing
+            </p>
+            <p>
+              • <strong>Animation sequences</strong> — wait for one animation to
+              finish before starting the next
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  "ho-exhaustmap": {
+    title: "exhaustMap",
+    subtitle: "Ignore new emissions while inner is running",
+    accentColor: "#f59e0b",
+    sections: [
+      {
+        title: "How It Works",
+        accent: "#f59e0b",
+        content: (
+          <>
+            <p>
+              While an inner Observable is active, <code>exhaustMap</code>{" "}
+              <strong>silently drops</strong> any new source emissions. It won't
+              subscribe to a new inner until the current one completes.
+            </p>
+            <p>
+              This acts as a <strong>natural debounce</strong> for operations
+              that should not overlap — no timers, no flags, no extra logic.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "When to Use",
+        accent: "#ef4444",
+        content: (
+          <>
+            <p>
+              • <strong>Form submit buttons</strong> — prevent double-submit
+              while the POST is in flight
+            </p>
+            <p>
+              • <strong>Login/auth flows</strong> — ignore rapid clicks while
+              authentication is processing
+            </p>
+            <p>
+              • <strong>Refresh actions</strong> — ignore refresh clicks until
+              the current refresh completes
+            </p>
+          </>
+        ),
+      },
+    ],
+  },
+
+  "ho-when-to-use": {
+    title: "Which Operator When?",
+    subtitle: "Quick decision guide for HO mapping operators",
+    accentColor: "#14b8a6",
+    sections: [
+      {
+        title: "Decision Matrix",
+        accent: "#14b8a6",
+        content: (
+          <>
+            <p>
+              <strong>switchMap</strong> → "Only the latest matters" — search,
+              route params, typeahead
+            </p>
+            <p>
+              <strong>mergeMap</strong> → "Run everything in parallel" —
+              uploads, logs, fire-and-forget
+            </p>
+            <p>
+              <strong>concatMap</strong> → "Order matters, run sequentially" —
+              ordered writes, transactions
+            </p>
+            <p>
+              <strong>exhaustMap</strong> → "Ignore duplicates while busy" —
+              form submit, login button
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Common Mistake",
+        accent: "#f87171",
+        content: (
+          <>
+            <p>
+              Using <code>mergeMap</code> for search autocomplete creates{" "}
+              <strong>race conditions</strong> — a slow response for "ab" can
+              arrive after a fast response for "abc", showing stale results. Use{" "}
+              <code>switchMap</code> instead.
+            </p>
+            <p>
+              Using <code>switchMap</code> for write operations can{" "}
+              <strong>cancel in-flight saves</strong>. Use{" "}
+              <code>concatMap</code> or <code>exhaustMap</code> for mutations.
             </p>
           </>
         ),
