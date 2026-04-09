@@ -50,6 +50,12 @@ function targetNode(s: ServiceEvolutionState): string {
   return "svc-0";
 }
 
+function deployTargetNode(s: ServiceEvolutionState): string {
+  if (s.variant === "monolith") return "app";
+  if (s.variant === "modular-monolith") return "app";
+  return targetNode(s);
+}
+
 function targetSchema(s: ServiceEvolutionState): string {
   if (s.variant === "modular-monolith") return "schema-0";
   return "db";
@@ -81,6 +87,10 @@ export function expandToken(
 ): string[] {
   if (token === "$services") return serviceNodes(state);
   if (token === "$dbs") return dbNodes(state);
+  if (token === "$cicd") return ["cicd"];
+  if (token === "$deploy-window") return ["deploy-window"];
+  if (token === "$deploy-standby") return ["deploy-standby"];
+  if (token === "$deploy-target") return [deployTargetNode(state)];
   if (token === "$client") return ["client"];
   if (token === "$gateway") return ["gateway"];
   if (token === "$target") return [targetNode(state)];
@@ -93,6 +103,13 @@ export function expandToken(
 
 export type StepKey =
   | "overview"
+  | "acid-atomicity"
+  | "acid-consistency"
+  | "acid-isolation"
+  | "acid-durability"
+  | "prepare-deploy"
+  | "deploy-offline"
+  | "deploy-live"
   | "deploy-change"
   | "traffic-spike"
   | "inject-fault"
@@ -107,9 +124,301 @@ export const STEPS: StepDef[] = [
   {
     key: "overview",
     label: "Architecture Overview",
-    nextButton: "Deploy a change →",
+    nextButton: (s) =>
+      s.variant === "monolith"
+        ? "Trace ACID transaction →"
+        : s.variant === "modular-monolith"
+          ? "Prepare deploy →"
+          : "Deploy a change →",
     action: "resetRun",
     explain: (s) => VARIANT_PROFILES[s.variant].description,
+  },
+
+  {
+    key: "acid-atomicity",
+    when: (s) => s.variant === "monolith",
+    label: "Atomicity",
+    processingText: "Opening local transaction...",
+    phase: "transaction",
+    nextButton: "Check consistency →",
+    flow: [
+      {
+        from: "$client",
+        to: "$gateway",
+        duration: 320,
+        explain:
+          "A checkout request enters the monolith. One thread can keep the whole transaction in one process.",
+        color: "#38bdf8",
+      },
+      {
+        from: "$gateway",
+        to: "ui",
+        duration: 320,
+        color: "#38bdf8",
+        explain:
+          "The request enters the controller layer and keeps one local transaction context.",
+      },
+      {
+        from: "ui",
+        to: "cart",
+        duration: 260,
+        color: "#38bdf8",
+      },
+      {
+        from: "cart",
+        to: "checkout",
+        duration: 280,
+        color: "#38bdf8",
+      },
+      {
+        from: "checkout",
+        to: "payments",
+        duration: 320,
+        color: "#38bdf8",
+        explain:
+          "Cart, Checkout, and Payments all participate in one in-process unit of work before anything commits.",
+      },
+    ],
+    finalHotZones: [
+      "gateway",
+      "app",
+      "ui",
+      "cart",
+      "checkout",
+      "payments",
+      "db",
+      "tx-atomicity",
+      "tx-route",
+    ],
+    explain:
+      "Atomicity: the monolith can stage cart, order, and payment changes inside one in-process transaction. If any part fails, none of it commits.",
+  },
+
+  {
+    key: "acid-consistency",
+    when: (s) => s.variant === "monolith",
+    label: "Consistency",
+    processingText: "Validating invariants...",
+    phase: "transaction",
+    nextButton: "Protect isolation →",
+    flow: [
+      {
+        from: "cart",
+        to: "checkout",
+        duration: 320,
+        explain:
+          "The same call stack can validate totals, stock, and order rules before commit.",
+        color: "#22c55e",
+      },
+      {
+        from: "checkout",
+        to: "payments",
+        duration: 320,
+        color: "#22c55e",
+        explain:
+          "Payment authorization and order invariants are checked inside the same transaction boundary.",
+      },
+    ],
+    finalHotZones: [
+      "app",
+      "ui",
+      "cart",
+      "checkout",
+      "payments",
+      "db",
+      "tx-consistency",
+      "tx-route",
+      "tx-invariants",
+    ],
+    explain:
+      "Consistency: one local transaction can enforce invariants like valid totals, reserved stock, and an authorized payment before any row becomes visible.",
+  },
+
+  {
+    key: "acid-isolation",
+    when: (s) => s.variant === "monolith",
+    label: "Isolation",
+    processingText: "Holding locks...",
+    phase: "transaction",
+    nextButton: "Commit durably →",
+    flow: [
+      {
+        from: "$client",
+        to: "$gateway",
+        duration: 320,
+        explain:
+          "A second request arrives while the first transaction is still open.",
+        color: "#fbbf24",
+      },
+    ],
+    finalHotZones: [
+      "gateway",
+      "app",
+      "checkout",
+      "payments",
+      "db",
+      "tx-isolation",
+      "tx-route",
+      "tx-locks",
+      "tx-queue",
+    ],
+    explain:
+      "Isolation: other requests wait instead of seeing half-written Cart or Payment state. With one process and one shared database, that local coordination is straightforward.",
+  },
+
+  {
+    key: "acid-durability",
+    when: (s) => s.variant === "monolith",
+    label: "Durability",
+    processingText: "Committing transaction...",
+    phase: "transaction",
+    nextButton: "Prepare deploy →",
+    flow: [
+      {
+        from: "payments",
+        to: "$dbs",
+        duration: 420,
+        explain:
+          "The transaction commits once to the shared database, turning staged changes into durable state.",
+        color: "#4ade80",
+      },
+    ],
+    finalHotZones: [
+      "app",
+      "ui",
+      "cart",
+      "checkout",
+      "payments",
+      "db",
+      "tx-durability",
+      "tx-route",
+      "tx-committed",
+    ],
+    explain:
+      "Durability: once the local commit lands in the shared DB, the order survives process restarts. This is the convenience monoliths give you before service boundaries complicate coordination.",
+  },
+
+  {
+    key: "prepare-deploy",
+    when: (s) => s.variant === "monolith" || s.variant === "modular-monolith",
+    label: "Prepare Deploy",
+    processingText: "Preparing release...",
+    phase: "deploy",
+    nextButton: (s) =>
+      s.variant === "modular-monolith"
+        ? "Take backend offline →"
+        : "Take app offline →",
+    flow: (s) => [
+      {
+        from: "$cicd",
+        to: "$deploy-window",
+        duration: 500,
+        explain:
+          s.variant === "modular-monolith"
+            ? "CI/CD prepares a backend release. Catalog and Ordering are the touched modules, but the whole monolith still ships as one unit."
+            : "CI/CD prepares a full-app deployment. The code change is mostly in UI and Cart, but the monolith still ships as one unit.",
+        color: "#60a5fa",
+      },
+    ],
+    finalHotZones: (s) =>
+      s.variant === "modular-monolith"
+        ? [
+            "cicd",
+            "deploy-window",
+            "app",
+            "db",
+            "mod-0",
+            "mod-1",
+            "schema-0",
+            "schema-1",
+            "deploy-prep",
+          ]
+        : ["cicd", "deploy-window", "ui", "cart", "deploy-prep"],
+    explain: (s) =>
+      s.variant === "modular-monolith"
+        ? "The pipeline is ready, and the touched modules are highlighted, but the release still ships as one backend."
+        : "The pipeline is ready, and UI plus Cart are the changed areas. But because this is one deployable unit, the release process still targets the whole application.",
+  },
+
+  {
+    key: "deploy-offline",
+    when: (s) => s.variant === "monolith" || s.variant === "modular-monolith",
+    label: "Take Monolith Offline",
+    processingText: "Draining traffic...",
+    phase: "deploy",
+    nextButton: (s) =>
+      s.variant === "modular-monolith"
+        ? "Bring copy online →"
+        : "Bring replacement online →",
+    flow: (s) => [
+      {
+        from: "$deploy-window",
+        to: "$deploy-target",
+        duration: 650,
+        explain:
+          s.variant === "modular-monolith"
+            ? "Traffic drains away from the live backend, and the whole modular monolith goes offline for replacement."
+            : "Traffic drains away from the live monolith, and the whole application goes offline for replacement.",
+        color: "#ef4444",
+      },
+    ],
+    finalHotZones: (s) =>
+      s.variant === "modular-monolith"
+        ? [
+            "deploy-window",
+            "app",
+            "db",
+            "mod-0",
+            "mod-1",
+            "schema-0",
+            "schema-1",
+            "deploy-offline",
+          ]
+        : ["deploy-window", "app", "ui", "cart", "deploy-offline"],
+    explain: (s) =>
+      s.variant === "modular-monolith"
+        ? "Even though the release mostly touches Catalog and Ordering, the modular monolith still has to go offline as a whole because there is only one deployment unit."
+        : "Even though the release mostly touches UI and Cart, the monolith has to go offline as a whole because there is only one deployment unit.",
+  },
+
+  {
+    key: "deploy-live",
+    when: (s) => s.variant === "monolith" || s.variant === "modular-monolith",
+    label: "Replacement Comes Online",
+    processingText: "Cutting over...",
+    phase: "deploy",
+    nextButton: "Spike traffic →",
+    flow: (s) => [
+      {
+        from: "$deploy-window",
+        to: "$deploy-standby",
+        duration: 650,
+        explain:
+          s.variant === "modular-monolith"
+            ? "CI/CD brings up an identical replacement copy, then cuts traffic over to the new backend."
+            : "CI/CD brings up an identical replacement copy and cuts traffic over to the new version.",
+        color: "#60a5fa",
+      },
+    ],
+    recalcMetrics: true,
+    finalHotZones: (s) =>
+      s.variant === "modular-monolith"
+        ? [
+            "cicd",
+            "app",
+            "deploy-standby",
+            "db",
+            "mod-0",
+            "mod-1",
+            "schema-0",
+            "schema-1",
+            "deploy-live",
+          ]
+        : ["cicd", "app", "deploy-standby", "ui", "cart", "deploy-live"],
+    explain: (s) =>
+      s.variant === "modular-monolith"
+        ? `Deploy time: ~${s.deployTimeS}s. Catalog and Ordering were the touched modules, but the whole backend still had to be replaced before it could come back online.`
+        : `Deploy time: ~${s.deployTimeS}s. UI and Cart were the changed parts, but the entire application still had to be replaced before it could come back online.`,
   },
 
   /* 1 — Deploy a change
@@ -118,38 +427,71 @@ export const STEPS: StepDef[] = [
   */
   {
     key: "deploy-change",
+    when: (s) => s.variant !== "monolith" && s.variant !== "modular-monolith",
     label: "Deploy a Change",
     processingText: "Deploying...",
     phase: "deploy",
     nextButton: "Spike traffic →",
-    flow: [
-      {
-        from: "$client",
-        to: "$gateway",
-        duration: 500,
-        explain: "Developer pushes a code change through CI/CD.",
-        color: "#60a5fa",
-      },
-      {
-        from: "$gateway",
-        to: "$target",
-        duration: 700,
-        color: (s) => VARIANT_PROFILES[s.variant].color,
-        explain: "Change rolls out to the impacted deployment unit.",
-      },
-    ],
+    flow: (s) =>
+      s.variant === "monolith"
+        ? [
+            {
+              from: "$cicd",
+              to: "$deploy-window",
+              duration: 450,
+              explain:
+                "CI/CD starts the release, drains traffic, and takes the current monolith offline.",
+              color: "#60a5fa",
+            },
+            {
+              from: "$deploy-window",
+              to: "$deploy-standby",
+              duration: 650,
+              explain:
+                "The pipeline brings up an identical replacement copy with the new code.",
+              color: "#60a5fa",
+            },
+            {
+              from: "$deploy-standby",
+              to: "$target",
+              duration: 700,
+              color: "#60a5fa",
+              explain:
+                "Traffic cuts over to the replacement, and the new version takes the old slot.",
+            },
+          ]
+        : [
+            {
+              from: "$cicd",
+              to: "$deploy-window",
+              duration: 450,
+              explain:
+                "CI/CD starts the rollout and prepares the new release for cutover.",
+              color: "#60a5fa",
+            },
+            {
+              from: "$deploy-window",
+              to: "$target",
+              duration: 700,
+              color: (current) => VARIANT_PROFILES[current.variant].color,
+              explain:
+                "The change rolls out to the impacted deployment unit, without involving the client path.",
+            },
+          ],
     recalcMetrics: true,
     finalHotZones: (s) =>
       s.variant === "modular-monolith"
-        ? ["gateway", targetNode(s), targetSchema(s), "db"]
-        : ["gateway", targetNode(s)],
+        ? ["cicd", targetNode(s), targetSchema(s), "db"]
+        : ["cicd", targetNode(s)],
     explain: (s) =>
       `Deploy time: ~${s.deployTimeS}s. ${
         s.variant === "monolith"
-          ? "The entire application was offline during the window."
+          ? "CI/CD redeployed the entire application as one unit, so the old copy went offline before an identical replacement could take over."
           : s.variant === "modular-monolith"
-            ? "One module changed, and it owns its own schema, but the whole backend still redeployed because it remains a single deploy unit."
-            : "Only one tiny unit swapped — zero blast radius on other services."
+            ? "One module changed, but the full backend still redeployed because it remains a single deploy unit despite the cleaner module boundaries."
+            : s.variant === "serverless"
+              ? "CI/CD swapped one function-sized unit, so the client path never needed a full-app outage."
+              : "CI/CD rolled only the impacted service, so the rest of the system stayed untouched."
       }`,
   },
 

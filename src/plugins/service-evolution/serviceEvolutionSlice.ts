@@ -48,7 +48,7 @@ export const VARIANT_PROFILES: Record<VariantKey, VariantProfile> = {
     color: "#94a3b8",
     accentText: "Single unit",
     description:
-      "One codebase, one binary, one database. Simple to develop but hard to scale or change independently.",
+      "One codebase, one binary, one database. Busy and quiet paths share the same runtime, so a few hotspots can bottleneck the whole app.",
     serviceCount: 1,
     dbCount: 1,
     traits: {
@@ -164,6 +164,8 @@ export const TRAIT_META: Record<
 /* ── Traffic simulation state ────────────────────────── */
 export type TrafficPhase =
   | "overview"
+  | "transaction"
+  | "deploy"
   | "traffic"
   | "scale-event"
   | "fault"

@@ -1,0 +1,226 @@
+.ci-cd-build-root {
+  --ci-cd-build-bg: #020617;
+  --ci-cd-build-panel: rgba(7, 17, 34, 0.88);
+  --ci-cd-build-border: rgba(148, 163, 184, 0.18);
+  --ci-cd-build-text: #e2e8f0;
+  --ci-cd-build-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--ci-cd-build-text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(59, 130, 246, 0.14),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(20, 184, 166, 0.12),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Signal ball color overrides ─────────────────────── */
+.viz-signal.viz-signal-green {
+  fill: #22c55e;
+  transition: none;
+}
+.viz-signal.viz-signal-amber {
+  fill: #f59e0b;
+  transition: none;
+}
+.viz-signal.viz-signal-purple {
+  fill: #c084fc;
+  transition: none;
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.ci-cd-build-stage {
+  background: var(--ci-cd-build-panel);
+  border: 1px solid var(--ci-cd-build-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.ci-cd-build-phase--overview .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.ci-cd-build-phase--graph-model .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.ci-cd-build-phase--affected .vc-stat-badge__value {
+  color: #f87171;
+}
+.ci-cd-build-phase--cold-build .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.ci-cd-build-phase--cache-save .vc-stat-badge__value {
+  color: #22c55e;
+}
+.ci-cd-build-phase--cache-lookup .vc-stat-badge__value {
+  color: #22c55e;
+}
+.ci-cd-build-phase--warm-build .vc-stat-badge__value {
+  color: #86efac;
+}
+.ci-cd-build-phase--tree-shake .vc-stat-badge__value {
+  color: #a78bfa;
+}
+.ci-cd-build-phase--summary .vc-stat-badge__value {
+  color: #86efac;
+}
+
+/* ── Controls ────────────────────────────────────────── */
+.ci-cd-build-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: center;
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  &__legend {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-right: 0.1rem;
+  }
+
+  &__sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(148, 163, 184, 0.14);
+    margin: 0 0.1rem;
+  }
+}
+
+.ci-cd-build-controls__btn {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 6px;
+  padding: 0.18rem 0.45rem;
+  background: rgba(15, 23, 42, 0.9);
+  color: #94a3b8;
+  font-size: 0.64rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    transform 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+
+  &:hover:not(:disabled) {
+    background: rgba(59, 130, 246, 0.1);
+    transform: translateY(-1px);
+  }
+}
+
+.ci-cd-build-controls__btn--active {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: currentColor;
+  color: #e2e8f0;
+  box-shadow: 0 0 0 1px currentColor inset;
+}
+
+.ci-cd-build-controls__slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 60px;
+  height: 3px;
+  border-radius: 2px;
+  background: #1e293b;
+  outline: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #3b82f6;
+    border: 2px solid #0f172a;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+  }
+
+  &::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+  }
+
+  &::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #3b82f6;
+    border: 2px solid #0f172a;
+    cursor: pointer;
+  }
+}
+
+/* ── KPIs table ──────────────────────────────────────── */
+.ci-cd-build-kpis {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid #1e293b;
+    font-size: 12px;
+
+    span {
+      color: #94a3b8;
+    }
+    strong {
+      color: #e2e8f0;
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+/* ── Traits list ─────────────────────────────────────── */
+.ci-cd-build-traits {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    font-size: 11px;
+    color: #cbd5e1;
+    padding: 2px 0 2px 12px;
+    position: relative;
+    line-height: 1.5;
+
+    &::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #475569;
+    }
+  }
+}

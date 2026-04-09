@@ -21,6 +21,12 @@ import MicroserviceCommPlugin from "./plugins/microservice-comm";
 import RestApiPlugin from "./plugins/rest-api";
 import GraphqlApiPlugin from "./plugins/graphql-api";
 import GrpcApiPlugin from "./plugins/grpc-api";
+import CommPatternsPlugin from "./plugins/comm-patterns";
+import SyncVsEventDrivenPlugin from "./plugins/sync-vs-event-driven";
+import DataManagementPlugin from "./plugins/data-management";
+import DatabaseSelectionPlugin from "./plugins/database-selection";
+import CommandsQueriesPlugin from "./plugins/commands-and-queries";
+import CiCdBuildPlugin from "./plugins/ci-cd-build";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -66,6 +72,7 @@ export const categories: PluginCategory[] = [
       ShardingPlugin,
       DbTradeoffPlugin,
       CapAcidPlugin,
+      CiCdBuildPlugin,
     ],
   },
   {
@@ -106,7 +113,19 @@ export const categories: PluginCategory[] = [
     description:
       "From monolith to nanoservices — explore how architecture granularity shapes deployability, scalability, and fault isolation.",
     accent: "#a78bfa",
-    plugins: [ServiceEvolutionPlugin, DecompositionPlugin, MicroserviceCommPlugin, RestApiPlugin, GraphqlApiPlugin, GrpcApiPlugin],
+    plugins: [
+      ServiceEvolutionPlugin,
+      DecompositionPlugin,
+      MicroserviceCommPlugin,
+      RestApiPlugin,
+      GraphqlApiPlugin,
+      GrpcApiPlugin,
+      CommPatternsPlugin,
+      SyncVsEventDrivenPlugin,
+      DataManagementPlugin,
+      CommandsQueriesPlugin,
+      DatabaseSelectionPlugin,
+    ],
   },
 ];
 

@@ -135,7 +135,7 @@ const Shell: React.FC<ShellProps> = ({ plugin, category }) => {
 
         <div className="visualization-container">
           {plugin.Controls && (
-            <div className="plugin-controls">
+            <div className={`plugin-controls plugin-controls--${plugin.id}`}>
               <plugin.Controls />
             </div>
           )}

@@ -3,6 +3,7 @@ import type { InfoModalSection } from "../../components/InfoModal/InfoModal";
 
 export type ConceptKey =
   | "monolith"
+  | "acid"
   | "modular-monolith"
   | "microservices"
   | "serverless"
@@ -85,6 +86,61 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             applications with predictable load, or anywhere strong consistency
             is non-negotiable and distributed transactions would add more
             complexity than the monolith removes.
+          </p>
+        ),
+      },
+    ],
+  },
+
+  acid: {
+    title: "In-Process ACID Transactions",
+    subtitle: "Why a monolith makes local correctness easy",
+    accentColor: "#38bdf8",
+    sections: [
+      {
+        title: "What changes in a monolith",
+        accent: "#38bdf8",
+        content: (
+          <p>
+            Cart, Checkout, Payments, and the shared database can all
+            participate in one local transaction because they live in one
+            process and usually share one database connection boundary.
+          </p>
+        ),
+      },
+      {
+        title: "ACID in practice",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>
+              <strong>Atomicity</strong> — cart, order, and payment changes all
+              commit together or all roll back
+            </li>
+            <li>
+              <strong>Consistency</strong> — one call stack can enforce totals,
+              stock, and payment invariants before commit
+            </li>
+            <li>
+              <strong>Isolation</strong> — concurrent requests do not see
+              partial writes while the transaction is still open
+            </li>
+            <li>
+              <strong>Durability</strong> — once committed, the shared database
+              preserves the result across restarts
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Why it gets harder later",
+        accent: "#f59e0b",
+        content: (
+          <p>
+            Once these capabilities move into separate services, one easy local
+            transaction usually becomes a workflow of multiple local commits,
+            retries, and compensations. That is one of the biggest practical
+            trade-offs when leaving the monolith.
           </p>
         ),
       },

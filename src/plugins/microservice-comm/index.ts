@@ -18,7 +18,7 @@ const MicroserviceCommPlugin: DemoPlugin<
   Dispatch<Action>
 > = {
   id: "microservice-comm",
-  name: "Communication Lab",
+  name: "Communication Protocols Lab",
   description:
     "Compare microservice communication protocols — HTTP/REST, gRPC, GraphQL (sync) vs AMQP, Kafka (async). See how coupling, latency, and flow differ.",
   initialState,

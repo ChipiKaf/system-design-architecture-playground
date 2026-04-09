@@ -1,0 +1,253 @@
+.sync-vs-event-driven-root {
+  --sync-vs-event-driven-bg: #020617;
+  --sync-vs-event-driven-panel: rgba(7, 17, 34, 0.88);
+  --sync-vs-event-driven-border: rgba(148, 163, 184, 0.18);
+  --sync-vs-event-driven-text: #e2e8f0;
+  --sync-vs-event-driven-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--sync-vs-event-driven-text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(59, 130, 246, 0.14),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(20, 184, 166, 0.12),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.sync-vs-event-driven-stage {
+  background: var(--sync-vs-event-driven-panel);
+  border: 1px solid var(--sync-vs-event-driven-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.sync-vs-event-driven-phase--overview .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.sync-vs-event-driven-phase--sync-fit .vc-stat-badge__value {
+  color: #fb7185;
+}
+.sync-vs-event-driven-phase--scenario .vc-stat-badge__value {
+  color: #fb7185;
+}
+.sync-vs-event-driven-phase--client-request .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.sync-vs-event-driven-phase--gateway-forward .vc-stat-badge__value {
+  color: #f97316;
+}
+.sync-vs-event-driven-phase--agg-fit .vc-stat-badge__value {
+  color: #fdba74;
+}
+.sync-vs-event-driven-phase--evt-need .vc-stat-badge__value {
+  color: #86efac;
+}
+.sync-vs-event-driven-phase--evt-client-request .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.sync-vs-event-driven-phase--evt-direct-order .vc-stat-badge__value {
+  color: #f87171;
+}
+.sync-vs-event-driven-phase--evt-no-broker-inventory .vc-stat-badge__value {
+  color: #ef4444;
+}
+.sync-vs-event-driven-phase--evt-no-broker-shipping .vc-stat-badge__value {
+  color: #ef4444;
+}
+.sync-vs-event-driven-phase--evt-no-broker-notification .vc-stat-badge__value {
+  color: #ef4444;
+}
+.sync-vs-event-driven-phase--evt-no-broker-tradeoff .vc-stat-badge__value {
+  color: #f87171;
+}
+.sync-vs-event-driven-phase--evt-queue-intro .vc-stat-badge__value {
+  color: #7dd3fc;
+}
+.sync-vs-event-driven-phase--evt-queue-command .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.sync-vs-event-driven-phase--evt-client-ack .vc-stat-badge__value {
+  color: #22c55e;
+}
+.sync-vs-event-driven-phase--evt-command-consume .vc-stat-badge__value {
+  color: #38bdf8;
+}
+.sync-vs-event-driven-phase--evt-pubsub-intro .vc-stat-badge__value {
+  color: #86efac;
+}
+.sync-vs-event-driven-phase--evt-event-publish .vc-stat-badge__value {
+  color: #22c55e;
+}
+.sync-vs-event-driven-phase--evt-buffered .vc-stat-badge__value {
+  color: #86efac;
+}
+.sync-vs-event-driven-phase--evt-inventory .vc-stat-badge__value {
+  color: #22c55e;
+}
+.sync-vs-event-driven-phase--evt-shipping .vc-stat-badge__value {
+  color: #22c55e;
+}
+.sync-vs-event-driven-phase--evt-notification .vc-stat-badge__value {
+  color: #22c55e;
+}
+.sync-vs-event-driven-phase--evt-broker-benefits .vc-stat-badge__value {
+  color: #38bdf8;
+}
+.sync-vs-event-driven-phase--evt-tradeoff .vc-stat-badge__value {
+  color: #a78bfa;
+}
+.sync-vs-event-driven-phase--eks-context .vc-stat-badge__value {
+  color: #7dd3fc;
+}
+.sync-vs-event-driven-phase--eks-public-dns .vc-stat-badge__value {
+  color: #38bdf8;
+}
+.sync-vs-event-driven-phase--eks-edge-entry .vc-stat-badge__value {
+  color: #38bdf8;
+}
+.sync-vs-event-driven-phase--eks-ingress-hop .vc-stat-badge__value {
+  color: #f97316;
+}
+.sync-vs-event-driven-phase--eks-service-dns .vc-stat-badge__value {
+  color: #38bdf8;
+}
+.sync-vs-event-driven-phase--eks-service-route .vc-stat-badge__value {
+  color: #fb923c;
+}
+.sync-vs-event-driven-phase--eks-endpoints .vc-stat-badge__value {
+  color: #84cc16;
+}
+.sync-vs-event-driven-phase--eks-egress-prep .vc-stat-badge__value {
+  color: #a78bfa;
+}
+.sync-vs-event-driven-phase--eks-egress-outbound .vc-stat-badge__value {
+  color: #a78bfa;
+}
+.sync-vs-event-driven-phase--eks-ops .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.sync-vs-event-driven-phase--agg-scenario .vc-stat-badge__value {
+  color: #fdba74;
+}
+.sync-vs-event-driven-phase--agg-client-request .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.sync-vs-event-driven-phase--agg-gateway-forward .vc-stat-badge__value {
+  color: #f97316;
+}
+.sync-vs-event-driven-phase--agg-discovery .vc-stat-badge__value {
+  color: #38bdf8;
+}
+.sync-vs-event-driven-phase--agg-dispatch .vc-stat-badge__value {
+  color: #84cc16;
+}
+.sync-vs-event-driven-phase--agg-collect .vc-stat-badge__value {
+  color: #84cc16;
+}
+.sync-vs-event-driven-phase--agg-merge .vc-stat-badge__value {
+  color: #fb923c;
+}
+.sync-vs-event-driven-phase--agg-return .vc-stat-badge__value {
+  color: #f97316;
+}
+.sync-vs-event-driven-phase--agg-tradeoff .vc-stat-badge__value {
+  color: #f87171;
+}
+.sync-vs-event-driven-phase--query-product .vc-stat-badge__value {
+  color: #84cc16;
+}
+.sync-vs-event-driven-phase--query-pricing .vc-stat-badge__value {
+  color: #84cc16;
+}
+.sync-vs-event-driven-phase--query-order .vc-stat-badge__value {
+  color: #c084fc;
+}
+.sync-vs-event-driven-phase--query-billing .vc-stat-badge__value {
+  color: #c084fc;
+}
+.sync-vs-event-driven-phase--query-shipping .vc-stat-badge__value {
+  color: #c084fc;
+}
+.sync-vs-event-driven-phase--bottleneck .vc-stat-badge__value {
+  color: #ef4444;
+}
+.sync-vs-event-driven-phase--tight-coupling .vc-stat-badge__value {
+  color: #a855f7;
+}
+.sync-vs-event-driven-phase--waste .vc-stat-badge__value {
+  color: #22c55e;
+}
+.sync-vs-event-driven-phase--summary .vc-stat-badge__value {
+  color: #86efac;
+}
+
+/* ── Controls ────────────────────────────────────────── */
+.sync-vs-event-driven-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.sync-vs-event-driven-controls__legend {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sync-vs-event-driven-muted);
+  margin-right: 0.25rem;
+}
+
+.sync-vs-event-driven-controls__btn {
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.sync-vs-event-driven-controls__btn:hover {
+  background: rgba(51, 65, 85, 0.7);
+}
+.sync-vs-event-driven-controls__btn--active {
+  border-color: currentColor;
+  background: rgba(51, 65, 85, 0.5);
+  font-weight: 700;
+}
+
+.sync-vs-event-driven-controls__btn--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sync-vs-event-driven-controls__btn--disabled:hover {
+  background: rgba(30, 41, 59, 0.6);
+}
+
+.sync-vs-event-driven-controls__sep {
+  width: 1px;
+  height: 1.2rem;
+  background: rgba(148, 163, 184, 0.2);
+}

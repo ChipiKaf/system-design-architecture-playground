@@ -277,33 +277,11 @@ export default ${camelName}Slice.reducer;
 } else if (isComparison) {
 sliceContent = `import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { LabState } from "../../lib/lab-engine";
+import { getAdapter } from "./${pluginName}-adapters";
 
 /* ── Variant identifiers ─────────────────────────────── */
 export type VariantKey = "variant-a" | "variant-b";
-// TODO: add more variant keys as needed
-
-/* ── Per-variant profile ─────────────────────────────── */
-export interface VariantProfile {
-  key: VariantKey;
-  label: string;
-  color: string;
-  description: string;
-}
-
-export const VARIANT_PROFILES: Record<VariantKey, VariantProfile> = {
-  "variant-a": {
-    key: "variant-a",
-    label: "Variant A",
-    color: "#3b82f6",
-    description: "Describe variant A's approach.",
-  },
-  "variant-b": {
-    key: "variant-b",
-    label: "Variant B",
-    color: "#22c55e",
-    description: "Describe variant B's approach.",
-  },
-};
+// TODO: rename / add variant keys to match your domain
 
 /* ── State shape ─────────────────────────────────────── */
 export interface ${pascalName}State extends LabState {
@@ -314,16 +292,10 @@ export interface ${pascalName}State extends LabState {
   throughput: number;
 }
 
-/* ── Metrics model ───────────────────────────────────── */
+/* ── Metrics model (delegates to adapter) ────────────── */
 export function computeMetrics(state: ${pascalName}State) {
-  // TODO: compute metrics based on active variant
-  if (state.variant === "variant-a") {
-    state.latencyMs = 50;
-    state.throughput = 1000;
-  } else {
-    state.latencyMs = 120;
-    state.throughput = 2000;
-  }
+  const adapter = getAdapter(state.variant);
+  adapter.computeMetrics(state);
 }
 
 export const initialState: ${pascalName}State = {
@@ -349,8 +321,10 @@ const ${camelName}Slice = createSlice({
       return s;
     },
     softResetRun: (state) => {
+      const adapter = getAdapter(state.variant);
+      adapter.softReset(state);
       state.hotZones = [];
-      state.explanation = VARIANT_PROFILES[state.variant].description;
+      state.explanation = adapter.profile.description;
       state.phase = "overview";
       computeMetrics(state);
     },
@@ -361,9 +335,10 @@ const ${camelName}Slice = createSlice({
       computeMetrics(state);
     },
     setVariant(state, action: PayloadAction<VariantKey>) {
+      const adapter = getAdapter(action.payload);
       state.variant = action.payload;
       state.hotZones = [];
-      state.explanation = VARIANT_PROFILES[action.payload].description;
+      state.explanation = adapter.profile.description;
       state.phase = "overview";
       computeMetrics(state);
     },
@@ -1385,8 +1360,8 @@ import {
 } from "../../components/plugin-kit";
 import { concepts, type ConceptKey } from "./concepts";
 import { use${pascalName}Animation, type Signal } from "./use${pascalName}Animation";
-import { VARIANT_PROFILES, type ${pascalName}State } from "./${camelName}Slice";
-import { buildSteps } from "./flow-engine";
+import { type ${pascalName}State } from "./${camelName}Slice";
+import { getAdapter } from "./${pluginName}-adapters";
 import "./main.scss";
 
 interface Props {
@@ -1410,31 +1385,15 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
 
   const st = runtime as ${pascalName}State;
   const { explanation, hotZones, phase, variant } = st;
-  const profile = VARIANT_PROFILES[variant];
+  const adapter = getAdapter(variant);
   const hot = (zone: string) => hotZones.includes(zone);
 
   /* ── Build VizCraft scene ─────────────────────────────── */
   const scene = (() => {
     const b = viz().view(W, H);
 
-    // TODO: build your nodes / edges dynamically based on \`variant\`
-    b.node("node-a")
-      .at(200, 300)
-      .rect(140, 60, 12)
-      .fill(hot("node-a") ? "#1e40af" : "#0f172a")
-      .stroke(hot("node-a") ? "#60a5fa" : "#334155", 2)
-      .label("Node A", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
-
-    b.node("node-b")
-      .at(650, 300)
-      .rect(140, 60, 12)
-      .fill(hot("node-b") ? "#065f46" : "#0f172a")
-      .stroke(hot("node-b") ? "#34d399" : "#334155", 2)
-      .label("Node B", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
-
-    b.edge("node-a", "node-b", "edge-ab")
-      .stroke("#475569", 2)
-      .animate("flow", { duration: "3s" });
+    // Delegate topology building to the adapter
+    adapter.buildTopology(b, st, { hot, phase });
 
     // ── Signals ──────────────────────────────────────────
     if (signals.length > 0) {
@@ -1485,6 +1444,9 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
     { key: "overview", label: "${pascalName}", color: "#93c5fd", borderColor: "#3b82f6" },
   ];
 
+  /* ── Stat badges from adapter ───────────────────────── */
+  const badges = adapter.getStatBadges(st);
+
   /* ── Render ─────────────────────────────────────────── */
   return (
     <div className="${pluginName}-root ${pluginName}-phase--\${phase}">
@@ -1494,15 +1456,16 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
           <div className="${pluginName}-stage">
             <StageHeader
               title="${pascalName}"
-              subtitle={\`Comparing: \${profile.label}\`}
+              subtitle={\`Comparing: \${adapter.profile.label}\`}
             >
-              <StatBadge
-                label="Variant"
-                value={profile.label}
-                className={\`${pluginName}-phase ${pluginName}-phase--\${phase}\`}
-              />
-              <StatBadge label="Latency" value={\`\${st.latencyMs}ms\`} />
-              <StatBadge label="Throughput" value={\`\${st.throughput} rps\`} />
+              {badges.map((badge) => (
+                <StatBadge
+                  key={badge.label}
+                  label={badge.label}
+                  value={badge.value}
+                  className={\`${pluginName}-phase ${pluginName}-phase--\${phase}\`}
+                />
+              ))}
             </StageHeader>
             <CanvasStage canvasRef={containerRef} />
           </div>
@@ -1513,10 +1476,10 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
               <p>{explanation}</p>
             </SideCard>
             <SideCard label="Active Variant" variant="info">
-              <p style={{ color: profile.color, fontWeight: 600 }}>
-                {profile.label}
+              <p style={{ color: adapter.colors.stroke, fontWeight: 600 }}>
+                {adapter.profile.label}
               </p>
-              <p>{profile.description}</p>
+              <p>{adapter.profile.description}</p>
             </SideCard>
           </SidePanel>
         }
@@ -2831,6 +2794,7 @@ fs.writeFileSync(path.join(targetDir, "data.ts"), dataContent);
    ================================================================ */
 if (isComparison) {
 const flowEngineContent = `import type { ${pascalName}State } from "./${camelName}Slice";
+import { getAdapter } from "./${pluginName}-adapters";
 import {
   buildSteps as genericBuildSteps,
   executeFlow as genericExecuteFlow,
@@ -2844,8 +2808,7 @@ import {
    ${pascalName} Lab — Declarative Flow Engine
 
    Uses the shared lab-engine for build/execute logic.
-   This file defines the plugin-specific steps, tokens,
-   and type aliases.
+   Token expansion and flow beats delegate to adapters.
    ══════════════════════════════════════════════════════════ */
 
 /* ── Specialised type aliases ──────────────────────────── */
@@ -2855,12 +2818,12 @@ export type StepDef = GenericStepDef<${pascalName}State, StepKey>;
 export type TaggedStep = GenericTaggedStep<StepKey>;
 export type FlowExecutorDeps = GenericFlowExecutorDeps<${pascalName}State>;
 
-/* ── Token expansion ─────────────────────────────────── */
+/* ── Token expansion (delegates to adapter) ──────────── */
 
-export function expandToken(token: string, _state: ${pascalName}State): string[] {
-  // TODO: expand $-prefixed tokens to runtime node IDs
-  // e.g. if (token === "$clients") return state.clients.map(c => c.id);
-  return [token];
+export function expandToken(token: string, state: ${pascalName}State): string[] {
+  const adapter = getAdapter(state.variant);
+  const expanded = adapter.expandToken(token, state);
+  return expanded ?? [token];
 }
 
 /* ── Step keys ───────────────────────────────────────── */
@@ -2876,8 +2839,10 @@ export const STEPS: StepDef[] = [
     label: "Architecture Overview",
     nextButton: "Send Traffic",
     action: "resetRun",
-    explain: (s) =>
-      \`\${s.variant === "variant-a" ? "Variant A" : "Variant B"} selected. Step through to compare.\`,
+    explain: (s) => {
+      const adapter = getAdapter(s.variant);
+      return \`\${adapter.profile.label} selected. Step through to compare.\`;
+    },
   },
   {
     key: "send-traffic",
@@ -2905,14 +2870,16 @@ export const STEPS: StepDef[] = [
     delay: 500,
     phase: "comparison",
     finalHotZones: ["node-b"],
-    explain: (s) =>
-      \`\${s.variant === "variant-a" ? "Variant A" : "Variant B"} — \${s.throughput} rps at \${s.latencyMs}ms latency.\`,
+    explain: (s) => {
+      const adapter = getAdapter(s.variant);
+      return \`\${adapter.profile.label} — \${s.throughput} rps at \${s.latencyMs}ms latency.\`;
+    },
   },
   {
     key: "summary",
     label: "Summary",
     phase: "summary",
-    explain: (s) =>
+    explain: () =>
       \`Comparison complete. Try switching variants and replaying.\`,
   },
 ];
@@ -2936,6 +2903,298 @@ export async function executeFlow(
 fs.writeFileSync(path.join(targetDir, "flow-engine.ts"), flowEngineContent);
 
 /* ================================================================
+   7d-ii. (Comparison only) Adapter scaffolding
+   ================================================================ */
+const adaptersDir = path.join(targetDir, `${pluginName}-adapters`);
+fs.mkdirSync(adaptersDir, { recursive: true });
+
+// ── types.ts ──────────────────────────────────────────────
+const adapterTypesContent = `/**
+ * ${pascalName}Adapter — the behavioural contract each variant must implement.
+ *
+ * Instead of scattering \\\`if (variant === "variant-a") … else …\\\`
+ * throughout the slice, flow-engine, and main.tsx, each variant
+ * implements this interface.  Consumers call \\\`getAdapter(variant)\\\`.
+ */
+
+import type { ${pascalName}State, VariantKey } from "../${camelName}Slice";
+import type { FlowBeat } from "../flow-engine";
+
+/* ── Static metadata ───────────────────────────────────── */
+
+export interface VariantProfile {
+  label: string;
+  description: string;
+}
+
+export interface VariantColors {
+  fill: string;   // dark node fill when highlighted
+  stroke: string; // accent border
+}
+
+/* ── Scene rendering ───────────────────────────────────── */
+
+export interface SceneHelpers {
+  hot: (zone: string) => boolean;
+  phase: string;
+}
+
+export interface StatBadgeConfig {
+  label: string;
+  value: string | number;
+  color: string;
+}
+
+/* ── The adapter interface ─────────────────────────────── */
+
+export interface ${pascalName}Adapter {
+  /** Unique key matching VariantKey */
+  id: VariantKey;
+
+  /** Static display metadata */
+  profile: VariantProfile;
+  colors: VariantColors;
+
+  /* ── Metrics ───────────────────────────────────────── */
+
+  /** Compute and mutate derived metrics on the state */
+  computeMetrics(state: ${pascalName}State): void;
+
+  /* ── Token expansion (flow engine) ─────────────────── */
+
+  /** Expand a $token into concrete node IDs, or null to use the token as-is */
+  expandToken(token: string, state: ${pascalName}State): string[] | null;
+
+  /* ── Flow engine ───────────────────────────────────── */
+
+  /** Return adapter-specific flow beats for the main traffic step */
+  getFlowBeats(state: ${pascalName}State): FlowBeat[];
+
+  /* ── Scene (VizCraft topology) ─────────────────────── */
+
+  /** Build the topology portion of the VizCraft scene */
+  buildTopology(
+    builder: any, // eslint-disable-line @typescript-eslint/no-explicit-any -- viz() builder
+    state: ${pascalName}State,
+    helpers: SceneHelpers,
+  ): void;
+
+  /** Stat badges for the header */
+  getStatBadges(state: ${pascalName}State): StatBadgeConfig[];
+
+  /* ── Soft reset per animation pass ─────────────────── */
+
+  /** Reset per-pass state (randomise, etc.) */
+  softReset(state: ${pascalName}State): void;
+}
+`;
+
+fs.writeFileSync(path.join(adaptersDir, "types.ts"), adapterTypesContent);
+
+// ── index.ts ─────────────────────────────────────────────
+const adapterIndexContent = `export type {
+  ${pascalName}Adapter,
+  StatBadgeConfig,
+  SceneHelpers,
+  VariantProfile,
+  VariantColors,
+} from "./types";
+
+import type { VariantKey } from "../${camelName}Slice";
+import type { ${pascalName}Adapter } from "./types";
+import { variantAAdapter } from "./variant-a";
+import { variantBAdapter } from "./variant-b";
+
+const ADAPTERS: Record<VariantKey, ${pascalName}Adapter> = {
+  "variant-a": variantAAdapter,
+  "variant-b": variantBAdapter,
+};
+
+/** Look up the adapter for the given variant key. */
+export function getAdapter(key: VariantKey): ${pascalName}Adapter {
+  return ADAPTERS[key];
+}
+
+/** All registered adapters (for iteration in controls, etc.). */
+export const allAdapters: ${pascalName}Adapter[] = Object.values(ADAPTERS);
+`;
+
+fs.writeFileSync(path.join(adaptersDir, "index.ts"), adapterIndexContent);
+
+// ── variant-a.ts ─────────────────────────────────────────
+const variantAContent = `import type { ${pascalName}Adapter } from "./types";
+import type { ${pascalName}State } from "../${camelName}Slice";
+
+export const variantAAdapter: ${pascalName}Adapter = {
+  id: "variant-a",
+
+  profile: {
+    label: "Variant A",
+    description: "Describe variant A's approach.",
+  },
+
+  colors: {
+    fill: "#1e3a5f",
+    stroke: "#3b82f6",
+  },
+
+  /* ── Metrics ───────────────────────────────────────── */
+
+  computeMetrics(state: ${pascalName}State) {
+    // TODO: compute real metrics for variant A
+    state.latencyMs = 50;
+    state.throughput = 1000;
+  },
+
+  /* ── Token expansion ───────────────────────────────── */
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  expandToken(_token: string, _state: ${pascalName}State): string[] | null {
+    // TODO: expand $-tokens to concrete node IDs
+    // e.g. if (token === "$nodes") return state.nodes.map(n => n.id);
+    return null; // fallback — use token as-is
+  },
+
+  /* ── Flow engine ───────────────────────────────────── */
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getFlowBeats(_state: ${pascalName}State) {
+    // TODO: return adapter-specific flow beats
+    return [];
+  },
+
+  /* ── Scene ─────────────────────────────────────────── */
+
+  buildTopology(builder, _state, helpers) {
+    // TODO: build variant-A-specific nodes & edges
+    builder
+      .node("node-a")
+      .at(200, 300)
+      .rect(140, 60, 12)
+      .fill(helpers.hot("node-a") ? "#1e40af" : "#0f172a")
+      .stroke(helpers.hot("node-a") ? "#60a5fa" : "#334155", 2)
+      .label("Node A", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    builder
+      .node("node-b")
+      .at(650, 300)
+      .rect(140, 60, 12)
+      .fill(helpers.hot("node-b") ? "#065f46" : "#0f172a")
+      .stroke(helpers.hot("node-b") ? "#34d399" : "#334155", 2)
+      .label("Node B", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    builder
+      .edge("node-a", "node-b", "edge-ab")
+      .stroke("#475569", 2)
+      .animate("flow", { duration: "3s" });
+  },
+
+  getStatBadges(state: ${pascalName}State) {
+    return [
+      { label: "Variant", value: "A", color: "#3b82f6" },
+      { label: "Latency", value: \`\${state.latencyMs}ms\`, color: "#60a5fa" },
+      { label: "Throughput", value: \`\${state.throughput} rps\`, color: "#22c55e" },
+    ];
+  },
+
+  /* ── Soft reset ────────────────────────────────────── */
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  softReset(_state: ${pascalName}State) {
+    // TODO: randomise per-pass state if needed
+  },
+};
+`;
+
+fs.writeFileSync(path.join(adaptersDir, "variant-a.ts"), variantAContent);
+
+// ── variant-b.ts ─────────────────────────────────────────
+const variantBContent = `import type { ${pascalName}Adapter } from "./types";
+import type { ${pascalName}State } from "../${camelName}Slice";
+
+export const variantBAdapter: ${pascalName}Adapter = {
+  id: "variant-b",
+
+  profile: {
+    label: "Variant B",
+    description: "Describe variant B's approach.",
+  },
+
+  colors: {
+    fill: "#064e3b",
+    stroke: "#22c55e",
+  },
+
+  /* ── Metrics ───────────────────────────────────────── */
+
+  computeMetrics(state: ${pascalName}State) {
+    // TODO: compute real metrics for variant B
+    state.latencyMs = 120;
+    state.throughput = 2000;
+  },
+
+  /* ── Token expansion ───────────────────────────────── */
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  expandToken(_token: string, _state: ${pascalName}State): string[] | null {
+    return null;
+  },
+
+  /* ── Flow engine ───────────────────────────────────── */
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getFlowBeats(_state: ${pascalName}State) {
+    return [];
+  },
+
+  /* ── Scene ─────────────────────────────────────────── */
+
+  buildTopology(builder, _state, helpers) {
+    // TODO: build variant-B-specific nodes & edges
+    builder
+      .node("node-a")
+      .at(200, 300)
+      .rect(140, 60, 12)
+      .fill(helpers.hot("node-a") ? "#064e3b" : "#0f172a")
+      .stroke(helpers.hot("node-a") ? "#22c55e" : "#334155", 2)
+      .label("Node A", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    builder
+      .node("node-b")
+      .at(650, 300)
+      .rect(140, 60, 12)
+      .fill(helpers.hot("node-b") ? "#064e3b" : "#0f172a")
+      .stroke(helpers.hot("node-b") ? "#22c55e" : "#334155", 2)
+      .label("Node B", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    builder
+      .edge("node-a", "node-b", "edge-ab")
+      .stroke("#475569", 2)
+      .animate("flow", { duration: "3s" });
+  },
+
+  getStatBadges(state: ${pascalName}State) {
+    return [
+      { label: "Variant", value: "B", color: "#22c55e" },
+      { label: "Latency", value: \`\${state.latencyMs}ms\`, color: "#60a5fa" },
+      { label: "Throughput", value: \`\${state.throughput} rps\`, color: "#22c55e" },
+    ];
+  },
+
+  /* ── Soft reset ────────────────────────────────────── */
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  softReset(_state: ${pascalName}State) {
+    // TODO: randomise per-pass state if needed
+  },
+};
+`;
+
+fs.writeFileSync(path.join(adaptersDir, "variant-b.ts"), variantBContent);
+
+console.log("  ✔ Created " + pluginName + "-adapters/ with types.ts, index.ts, variant-a.ts, variant-b.ts");
+
+/* ================================================================
    7e. (Comparison only) Controls  — controls.tsx
    ================================================================ */
 const controlsContent = `import React from "react";
@@ -2944,12 +3203,10 @@ import { type RootState } from "../../store/store";
 import { resetSimulation } from "../../store/slices/simulationSlice";
 import {
   setVariant,
-  VARIANT_PROFILES,
   type ${pascalName}State,
   type VariantKey,
 } from "./${camelName}Slice";
-
-const variantKeys = Object.keys(VARIANT_PROFILES) as VariantKey[];
+import { allAdapters } from "./${pluginName}-adapters";
 
 const ${pascalName}Controls: React.FC = () => {
   const dispatch = useDispatch();
@@ -2965,19 +3222,16 @@ const ${pascalName}Controls: React.FC = () => {
 
   return (
     <div className="${pluginName}-controls">
-      {variantKeys.map((key) => {
-        const profile = VARIANT_PROFILES[key];
-        return (
-          <button
-            key={key}
-            className={\`${pluginName}-controls__btn\${key === variant ? " ${pluginName}-controls__btn--active" : ""}\`}
-            style={key === variant ? { color: profile.color, borderColor: profile.color } : {}}
-            onClick={() => handleSwitch(key)}
-          >
-            {profile.label}
-          </button>
-        );
-      })}
+      {allAdapters.map((adapter) => (
+        <button
+          key={adapter.id}
+          className={\`${pluginName}-controls__btn\${adapter.id === variant ? " ${pluginName}-controls__btn--active" : ""}\`}
+          style={adapter.id === variant ? { color: adapter.colors.stroke, borderColor: adapter.colors.stroke } : {}}
+          onClick={() => handleSwitch(adapter.id)}
+        >
+          {adapter.profile.label}
+        </button>
+      ))}
     </div>
   );
 };
@@ -3122,6 +3376,11 @@ if (isTimeline) {
 if (isComparison) {
   console.log("    • flow-engine.ts      — Lab-engine step & flow config");
   console.log("    • controls.tsx        — Variant selector panel");
+  console.log("    • " + pluginName + "-adapters/");
+  console.log("        types.ts          — Adapter interface contract");
+  console.log("        index.ts          — getAdapter() registry");
+  console.log("        variant-a.ts      — Variant A adapter");
+  console.log("        variant-b.ts      — Variant B adapter");
 }
 console.log("");
 console.log("  Next steps:");
@@ -3138,12 +3397,13 @@ if (isSandbox) {
   console.log("    4. Add concept pills & definitions in concepts.tsx");
   console.log("    5. Customise node tooltips and sidebar detail in main.tsx");
 } else if (isComparison) {
-  console.log("    1. Define VariantKey + VARIANT_PROFILES in " + camelName + "Slice.ts");
-  console.log("    2. Implement computeMetrics() per variant");
-  console.log("    3. Define steps & flow beats in STEPS (flow-engine.ts)");
-  console.log("    4. Build dynamic scene in main.tsx (nodes adapt to selected variant)");
-  console.log("    5. Add concept pills & definitions in concepts.tsx");
-  console.log("    6. Uses shared lib/lab-engine — animation hook is ~30 lines");
+  console.log("    1. Rename VariantKey values + adapter files to match your domain");
+  console.log("    2. Implement computeMetrics() in each adapter");
+  console.log("    3. Build variant-specific VizCraft topology in buildTopology()");
+  console.log("    4. Add $-token expansion in expandToken() per adapter");
+  console.log("    5. Define steps & flow beats in STEPS (flow-engine.ts)");
+  console.log("    6. Add concept pills & definitions in concepts.tsx");
+  console.log("    7. Uses shared lib/lab-engine — animation hook is ~30 lines");
 } else {
   console.log("    1. Define your VizCraft nodes/edges in main.tsx");
   console.log("    2. Add step animations in use" + pascalName + "Animation.ts");
