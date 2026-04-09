@@ -12,6 +12,7 @@ export type ConceptKey =
   | "mqtt"
   | "iot-core"
   | "device-shadow"
+  | "dead-letter-queue"
   | "kafka"
   | "service-discovery"
   | "serialization"
@@ -403,15 +404,20 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
           <>
             <p>
               MQTT is a lightweight publish/subscribe protocol built for devices
-              with constrained CPU, battery, or network quality. Devices do not
-              call backend services directly. They keep a long-lived connection
-              to a broker and publish or subscribe on topics.
+              with limited battery, processing power, or unstable internet.
+              Devices do not call backend services directly. Instead, they stay
+              connected to one message hub and send or receive messages through
+              named channels called <strong>topics</strong> (message channels).
             </p>
             <p style={{ marginTop: 8 }}>
               On AWS, that broker is usually <strong>AWS IoT Core</strong>.
-              Devices connect to the account-specific IoT endpoint, publish
-              telemetry to topics, and receive downlink commands or shadow delta
-              updates over the same MQTT session.
+              Devices connect to AWS's device endpoint, send
+              <strong> telemetry </strong>
+              (readings or status updates like temperature, battery, or
+              location) to topics, and can receive
+              <strong> shadow delta </strong>
+              updates (messages saying what still needs to change) back over the
+              same connection.
             </p>
           </>
         ),
@@ -421,15 +427,33 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         accent: "#60a5fa",
         content: (
           <ul>
-            <li>Device connects with X.509 certificate and IoT policy</li>
-            <li>Device publishes telemetry topic to AWS IoT Core</li>
             <li>
-              IoT Rules route matching messages to Lambda, Timestream, SQS,
-              EventBridge, or Kinesis
+              Each device connects with its own{" "}
+              <strong>X.509 certificate</strong> (digital ID card) and{" "}
+              <strong>IoT policy</strong> (permission rules) — no two devices
+              share a certificate
             </li>
-            <li>Device Shadow stores desired and reported device state</li>
             <li>
-              Cloud apps publish commands through AWS IoT APIs or shadow updates
+              Device publishes <strong>telemetry</strong>
+              (measurements or status updates)
+            </li>
+            <li>
+              AWS IoT Core checks <strong>IoT Rules</strong>
+              (routing rules) and forwards the message to the right AWS service
+            </li>
+            <li>
+              If processing fails, a{" "}
+              <strong>Dead-Letter Queue (DLQ)</strong> preserves the message so
+              it can be inspected and replayed later
+            </li>
+            <li>
+              <strong>Device Shadow</strong> stores only the{" "}
+              <em>last state</em> (reported from device + desired from cloud) —
+              not a history log
+            </li>
+            <li>
+              Cloud apps send commands by updating the shadow's desired state
+              instead of calling the device directly
             </li>
           </ul>
         ),
@@ -440,10 +464,17 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <ul>
             <li>
-              Telemetry ingestion from sensors, gateways, and embedded devices
+              Collecting <strong>telemetry</strong>
+              (readings) from sensors, gateways, and embedded devices
             </li>
-            <li>Cloud-to-device commands or configuration changes</li>
-            <li>Offline-tolerant device state synchronization with shadows</li>
+            <li>
+              Sending commands or setting changes from the cloud to devices
+            </li>
+            <li>
+              Keeping device state in sync even when devices disconnect for a
+              while using <strong>Device Shadow</strong>
+              (cloud state copy)
+            </li>
             <li>Low-bandwidth or intermittently connected device fleets</li>
           </ul>
         ),
@@ -459,7 +490,12 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
               management
             </li>
             <li>
-              Topic hierarchy and fleet identity model need strong governance
+              Device Shadow is last-state only — use Timestream or S3 for
+              historical data
+            </li>
+            <li>
+              Without a Dead-Letter Queue (DLQ), failed messages are silently
+              lost — always configure one
             </li>
             <li>
               Best for device messaging, not as a generic integration backbone
@@ -483,14 +519,17 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
           <>
             <p>
               AWS IoT Core is more than just a broker. It provides the managed
-              MQTT endpoint, Thing identities, certificate-based device auth,
-              IoT policies, reserved shadow topics, and the rules engine that
-              routes messages into other AWS services.
+              MQTT endpoint, device identities,{" "}
+              <strong>X.509 certificates</strong>
+              (device ID cards), <strong>IoT policies</strong>
+              (permission rules), special shadow topics, and the routing engine
+              that sends messages into other AWS services.
             </p>
             <p style={{ marginTop: 8 }}>
-              Devices typically connect with mutual TLS on port 8883. When that
-              is difficult, clients can also use MQTT over WebSockets on port
-              443 with SigV4-backed auth.
+              Devices usually connect with <strong>mutual TLS</strong>
+              (an encrypted connection where both sides prove who they are) on
+              port 8883. If that style of connection is not possible, MQTT can
+              also ride on WebSockets over port 443.
             </p>
           </>
         ),
@@ -501,15 +540,23 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <ul>
             <li>
-              Create a Thing or a provisioning strategy for each device class
-            </li>
-            <li>Provision X.509 certs and attach narrow IoT policies</li>
-            <li>
-              Design topic names so tenants, devices, and actions are clear
+              Give each device a clear <strong>Thing identity</strong>
+              (its AWS record in the device registry)
             </li>
             <li>
-              Use IoT Rules to fan topics into downstream services instead of
-              teaching devices about those systems
+              Give each device an <strong>X.509 certificate</strong>
+              (digital ID card) and only the <strong>IoT policy</strong>
+              permissions it really needs
+            </li>
+            <li>
+              Name <strong>topics</strong>
+              (message channels) clearly so it is obvious which device and
+              action a message belongs to
+            </li>
+            <li>
+              Let <strong>IoT Rules</strong>
+              route messages into AWS services so devices stay simple and do not
+              need to know your backend details
             </li>
           </ul>
         ),
@@ -519,41 +566,83 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
 
   "device-shadow": {
     title: "Device Shadow",
-    subtitle: "Desired and reported state for online or offline devices",
+    subtitle: "Last-state-only cloud copy — not a history log",
     accentColor: "#60a5fa",
     sections: [
       {
-        title: "Why it matters",
+        title: "What it stores (and what it does NOT)",
         accent: "#60a5fa",
         content: (
           <>
             <p>
-              Device Shadow stores a JSON document with a device's
-              <strong> desired state </strong>
-              from the cloud and
-              <strong> reported state </strong>
-              from the device. AWS IoT Core computes the delta between them.
+              Device Shadow is a small JSON document in the cloud with two
+              sections:
             </p>
+            <ul style={{ marginTop: 4 }}>
+              <li>
+                <strong>reported</strong> — the latest state the device says it
+                has, e.g. <code>{`{"temp": 22}`}</code>
+              </li>
+              <li>
+                <strong>desired</strong> — the state the cloud wants the device
+                to reach, e.g. <code>{`{"temp": 20}`}</code>
+              </li>
+            </ul>
             <p style={{ marginTop: 8 }}>
-              This means cloud systems can request a state change even when the
-              device is offline. When the device reconnects, it receives the
-              delta and can reconcile itself.
+              AWS IoT Core computes the <strong>delta</strong> (the difference),
+              e.g. <code>{`{"temp": 20}`}</code> — meaning the device still
+              needs to change to 20.
+            </p>
+            <p
+              style={{ marginTop: 8, color: "#f87171", fontWeight: "bold" }}
+            >
+              Important: the shadow only keeps the LATEST value for each
+              field. When a new reading arrives, it overwrites the previous
+              one. It is NOT a history log. If you need a history of
+              temperature readings over time, store telemetry in Timestream
+              or S3.
             </p>
           </>
         ),
       },
       {
-        title: "How command flow often works",
+        title: "Example: what happens step by step",
         accent: "#22c55e",
         content: (
-          <ul>
+          <ol>
             <li>
-              Backend app writes desired state through AWS SDK or IoT Data Plane
+              Device publishes reported state:{" "}
+              <code>{`{"temp": 22}`}</code>
             </li>
-            <li>Shadow computes delta between desired and reported state</li>
-            <li>Device subscribes to reserved shadow topics</li>
-            <li>Device applies the change and updates reported state back</li>
-          </ul>
+            <li>
+              Backend writes desired state:{" "}
+              <code>{`{"temp": 20}`}</code>
+            </li>
+            <li>
+              Shadow computes delta:{" "}
+              <code>{`{"temp": 20}`}</code> (device needs to cool down)
+            </li>
+            <li>
+              Device receives delta, adjusts, then reports:{" "}
+              <code>{`{"temp": 20}`}</code>
+            </li>
+            <li>
+              Desired and reported now match — delta becomes empty, no more
+              commands
+            </li>
+          </ol>
+        ),
+      },
+      {
+        title: "Offline scenario",
+        accent: "#f59e0b",
+        content: (
+          <p>
+            If the device is offline when the cloud writes a new desired state,
+            the shadow keeps the delta. When the device reconnects, it receives
+            the delta and catches up — this is why shadow is useful for
+            intermittent connections.
+          </p>
         ),
       },
       {
@@ -561,13 +650,79 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         accent: "#ef4444",
         content: (
           <ul>
-            <li>Not a full historical event store</li>
-            <li>Not a replacement for telemetry storage in Timestream or S3</li>
             <li>
-              Not the same as fleet-wide operational workflows like firmware
-              rollouts, which usually use IoT Jobs
+              Not a full historical event store — only <em>last state</em>
+            </li>
+            <li>
+              Not a replacement for storing sensor readings in Timestream or S3
+            </li>
+            <li>
+              Not the same as fleet-wide jobs like firmware updates, which
+              usually use AWS IoT Jobs
             </li>
           </ul>
+        ),
+      },
+    ],
+  },
+
+  "dead-letter-queue": {
+    title: "Dead-Letter Queue (DLQ)",
+    subtitle: "Safety net for messages that cannot be processed",
+    accentColor: "#ef4444",
+    sections: [
+      {
+        title: "What it is",
+        accent: "#ef4444",
+        content: (
+          <>
+            <p>
+              A Dead-Letter Queue (DLQ) is a special queue where messages go
+              when they <strong>cannot be processed</strong> after several
+              automatic retries. Instead of silently dropping the message, the
+              system moves it to the DLQ so it is preserved.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              Think of it like a post office's "undeliverable mail" bin — if a
+              letter keeps bouncing back, it goes into a separate pile so
+              someone can look at it later.
+            </p>
+          </>
+        ),
+      },
+      {
+        title: "Why it matters in MQTT / IoT",
+        accent: "#f59e0b",
+        content: (
+          <ul>
+            <li>
+              If Lambda fails (bug, timeout, or downstream outage), the
+              telemetry message is not lost
+            </li>
+            <li>
+              Engineers can inspect failed messages, fix the code, and{" "}
+              <strong>replay</strong> them from the DLQ
+            </li>
+            <li>
+              CloudWatch alarms can watch the DLQ depth and alert when failures
+              spike
+            </li>
+            <li>
+              On AWS, the DLQ is usually an <strong>SQS queue</strong> attached
+              to the Lambda function or IoT Rule action
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Without a DLQ",
+        accent: "#ef4444",
+        content: (
+          <p>
+            Without a DLQ, failed messages are simply discarded after retries.
+            You would never know that readings were lost, and you cannot recover
+            them. A DLQ turns silent data loss into a visible, fixable problem.
+          </p>
         ),
       },
     ],

@@ -29,6 +29,7 @@ import CommandsQueriesPlugin from "./plugins/commands-and-queries";
 import CiCdBuildPlugin from "./plugins/ci-cd-build";
 import EcommerceCapPlugin from "./plugins/ecommerce-cap";
 import DistributedTransactionsPlugin from "./plugins/distributed-transactions";
+import AngularConstructorVsNgoninitPlugin from "./plugins/angular-constructor-vs-ngoninit";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -98,7 +99,7 @@ export const categories: PluginCategory[] = [
     description:
       "How code actually runs — event loops, call stacks, queues, rendering, and other runtime mechanics.",
     accent: "#14b8a6",
-    plugins: [EventLoopPlugin],
+    plugins: [EventLoopPlugin, AngularConstructorVsNgoninitPlugin],
   },
   {
     id: "iot",

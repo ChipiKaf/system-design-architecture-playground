@@ -739,42 +739,87 @@ function buildAmqpScene(b: Builder, hot: HotFn, signals: Signal[]) {
 }
 
 function buildMqttScene(b: Builder, hot: HotFn, signals: Signal[]) {
-  /*  Layout:
-      IoT Device → AWS IoT Core → IoT Rules → Lambda → Timestream
-                               └→ Device Shadow ← Ops / Backend
-      Downlink: Device Shadow → IoT Core → IoT Device  */
+  /*  Layout — 3 devices on the left, each with its own X.509 cert:
+      Temp Sensor    ─┐
+      Pressure Sensor ┤──→ AWS IoT Core ──→ IoT Rules ──→ Lambda ──→ Timestream
+      GPS Tracker    ─┘                          │             │
+                                                 │             └──→ SQS DLQ
+                                                 │
+                              ┌──────── Device Shadow ─────────┐
+                              │  reported  │  desired  │ delta │
+                              └────────────────────────────────┘
+                                               ↑
+                                          Ops / Backend                      */
 
-  darkNode(b, "iot-device", 40, 220, 110, 50, "IoT Device", hot, "#a78bfa", {
-    fontSize: 10,
+  /* ── 3 IoT devices ───────────────────────────────── */
+  darkNode(b, "device-temp", 30, 120, 110, 40, "Temp Sensor", hot, "#a78bfa", {
+    fontSize: 9,
   });
+  darkNode(
+    b,
+    "device-pressure",
+    30,
+    220,
+    110,
+    40,
+    "Pressure Sensor",
+    hot,
+    "#a78bfa",
+    { fontSize: 9 },
+  );
+  darkNode(b, "device-gps", 30, 320, 110, 40, "GPS Tracker", hot, "#a78bfa", {
+    fontSize: 9,
+  });
+
+  /* ── Core cloud path ─────────────────────────────── */
   brokerNode(b, "iot-core", 220, 218, 132, 56, "AWS IoT Core", hot, "#a78bfa");
-  awsNode(b, "iot-rules", 430, 120, "IoT Rules", hot, "#f59e0b");
-  awsNode(b, "lambda-ingest", 600, 120, "Lambda", hot, "#f59e0b");
-  awsNode(b, "timestream", 770, 120, "Timestream", hot, "#22c55e");
+  awsNode(b, "iot-rules", 430, 80, "IoT Rules", hot, "#f59e0b");
+  awsNode(b, "lambda-ingest", 600, 80, "Lambda", hot, "#f59e0b");
+  awsNode(b, "timestream", 780, 80, "Timestream", hot, "#22c55e");
+
+  /* ── Dead-letter queue for failed messages ───────── */
+  darkNode(b, "sqs-dlq", 600, 170, 100, 36, "SQS DLQ", hot, "#ef4444", {
+    fontSize: 9,
+  });
+
+  /* ── Device Shadow area (expanded) ───────────────── */
   darkNode(
     b,
     "device-shadow",
-    450,
-    330,
-    130,
-    46,
+    410,
+    350,
+    200,
+    90,
     "Device Shadow",
     hot,
     "#60a5fa",
-    { fontSize: 10 },
+    { fontSize: 11 },
   );
-  darkNode(b, "ops-app", 690, 330, 130, 46, "Ops / Backend", hot, "#60a5fa", {
+
+  /* ── Ops / Backend ───────────────────────────────── */
+  darkNode(b, "ops-app", 710, 370, 130, 46, "Ops / Backend", hot, "#60a5fa", {
     fontSize: 10,
   });
 
-  b.edge("iot-device", "iot-core", "e-mqtt-connect")
+  /* ── Device → IoT Core edges (each device has its own cert) ── */
+  b.edge("device-temp", "iot-core", "e-mqtt-conn-temp")
     .stroke("#a78bfa", 2)
     .arrow(true)
-    .label("MQTT/TLS", { fill: "#c4b5fd", fontSize: 8 });
+    .label("MQTT/TLS", { fill: "#c4b5fd", fontSize: 7 });
+  b.edge("device-pressure", "iot-core", "e-mqtt-conn-pressure")
+    .stroke("#a78bfa", 2)
+    .arrow(true)
+    .label("MQTT/TLS", { fill: "#c4b5fd", fontSize: 7 });
+  b.edge("device-gps", "iot-core", "e-mqtt-conn-gps")
+    .stroke("#a78bfa", 2)
+    .arrow(true)
+    .label("MQTT/TLS", { fill: "#c4b5fd", fontSize: 7 });
+
+  /* ── Telemetry processing path ───────────────────── */
   b.edge("iot-core", "iot-rules", "e-mqtt-rules")
     .stroke("#f59e0b", 1.8)
     .arrow(true)
-    .label("devices/+/telemetry", { fill: "#fbbf24", fontSize: 7 });
+    .label("telemetry topic (readings)", { fill: "#fbbf24", fontSize: 7 });
   b.edge("iot-rules", "lambda-ingest", "e-mqtt-lambda")
     .stroke("#f59e0b", 1.8)
     .arrow(true)
@@ -782,26 +827,47 @@ function buildMqttScene(b: Builder, hot: HotFn, signals: Signal[]) {
   b.edge("lambda-ingest", "timestream", "e-mqtt-store")
     .stroke("#22c55e", 1.8)
     .arrow(true)
-    .label("write telemetry", { fill: "#4ade80", fontSize: 7 });
+    .label("store telemetry (readings)", { fill: "#4ade80", fontSize: 7 });
+
+  /* ── Failed message → DLQ ────────────────────────── */
+  b.edge("lambda-ingest", "sqs-dlq", "e-mqtt-dlq")
+    .stroke("#ef4444", 1.5)
+    .arrow(true)
+    .dashed()
+    .label("failed → retry queue", { fill: "#fca5a5", fontSize: 7 });
+
+  /* ── Shadow edges ────────────────────────────────── */
   b.edge("iot-core", "device-shadow", "e-mqtt-shadow-report")
     .stroke("#60a5fa", 1.6)
     .arrow(true)
-    .label("reported state", { fill: "#93c5fd", fontSize: 7 });
+    .label("reported state (device says this)", {
+      fill: "#93c5fd",
+      fontSize: 7,
+    });
   b.edge("ops-app", "device-shadow", "e-mqtt-shadow-desired")
     .stroke("#60a5fa", 1.6)
     .arrow(true)
-    .label("desired state", { fill: "#93c5fd", fontSize: 7 });
+    .label("desired state (cloud wants this)", {
+      fill: "#93c5fd",
+      fontSize: 7,
+    });
   b.edge("device-shadow", "iot-core", "e-mqtt-delta")
     .stroke("#60a5fa", 1.5)
     .arrow(true)
     .dashed()
-    .label("shadow delta", { fill: "#93c5fd", fontSize: 7 });
-  b.edge("iot-core", "iot-device", "e-mqtt-downlink")
+    .label("delta (what still needs to change)", {
+      fill: "#93c5fd",
+      fontSize: 7,
+    });
+
+  /* ── Downlink back to a device ───────────────────── */
+  b.edge("iot-core", "device-temp", "e-mqtt-downlink")
     .stroke("#22c55e", 1.5)
     .arrow(true)
     .dashed()
     .label("command / delta", { fill: "#4ade80", fontSize: 7 });
 
+  /* ── Overlays ────────────────────────────────────── */
   b.overlay((o) => {
     o.add(
       "rect",
@@ -836,23 +902,60 @@ function buildMqttScene(b: Builder, hot: HotFn, signals: Signal[]) {
       {
         x: W / 2,
         y: H - 16,
-        text: "MQTT over TLS · IoT Rules · Device Shadow · Cloud-to-device",
+        text: "MQTT/TLS (encrypted MQTT) · IoT Rules · DLQ (dead-letter queue) · Device Shadow (last state only) · cloud-to-device",
         fill: "#475569",
-        fontSize: 9,
+        fontSize: 8,
       },
       { key: "footer" },
+    );
+
+    /* ── Per-device X.509 cert labels ─────────────── */
+    o.add(
+      "text",
+      {
+        x: 30,
+        y: 108,
+        text: "🔑 X.509 cert A",
+        fill: "#c4b5fd",
+        fontSize: 7,
+      },
+      { key: "cert-temp" },
     );
     o.add(
       "text",
       {
-        x: 82,
-        y: 205,
-        text: "X.509 cert + IoT policy",
+        x: 30,
+        y: 208,
+        text: "🔑 X.509 cert B",
         fill: "#c4b5fd",
         fontSize: 7,
       },
-      { key: "mqtt-auth" },
+      { key: "cert-pressure" },
     );
+    o.add(
+      "text",
+      {
+        x: 30,
+        y: 308,
+        text: "🔑 X.509 cert C",
+        fill: "#c4b5fd",
+        fontSize: 7,
+      },
+      { key: "cert-gps" },
+    );
+    o.add(
+      "text",
+      {
+        x: 85,
+        y: 370,
+        text: "each device has its own\ncert (ID card) + IoT policy (rules)",
+        fill: "#a78bfa",
+        fontSize: 7,
+      },
+      { key: "cert-note" },
+    );
+
+    /* ── IoT Core label ──────────────────────────── */
     o.add(
       "text",
       {
@@ -864,12 +967,14 @@ function buildMqttScene(b: Builder, hot: HotFn, signals: Signal[]) {
       },
       { key: "aws-iot-core" },
     );
+
+    /* ── Rules / processing annotations ──────────── */
     o.add(
       "text",
       {
         x: 430,
-        y: 102,
-        text: "SQL-like topic filters",
+        y: 62,
+        text: "IoT Rule (if this topic matches, send it here)",
         fill: "#fbbf24",
         fontSize: 7,
       },
@@ -878,25 +983,155 @@ function buildMqttScene(b: Builder, hot: HotFn, signals: Signal[]) {
     o.add(
       "text",
       {
-        x: 450,
-        y: 316,
-        text: "$aws/things/{thing}/shadow/...",
-        fill: "#93c5fd",
+        x: 600,
+        y: 200,
+        text: "⚠ failed after retries →\nmessage preserved, not lost",
+        fill: "#fca5a5",
         fontSize: 7,
       },
-      { key: "mqtt-shadow-note" },
+      { key: "dlq-note" },
+    );
+
+    /* ── Device Shadow detail overlays ───────────── */
+    o.add(
+      "rect",
+      {
+        x: 414,
+        y: 370,
+        w: 88,
+        h: 56,
+        rx: 4,
+        ry: 4,
+        fill: "rgba(96,165,250,0.08)",
+        stroke: "#60a5fa",
+        strokeWidth: 0.8,
+        opacity: 1,
+      },
+      { key: "shadow-reported-bg" },
     );
     o.add(
       "text",
       {
-        x: 690,
-        y: 316,
-        text: "AWS SDK / IoT Data Plane",
+        x: 458,
+        y: 382,
+        text: "reported (device)",
+        fill: "#93c5fd",
+        fontSize: 7,
+        fontWeight: "bold",
+      },
+      { key: "shadow-reported-title" },
+    );
+    o.add(
+      "text",
+      {
+        x: 458,
+        y: 396,
+        text: '{ "temp": 22 }',
+        fill: "#64748b",
+        fontSize: 7,
+      },
+      { key: "shadow-reported-val" },
+    );
+    o.add(
+      "text",
+      {
+        x: 458,
+        y: 410,
+        text: "latest only — no history",
+        fill: "#475569",
+        fontSize: 6,
+      },
+      { key: "shadow-reported-note" },
+    );
+
+    o.add(
+      "rect",
+      {
+        x: 510,
+        y: 370,
+        w: 88,
+        h: 56,
+        rx: 4,
+        ry: 4,
+        fill: "rgba(96,165,250,0.08)",
+        stroke: "#60a5fa",
+        strokeWidth: 0.8,
+        opacity: 1,
+      },
+      { key: "shadow-desired-bg" },
+    );
+    o.add(
+      "text",
+      {
+        x: 554,
+        y: 382,
+        text: "desired (cloud)",
+        fill: "#93c5fd",
+        fontSize: 7,
+        fontWeight: "bold",
+      },
+      { key: "shadow-desired-title" },
+    );
+    o.add(
+      "text",
+      {
+        x: 554,
+        y: 396,
+        text: '{ "temp": 20 }',
+        fill: "#64748b",
+        fontSize: 7,
+      },
+      { key: "shadow-desired-val" },
+    );
+    o.add(
+      "text",
+      {
+        x: 554,
+        y: 410,
+        text: "overwrites previous",
+        fill: "#475569",
+        fontSize: 6,
+      },
+      { key: "shadow-desired-note" },
+    );
+
+    o.add(
+      "text",
+      {
+        x: 510,
+        y: 434,
+        text: 'delta → { "temp": 20 }  (what still needs to change)',
+        fill: "#fbbf24",
+        fontSize: 7,
+        fontWeight: "bold",
+      },
+      { key: "shadow-delta-val" },
+    );
+    o.add(
+      "text",
+      {
+        x: 510,
+        y: 448,
+        text: "⚠ Shadow stores LAST STATE only — it is NOT a history log",
+        fill: "#f87171",
+        fontSize: 7,
+      },
+      { key: "shadow-not-history" },
+    );
+
+    /* ── Ops / Backend annotation ────────────────── */
+    o.add(
+      "text",
+      {
+        x: 710,
+        y: 356,
+        text: "backend writes desired state (wanted settings)",
         fill: "#93c5fd",
         fontSize: 7,
       },
       { key: "mqtt-backend-note" },
     );
+
     signals.forEach((sig) => {
       const { id, colorClass, ...params } = sig;
       o.add("signal", params as SignalOverlayParams, {
@@ -1121,7 +1356,7 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
   const hot = (zone: string) => hotZones.includes(zone);
   const apiSurfaceSummary =
     variant === "mqtt"
-      ? "Device-facing async protocol: IoT devices keep long-lived MQTT/TLS sessions to AWS IoT Core. Cloud apps usually interact through rules, shadows, and the IoT Data Plane rather than direct request/response calls."
+      ? "Device-facing async protocol: each device keeps its own MQTT/TLS connection (encrypted MQTT) to AWS IoT Core, authenticated by its own X.509 certificate (digital ID card). The cloud routes messages via IoT Rules, stores telemetry in Timestream, and if processing fails a Dead-Letter Queue (DLQ) preserves the message. Device Shadow keeps the last known state (not history) so the cloud can send commands even when a device is offline."
       : isAsync
         ? "Async messaging removes the request/response split: producers publish and continue immediately while consumers process later."
         : variant === "grpc"
@@ -1132,11 +1367,31 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
   const mqttSetupNotes =
     variant === "mqtt"
       ? [
-          "Provision each device with a Thing identity, X.509 certificate, and an IoT policy that only allows the right topics.",
-          "Devices usually connect to the account-specific AWS IoT Core endpoint over MQTT/TLS on port 8883, or over WebSockets on 443 when needed.",
-          "Use IoT Rules to fan telemetry into Lambda, Timestream, SQS, EventBridge, Kinesis, or other AWS targets without teaching the device about those services.",
-          "Use Device Shadow for desired and reported state so cloud apps can manage devices even when they disconnect.",
-          "If you later need fleet-wide remote actions like firmware rollout, AWS IoT Jobs usually complements shadows instead of replacing them.",
+          "Each device gets its own X.509 certificate (digital ID card) and IoT policy (permission rules). No two devices share a certificate — if one is compromised you revoke just that one.",
+          "Devices connect to AWS IoT Core over MQTT/TLS (encrypted MQTT) on port 8883.",
+          "Telemetry means readings or status updates from the device, such as temperature, battery, pressure, or location.",
+          "IoT Rules (routing rules) forward telemetry to Lambda, Timestream, SQS, etc. without the device knowing those systems.",
+          "If Lambda fails to process a message, configure an SQS Dead-Letter Queue (DLQ) so the message is saved for later inspection instead of being lost.",
+          "Device Shadow stores ONLY the last state — it is not a history log. It has two sections: 'reported' (from the device) and 'desired' (from the cloud). AWS computes the delta (the difference) automatically.",
+          "If you need history of readings over time, store telemetry in Timestream or S3 — shadow is only for current state.",
+        ]
+      : null;
+  const mqttPlainEnglishTerms =
+    variant === "mqtt"
+      ? [
+          "X.509 certificate: the device's digital ID card — each device gets its own.",
+          "IoT policy: the permission rules for what the device may publish or subscribe to.",
+          "Telemetry: the readings or status updates sent by the device.",
+          "Topic: the named message channel a device publishes to or listens on.",
+          "MQTT/TLS: MQTT sent over an encrypted connection.",
+          "AWS IoT Core: the managed message hub devices connect to.",
+          "Thing identity: the AWS record that represents one device.",
+          "Dead-Letter Queue (DLQ): a safety-net queue where failed messages go instead of being lost.",
+          "Device Shadow: stores ONLY the last state (not history) — has 'reported' and 'desired' sections.",
+          "Reported state: the latest state the device says it has (e.g. {\"temp\": 22}).",
+          "Desired state: the state the cloud wants the device to reach (e.g. {\"temp\": 20}).",
+          "Delta: the difference between desired and reported — what still needs to change.",
+          "Timestream: a database for measurements collected over time (the actual history).",
         ]
       : null;
 
@@ -1223,6 +1478,12 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
       label: "Device Shadow",
       color: "#93c5fd",
       borderColor: "#60a5fa",
+    },
+    {
+      key: "dead-letter-queue",
+      label: "DLQ",
+      color: "#fca5a5",
+      borderColor: "#ef4444",
     },
     {
       key: "temporal-coupling",
@@ -1348,6 +1609,22 @@ const MicroserviceCommVisualization: React.FC<Props> = ({
                 ))}
               </div>
             </SideCard>
+            {mqttPlainEnglishTerms ? (
+              <SideCard label="Plain-English Terms" variant="info">
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 16,
+                    color: "#cbd5e1",
+                    fontSize: "0.72rem",
+                  }}
+                >
+                  {mqttPlainEnglishTerms.map((term) => (
+                    <li key={term}>{term}</li>
+                  ))}
+                </ul>
+              </SideCard>
+            ) : null}
             {mqttSetupNotes ? (
               <SideCard label="AWS IoT Setup" variant="info">
                 <ul
