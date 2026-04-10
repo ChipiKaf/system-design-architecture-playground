@@ -63,6 +63,8 @@ export async function executeFlow<S extends LabState>(
   deps: FlowExecutorDeps<S>,
   expandToken: (token: string, state: S) => string[],
 ): Promise<void> {
+  let accumulated: string[] = [];
+
   for (const beat of beats) {
     if (deps.cancelled()) return;
 
@@ -80,8 +82,8 @@ export async function executeFlow<S extends LabState>(
     }
     if (pairs.length === 0) continue;
 
-    const hotZones = [...new Set([...froms, ...tos])];
-    const update: Partial<S> = { hotZones } as Partial<S>;
+    accumulated = [...new Set([...accumulated, ...froms, ...tos])];
+    const update: Partial<S> = { hotZones: accumulated } as Partial<S>;
     if (beat.explain)
       (update as Record<string, unknown>).explanation = beat.explain;
     deps.patch(update);

@@ -43,10 +43,16 @@ Every plugin lives in `src/plugins/{kebab-name}/` with exactly six files.
 ### Scaffolding
 
 ```bash
-npm run generate my-plugin --category "Category Name"
-# or shorthand:
-npm run generate my-plugin -c "Category Name"
+npm run generate -- my-plugin --category "Category Name"
+# or with a mode:
+npm run generate -- my-plugin --category "Category Name" --sandbox
+npm run generate -- my-plugin --category "Category Name" --comparison
+npm run generate -- my-plugin --category "Category Name" --modular
 ```
+
+Modes: `--sandbox` / `-s`, `--timeline` / `-t`, `--comparison` / `-l`, `--modular` / `-m`.
+
+For mode-specific rules see: vizcraft-sandbox-plugin, vizcraft-comparison-lab-plugin, vizcraft-modular-plugin.
 
 If the category exists, the plugin is appended into its `plugins` array.
 If the category does not exist, a new entry is created in the `categories` array.

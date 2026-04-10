@@ -31,6 +31,9 @@ import EcommerceCapPlugin from "./plugins/ecommerce-cap";
 import DistributedTransactionsPlugin from "./plugins/distributed-transactions";
 import AngularPlugin from "./plugins/angular";
 import SolidPlugin from "./plugins/solid";
+import GraphqlPlugin from "./plugins/graphql";
+import PostgresqlPlugin from "./plugins/postgresql";
+import StructuresPlugin from "./plugins/structures";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -78,6 +81,7 @@ export const categories: PluginCategory[] = [
       CapAcidPlugin,
       CiCdBuildPlugin,
       EcommerceCapPlugin,
+      GraphqlPlugin,
     ],
   },
   {
@@ -132,6 +136,14 @@ export const categories: PluginCategory[] = [
       DatabaseSelectionPlugin,
       DistributedTransactionsPlugin,
     ],
+  },
+  {
+    id: "database-deep-dive",
+    name: "Database Deep Dive",
+    description:
+      "Deep dives into database internals, indexing, query planning, storage patterns, and performance trade-offs.",
+    accent: "#10b981",
+    plugins: [PostgresqlPlugin, StructuresPlugin],
   },
 ];
 

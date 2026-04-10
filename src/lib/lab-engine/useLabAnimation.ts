@@ -112,7 +112,10 @@ export function useLabAnimation<S extends LabState, K extends string>(
 
         const tick = (now: number) => {
           const p = Math.min((now - start) / duration, 1);
-          setSignals(sigs.map((s) => ({ ...s, progress: p })));
+          setSignals((prev) => {
+            const completed = prev.filter((s) => s.progress >= 1);
+            return [...completed, ...sigs.map((s) => ({ ...s, progress: p }))];
+          });
           if (p < 1) {
             rafRef.current = requestAnimationFrame(tick);
           } else {

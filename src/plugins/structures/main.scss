@@ -1,0 +1,169 @@
+.structures-root {
+  --structures-bg: #020617;
+  --structures-panel: rgba(7, 17, 34, 0.88);
+  --structures-border: rgba(148, 163, 184, 0.18);
+  --structures-text: #e2e8f0;
+  --structures-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--structures-text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(59, 130, 246, 0.14),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(20, 184, 166, 0.12),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.structures-stage {
+  background: var(--structures-panel);
+  border: 1px solid var(--structures-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.structures-phase--overview .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.structures-phase--processing .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.structures-phase--comparison .vc-stat-badge__value {
+  color: #14b8a6;
+}
+.structures-phase--summary .vc-stat-badge__value {
+  color: #86efac;
+}
+
+/* ── Controls ────────────────────────────────────────── */
+.structures-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.structures-controls__group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.structures-controls__select {
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  outline: none;
+}
+.structures-controls__select:focus {
+  border-color: #60a5fa;
+}
+
+.structures-controls__btn {
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.structures-controls__btn:hover {
+  background: rgba(51, 65, 85, 0.7);
+}
+.structures-controls__btn--active {
+  border-color: currentColor;
+  background: rgba(51, 65, 85, 0.5);
+  font-weight: 700;
+}
+
+.structures-controls__sep {
+  width: 1px;
+  height: 1.2rem;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+/* ── Code block (sidebar) ───────────────────────────── */
+.structures-code {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+/* ── Heap table (sidebar) ───────────────────────────── */
+.structures-heap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+
+  th {
+    text-align: left;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.25rem 0.4rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  }
+
+  td {
+    padding: 0.22rem 0.4rem;
+    color: #94a3b8;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.07);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    transition: background 0.2s;
+  }
+}
+
+.structures-heap-row--new {
+  td {
+    color: #fde68a;
+    font-weight: 600;
+  }
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.structures-heap-row--highlight {
+  td {
+    color: #86efac;
+    font-weight: 600;
+  }
+  background: rgba(34, 197, 94, 0.12);
+}

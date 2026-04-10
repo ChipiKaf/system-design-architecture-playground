@@ -6,13 +6,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ── Arg parsing ────────────────────────────────────────────
-// Usage:  npm run generate -- <plugin-name> [--category "Category Name"] [--sandbox | --timeline | --comparison]
+// Usage:  npm run generate -- <plugin-name> [--category "Category Name"] [--sandbox | --timeline | --comparison | --modular]
 const args = process.argv.slice(2);
 let pluginName = null;
 let categoryName = null;
 let isSandbox = false;
 let isTimeline = false;
 let isComparison = false;
+let isModular = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--category" || args[i] === "-c") {
@@ -23,6 +24,8 @@ for (let i = 0; i < args.length; i++) {
     isTimeline = true;
   } else if (args[i] === "--comparison" || args[i] === "-l") {
     isComparison = true;
+  } else if (args[i] === "--modular" || args[i] === "-m") {
+    isModular = true;
   } else if (!args[i].startsWith("-")) {
     pluginName = args[i];
   }
@@ -30,18 +33,19 @@ for (let i = 0; i < args.length; i++) {
 
 if (!pluginName) {
   console.error(
-    "Usage: npm run generate -- <plugin-name> [--category \"Category Name\"] [--sandbox | --timeline | --comparison]\n" +
+    "Usage: npm run generate -- <plugin-name> [--category \"Category Name\"] [--sandbox | --timeline | --comparison | --modular]\n" +
       "       Name must be kebab-case, e.g. npm run generate -- api-gateway\n" +
       "       --category    / -c   Existing or new category to place the plugin in\n" +
       "       --sandbox     / -s   Dynamic controls + declarative flow engine\n" +
       "       --timeline    / -t   Progressive-reveal timeline\n" +
-      "       --comparison  / -l   Shared lab-engine comparison lab",
+      "       --comparison  / -l   Shared lab-engine comparison lab\n" +
+      "       --modular     / -m   Topic + variant adapters (interview / question style)",
   );
   process.exit(1);
 }
 
-if ([isSandbox, isTimeline, isComparison].filter(Boolean).length > 1) {
-  console.error("Error: --sandbox, --timeline, and --comparison are mutually exclusive.");
+if ([isSandbox, isTimeline, isComparison, isModular].filter(Boolean).length > 1) {
+  console.error("Error: --sandbox, --timeline, --comparison, and --modular are mutually exclusive.");
   process.exit(1);
 }
 
@@ -351,6 +355,112 @@ export const {
   patchState,
   recalcMetrics,
   setVariant,
+} = ${camelName}Slice.actions;
+export default ${camelName}Slice.reducer;
+`;
+} else if (isModular) {
+sliceContent = `import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import type { LabState } from "../../lib/lab-engine";
+import { getAdapter, TOPICS, type TopicKey } from "./${pluginName}-adapters";
+
+/* ── Variant identifiers ─────────────────────────────── */
+export type VariantKey = "topic-a-opt-1" | "topic-a-opt-2" | "topic-b-opt-1" | "topic-b-opt-2";
+// TODO: rename to match your domain (e.g. "constructor" | "ngoninit" | ...)
+
+export { type TopicKey };
+
+/* ── State shape ─────────────────────────────────────── */
+export interface ${pascalName}State extends LabState {
+  topic: TopicKey;
+  variant: VariantKey;
+
+  /* Topic A state fields */
+  // TODO: add per-topic state fields
+  topicAMetric: string;
+
+  /* Topic B state fields */
+  topicBMetric: string;
+}
+
+/* ── Metrics model (delegates to adapter) ────────────── */
+export function computeMetrics(state: ${pascalName}State) {
+  const adapter = getAdapter(state.variant);
+  adapter.computeMetrics(state);
+}
+
+function resetFlags(state: ${pascalName}State) {
+  state.topicAMetric = "none";
+  state.topicBMetric = "none";
+}
+
+export const initialState: ${pascalName}State = {
+  topic: TOPICS[0].id,
+  variant: TOPICS[0].defaultVariant as VariantKey,
+
+  topicAMetric: "none",
+  topicBMetric: "none",
+
+  hotZones: [],
+  explanation:
+    "Select a topic and variant above, then step through to explore.",
+  phase: "overview",
+};
+
+computeMetrics(initialState);
+
+/* ── Slice ───────────────────────────────────────────── */
+const ${camelName}Slice = createSlice({
+  name: "${camelName}",
+  initialState,
+  reducers: {
+    reset: () => {
+      const s = { ...initialState };
+      computeMetrics(s);
+      return s;
+    },
+    softResetRun: (state) => {
+      const adapter = getAdapter(state.variant);
+      adapter.softReset(state);
+      state.hotZones = [];
+      state.explanation = adapter.profile.description;
+      state.phase = "overview";
+      computeMetrics(state);
+    },
+    patchState(state, action: PayloadAction<Partial<${pascalName}State>>) {
+      Object.assign(state, action.payload);
+    },
+    recalcMetrics(state) {
+      computeMetrics(state);
+    },
+    setVariant(state, action: PayloadAction<VariantKey>) {
+      const adapter = getAdapter(action.payload);
+      resetFlags(state);
+      state.variant = action.payload;
+      state.hotZones = [];
+      state.explanation = adapter.profile.description;
+      state.phase = "overview";
+      computeMetrics(state);
+    },
+    setTopic(state, action: PayloadAction<TopicKey>) {
+      const topic = TOPICS.find((t) => t.id === action.payload)!;
+      resetFlags(state);
+      state.topic = topic.id;
+      state.variant = topic.defaultVariant as VariantKey;
+      state.hotZones = [];
+      state.explanation = "Topic switched — step through to explore.";
+      state.phase = "overview";
+      computeMetrics(state);
+    },
+  },
+});
+
+export const {
+  reset,
+  softResetRun,
+  patchState,
+  recalcMetrics,
+  setVariant,
+  setTopic,
 } = ${camelName}Slice.actions;
 export default ${camelName}Slice.reducer;
 `;
@@ -709,6 +819,38 @@ export const use${pascalName}Animation = (
 };
 `;
 } else if (isComparison) {
+hookContent = `import {
+  patchState,
+  softResetRun,
+  recalcMetrics,
+  type ${pascalName}State,
+} from "./${camelName}Slice";
+import { STEPS, buildSteps, expandToken, type StepKey } from "./flow-engine";
+import {
+  useLabAnimation,
+  type Signal,
+  type UseLabAnimationConfig,
+} from "../../lib/lab-engine";
+
+export type { Signal };
+
+const labConfig: UseLabAnimationConfig<${pascalName}State, StepKey> = {
+  selector: (root) => root.${camelName} as ${pascalName}State,
+  allSteps: STEPS,
+  buildSteps,
+  expandToken,
+  actions: () => ({
+    resetRun: { create: () => softResetRun(), terminal: true },
+    // TODO: add more action mappings as needed
+  }),
+  recalcMetrics: () => recalcMetrics(),
+  patchState: (p) => patchState(p),
+};
+
+export const use${pascalName}Animation = (onAnimationComplete?: () => void) =>
+  useLabAnimation(labConfig, onAnimationComplete);
+`;
+} else if (isModular) {
 hookContent = `import {
   patchState,
   softResetRun,
@@ -1491,6 +1633,169 @@ const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) =>
 
 export default ${pascalName}Visualization;
 `;
+} else if (isModular) {
+mainContent = `import React, { useLayoutEffect, useRef, useEffect } from "react";
+import {
+  viz,
+  type PanZoomController,
+  type SignalOverlayParams,
+} from "vizcraft";
+import {
+  useConceptModal,
+  ConceptPills,
+  PluginLayout,
+  StageHeader,
+  StatBadge,
+  SidePanel,
+  SideCard,
+  CanvasStage,
+} from "../../components/plugin-kit";
+import { concepts, type ConceptKey } from "./concepts";
+import { use${pascalName}Animation, type Signal } from "./use${pascalName}Animation";
+import { type ${pascalName}State } from "./${camelName}Slice";
+import { getAdapter, TOPICS } from "./${pluginName}-adapters";
+import "./main.scss";
+
+interface Props {
+  onAnimationComplete?: () => void;
+}
+
+const W = 900;
+const H = 600;
+
+/* ── Topic questions (shown in sidebar) ──────────────── */
+const TOPIC_QUESTIONS: Record<string, string> = {
+  "topic-a": "How does Topic A work? (TODO: replace with real question)",
+  "topic-b": "How does Topic B work? (TODO: replace with real question)",
+};
+
+const ${pascalName}Visualization: React.FC<Props> = ({ onAnimationComplete }) => {
+  const { runtime, signals } =
+    use${pascalName}Animation(onAnimationComplete);
+  const { openConcept, ConceptModal } = useConceptModal<ConceptKey>(concepts);
+  const containerRef = useRef<HTMLDivElement>(null!);
+  const builderRef = useRef<ReturnType<typeof viz> | null>(null);
+  const pzRef = useRef<PanZoomController | null>(null);
+  const viewportRef = useRef<{
+    zoom: number;
+    pan: { x: number; y: number };
+  } | null>(null);
+
+  const st = runtime as ${pascalName}State;
+  const { explanation, hotZones, phase, variant, topic } = st;
+  const adapter = getAdapter(variant);
+  const hot = (zone: string) => hotZones.includes(zone);
+  const activeTopic = TOPICS.find((t) => t.id === topic);
+
+  /* ── Build VizCraft scene ─────────────────────────────── */
+  const scene = (() => {
+    const b = viz().view(W, H);
+
+    adapter.buildTopology(b, st, { hot, phase });
+
+    if (signals.length > 0) {
+      b.overlay((o) => {
+        signals.forEach((sig: Signal) => {
+          const { id, colorClass, ...params } = sig;
+          o.add(
+            "signal",
+            params as SignalOverlayParams,
+            { key: id, className: colorClass },
+          );
+        });
+      });
+    }
+
+    return b;
+  })();
+
+  /* ── Mount / destroy VizCraft scene ─────────────────── */
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const saved = pzRef.current?.getState() ?? viewportRef.current;
+    builderRef.current?.destroy();
+    builderRef.current = scene;
+    pzRef.current =
+      scene.mount(containerRef.current, {
+        autoplay: true,
+        panZoom: true,
+        initialZoom: saved?.zoom ?? 1,
+        initialPan: saved?.pan ?? { x: 0, y: 0 },
+      }) ?? null;
+    const unsub = pzRef.current?.onChange((s) => {
+      viewportRef.current = s;
+    });
+    return () => { unsub?.(); };
+  }, [scene]);
+
+  useEffect(() => {
+    return () => {
+      builderRef.current?.destroy();
+      builderRef.current = null;
+      pzRef.current = null;
+    };
+  }, []);
+
+  /* ── Pill definitions ───────────────────────────────── */
+  const pills = [
+    { key: "overview" as ConceptKey, label: "${pascalName}", color: "#93c5fd", borderColor: "#3b82f6" },
+    // TODO: add per-topic concept pills
+  ];
+
+  /* ── Stat badges from adapter ───────────────────────── */
+  const badges = adapter.getStatBadges(st);
+
+  /* ── Render ─────────────────────────────────────────── */
+  return (
+    <div className={\`${pluginName}-root ${pluginName}-phase--\${phase}\`}>
+      <PluginLayout
+        toolbar={<ConceptPills pills={pills} onOpen={openConcept} />}
+        canvas={
+          <div className="${pluginName}-stage">
+            <StageHeader
+              title="${pascalName}"
+              subtitle={\`\${activeTopic?.label ?? topic} — \${adapter.profile.label}\`}
+            >
+              {badges.map((badge) => (
+                <StatBadge
+                  key={badge.label}
+                  label={badge.label}
+                  value={badge.value}
+                  className={\`${pluginName}-phase ${pluginName}-phase--\${phase}\`}
+                />
+              ))}
+            </StageHeader>
+            <CanvasStage canvasRef={containerRef} />
+          </div>
+        }
+        sidebar={
+          <SidePanel>
+            {TOPIC_QUESTIONS[topic] && (
+              <SideCard label="Interview Question" variant="info">
+                <p style={{ fontStyle: "italic", color: "#94a3b8" }}>
+                  {TOPIC_QUESTIONS[topic]}
+                </p>
+              </SideCard>
+            )}
+            <SideCard label="What's happening" variant="explanation">
+              <p>{explanation}</p>
+            </SideCard>
+            <SideCard label="Active Variant" variant="info">
+              <p style={{ color: adapter.colors.stroke, fontWeight: 600 }}>
+                {adapter.profile.label}
+              </p>
+              <p>{adapter.profile.description}</p>
+            </SideCard>
+          </SidePanel>
+        }
+      />
+      <ConceptModal />
+    </div>
+  );
+};
+
+export default ${pascalName}Visualization;
+`;
 } else {
 mainContent = `import React, { useLayoutEffect, useRef, useEffect } from "react";
 import {
@@ -1925,6 +2230,98 @@ scssContent = `.${pluginName}-root {
   background: rgba(148, 163, 184, 0.2);
 }
 `;
+} else if (isModular) {
+scssContent = `.${pluginName}-root {
+  --${pluginName}-bg: #020617;
+  --${pluginName}-panel: rgba(7, 17, 34, 0.88);
+  --${pluginName}-border: rgba(148, 163, 184, 0.18);
+  --${pluginName}-text: #e2e8f0;
+  --${pluginName}-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--${pluginName}-text);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.12), transparent 30%),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.${pluginName}-stage {
+  background: var(--${pluginName}-panel);
+  border: 1px solid var(--${pluginName}-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.${pluginName}-phase--overview .vc-stat-badge__value { color: #fbbf24; }
+.${pluginName}-phase--processing .vc-stat-badge__value { color: #60a5fa; }
+.${pluginName}-phase--comparison .vc-stat-badge__value { color: #14b8a6; }
+.${pluginName}-phase--summary .vc-stat-badge__value { color: #86efac; }
+
+/* ── Controls ────────────────────────────────────────── */
+.${pluginName}-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.${pluginName}-controls__group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.${pluginName}-controls__select {
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  outline: none;
+}
+.${pluginName}-controls__select:focus {
+  border-color: #60a5fa;
+}
+
+.${pluginName}-controls__btn {
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.${pluginName}-controls__btn:hover {
+  background: rgba(51, 65, 85, 0.7);
+}
+.${pluginName}-controls__btn--active {
+  border-color: currentColor;
+  background: rgba(51, 65, 85, 0.5);
+  font-weight: 700;
+}
+
+.${pluginName}-controls__sep {
+  width: 1px;
+  height: 1.2rem;
+  background: rgba(148, 163, 184, 0.2);
+}
+`;
 } else {
 scssContent = `.${pluginName}-root {
   --${pluginName}-bg: #020617;
@@ -2073,6 +2470,45 @@ const ${pascalName}Plugin: DemoPlugin<
   id: "${pluginName}",
   name: "${pascalName}",
   description: "Describe what this comparison lab teaches.",
+  initialState,
+  reducer: ${camelName}Reducer,
+  Component: ${pascalName}Visualization,
+  Controls: ${pascalName}Controls,
+  restartConfig: { text: "Replay", color: "#3b82f6" },
+  getSteps: (state: ${pascalName}State): DemoStep[] => buildSteps(state),
+  init: (dispatch) => {
+    dispatch(reset());
+  },
+  selector: (state: LocalRootState) => state.${camelName},
+};
+
+export { buildSteps };
+export type { StepKey, TaggedStep };
+export default ${pascalName}Plugin;
+`;
+} else if (isModular) {
+indexContent = `import type { Action, Dispatch } from "@reduxjs/toolkit";
+import type { DemoPlugin, DemoStep } from "../../types/ModelPlugin";
+import ${pascalName}Visualization from "./main";
+import ${pascalName}Controls from "./controls";
+import ${camelName}Reducer, {
+  type ${pascalName}State,
+  initialState,
+  reset,
+} from "./${camelName}Slice";
+import { buildSteps, type StepKey, type TaggedStep } from "./flow-engine";
+
+type LocalRootState = { ${camelName}: ${pascalName}State };
+
+const ${pascalName}Plugin: DemoPlugin<
+  ${pascalName}State,
+  Action,
+  LocalRootState,
+  Dispatch<Action>
+> = {
+  id: "${pluginName}",
+  name: "${pascalName}",
+  description: "Modular topic lab — pick a topic, compare variants.",
   initialState,
   reducer: ${camelName}Reducer,
   Component: ${pascalName}Visualization,
@@ -3243,6 +3679,404 @@ fs.writeFileSync(path.join(targetDir, "controls.tsx"), controlsContent);
 } // end comparison-only files
 
 /* ================================================================
+   7e. (Modular only) Flow Engine + Adapters + Controls
+   ================================================================ */
+if (isModular) {
+
+// ── flow-engine.ts ────────────────────────────────────────
+const flowEngineContent = `import type { ${pascalName}State } from "./${camelName}Slice";
+import { getAdapter } from "./${pluginName}-adapters";
+import {
+  buildSteps as genericBuildSteps,
+  executeFlow as genericExecuteFlow,
+  type FlowBeat as GenericFlowBeat,
+  type StepDef as GenericStepDef,
+  type TaggedStep as GenericTaggedStep,
+  type FlowExecutorDeps as GenericFlowExecutorDeps,
+} from "../../lib/lab-engine";
+
+/* ══════════════════════════════════════════════════════════
+   ${pascalName} Lab — Declarative Flow Engine
+
+   Uses the shared lab-engine for build/execute logic.
+   Token expansion and flow beats delegate to adapters.
+   Steps use \`when\` guards to show only for the active topic.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Specialised type aliases ──────────────────────────── */
+
+export type FlowBeat = GenericFlowBeat<${pascalName}State>;
+export type StepDef = GenericStepDef<${pascalName}State, StepKey>;
+export type TaggedStep = GenericTaggedStep<StepKey>;
+export type FlowExecutorDeps = GenericFlowExecutorDeps<${pascalName}State>;
+
+/* ── Token expansion (delegates to adapter) ──────────── */
+
+export function expandToken(token: string, state: ${pascalName}State): string[] {
+  const adapter = getAdapter(state.variant);
+  const expanded = adapter.expandToken(token, state);
+  return expanded ?? [token];
+}
+
+/* ── Step keys ───────────────────────────────────────── */
+
+export type StepKey =
+  | "overview"
+  | "ta-demonstrate"
+  | "ta-summary"
+  | "tb-demonstrate"
+  | "tb-summary";
+// TODO: add per-topic step keys as needed
+
+/* ── Step Configuration ──────────────────────────────── */
+
+export const STEPS: StepDef[] = [
+  {
+    key: "overview",
+    label: "Overview",
+    nextButton: "Demonstrate",
+    action: "resetRun",
+    explain: (s) => {
+      const adapter = getAdapter(s.variant);
+      return \`\${adapter.profile.label} selected. Step through to explore.\`;
+    },
+  },
+  // ── Topic A steps ──
+  {
+    key: "ta-demonstrate",
+    label: "Demonstrate",
+    when: (s) => s.topic === "topic-a",
+    processingText: "Running…",
+    nextButtonColor: "#2563eb",
+    phase: "processing",
+    flow: (s) => getAdapter(s.variant).getFlowBeats(s),
+    recalcMetrics: true,
+    explain: (s) => {
+      const adapter = getAdapter(s.variant);
+      return \`\${adapter.profile.label} in action.\`;
+    },
+  },
+  {
+    key: "ta-summary",
+    label: "Summary",
+    when: (s) => s.topic === "topic-a",
+    phase: "summary",
+    explain: () => "Topic A complete. Try another variant or topic.",
+  },
+  // ── Topic B steps ──
+  {
+    key: "tb-demonstrate",
+    label: "Demonstrate",
+    when: (s) => s.topic === "topic-b",
+    processingText: "Running…",
+    nextButtonColor: "#2563eb",
+    phase: "processing",
+    flow: (s) => getAdapter(s.variant).getFlowBeats(s),
+    recalcMetrics: true,
+    explain: (s) => {
+      const adapter = getAdapter(s.variant);
+      return \`\${adapter.profile.label} in action.\`;
+    },
+  },
+  {
+    key: "tb-summary",
+    label: "Summary",
+    when: (s) => s.topic === "topic-b",
+    phase: "summary",
+    explain: () => "Topic B complete. Try another variant or topic.",
+  },
+];
+
+/* ── Build active steps ──────────────────────────────── */
+
+export function buildSteps(state: ${pascalName}State): TaggedStep[] {
+  return genericBuildSteps(STEPS, state);
+}
+
+/* ── Execute flow ────────────────────────────────────── */
+
+export async function executeFlow(
+  beats: FlowBeat[],
+  deps: FlowExecutorDeps,
+): Promise<void> {
+  return genericExecuteFlow(beats, deps, expandToken);
+}
+`;
+
+fs.writeFileSync(path.join(targetDir, "flow-engine.ts"), flowEngineContent);
+
+// ── Adapter scaffolding ─────────────────────────────────
+const adaptersDir = path.join(targetDir, `${pluginName}-adapters`);
+fs.mkdirSync(adaptersDir, { recursive: true });
+
+// ── types.ts ──────────────────────────────────────────────
+const adapterTypesContent = `import type { ${pascalName}State, VariantKey } from "../${camelName}Slice";
+import type { FlowBeat } from "../flow-engine";
+
+/* ── Static metadata ───────────────────────────────────── */
+
+export interface VariantProfile {
+  label: string;
+  description: string;
+}
+
+export interface VariantColors {
+  fill: string;
+  stroke: string;
+}
+
+/* ── Scene rendering ───────────────────────────────────── */
+
+export interface SceneHelpers {
+  hot: (zone: string) => boolean;
+  phase: string;
+}
+
+export interface StatBadgeConfig {
+  label: string;
+  value: string | number;
+  color: string;
+}
+
+/* ── The adapter interface ─────────────────────────────── */
+
+export interface ${pascalName}Adapter {
+  id: VariantKey;
+  profile: VariantProfile;
+  colors: VariantColors;
+  computeMetrics(state: ${pascalName}State): void;
+  expandToken(token: string, state: ${pascalName}State): string[] | null;
+  getFlowBeats(state: ${pascalName}State): FlowBeat[];
+  buildTopology(
+    builder: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    state: ${pascalName}State,
+    helpers: SceneHelpers,
+  ): void;
+  getStatBadges(state: ${pascalName}State): StatBadgeConfig[];
+  softReset(state: ${pascalName}State): void;
+}
+`;
+
+fs.writeFileSync(path.join(adaptersDir, "types.ts"), adapterTypesContent);
+
+// ── index.ts (with topics) ───────────────────────────────
+const adapterIndexContent = `export type {
+  ${pascalName}Adapter,
+  StatBadgeConfig,
+  SceneHelpers,
+  VariantProfile,
+  VariantColors,
+} from "./types";
+
+import type { VariantKey } from "../${camelName}Slice";
+import type { ${pascalName}Adapter } from "./types";
+import { topicAOpt1Adapter } from "./topic-a-opt-1";
+import { topicAOpt2Adapter } from "./topic-a-opt-2";
+import { topicBOpt1Adapter } from "./topic-b-opt-1";
+import { topicBOpt2Adapter } from "./topic-b-opt-2";
+
+/* ── Topic definitions ────────────────────────────────── */
+
+export type TopicKey = "topic-a" | "topic-b";
+// TODO: rename topics to match your domain
+
+export interface TopicDef {
+  id: TopicKey;
+  label: string;
+  variants: VariantKey[];
+  defaultVariant: VariantKey;
+}
+
+export const TOPICS: TopicDef[] = [
+  {
+    id: "topic-a",
+    label: "Topic A",
+    variants: ["topic-a-opt-1", "topic-a-opt-2"],
+    defaultVariant: "topic-a-opt-1",
+  },
+  {
+    id: "topic-b",
+    label: "Topic B",
+    variants: ["topic-b-opt-1", "topic-b-opt-2"],
+    defaultVariant: "topic-b-opt-1",
+  },
+];
+
+/* ── Adapter registry ─────────────────────────────────── */
+
+const ADAPTERS: Record<VariantKey, ${pascalName}Adapter> = {
+  "topic-a-opt-1": topicAOpt1Adapter,
+  "topic-a-opt-2": topicAOpt2Adapter,
+  "topic-b-opt-1": topicBOpt1Adapter,
+  "topic-b-opt-2": topicBOpt2Adapter,
+};
+
+export function getAdapter(key: VariantKey): ${pascalName}Adapter {
+  return ADAPTERS[key];
+}
+
+export const allAdapters: ${pascalName}Adapter[] = Object.values(ADAPTERS);
+`;
+
+fs.writeFileSync(path.join(adaptersDir, "index.ts"), adapterIndexContent);
+
+// ── Helper to write a placeholder adapter ────────────────
+function writeModularAdapter(fileName, varName, variantKey, label, accentFill, accentStroke) {
+  const content = `import type { ${pascalName}Adapter } from "./types";
+import type { ${pascalName}State } from "../${camelName}Slice";
+
+export const ${varName}: ${pascalName}Adapter = {
+  id: "${variantKey}",
+
+  profile: {
+    label: "${label}",
+    description: "Describe ${label}'s approach.",
+  },
+
+  colors: {
+    fill: "${accentFill}",
+    stroke: "${accentStroke}",
+  },
+
+  computeMetrics(state: ${pascalName}State) {
+    // TODO: compute real metrics for ${label}
+    state.topicAMetric = "placeholder";
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  expandToken(_token: string, _state: ${pascalName}State): string[] | null {
+    return null;
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getFlowBeats(_state: ${pascalName}State) {
+    return [];
+  },
+
+  buildTopology(builder, _state, helpers) {
+    builder
+      .node("node-a")
+      .at(200, 300)
+      .rect(140, 60, 12)
+      .fill(helpers.hot("node-a") ? "${accentFill}" : "#0f172a")
+      .stroke(helpers.hot("node-a") ? "${accentStroke}" : "#334155", 2)
+      .label("${label} — A", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    builder
+      .node("node-b")
+      .at(650, 300)
+      .rect(140, 60, 12)
+      .fill(helpers.hot("node-b") ? "${accentFill}" : "#0f172a")
+      .stroke(helpers.hot("node-b") ? "${accentStroke}" : "#334155", 2)
+      .label("${label} — B", { fill: "#fff", fontSize: 13, fontWeight: "bold" });
+
+    builder
+      .edge("node-a", "node-b", "edge-ab")
+      .stroke("#475569", 2)
+      .animate("flow", { duration: "3s" });
+  },
+
+  getStatBadges(_state: ${pascalName}State) {
+    return [
+      { label: "Variant", value: "${label}", color: "${accentStroke}" },
+    ];
+  },
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  softReset(_state: ${pascalName}State) {
+    // TODO: reset per-pass state
+  },
+};
+`;
+  fs.writeFileSync(path.join(adaptersDir, fileName), content);
+}
+
+writeModularAdapter("topic-a-opt-1.ts", "topicAOpt1Adapter", "topic-a-opt-1", "Topic A Opt 1", "#1e3a5f", "#3b82f6");
+writeModularAdapter("topic-a-opt-2.ts", "topicAOpt2Adapter", "topic-a-opt-2", "Topic A Opt 2", "#064e3b", "#22c55e");
+writeModularAdapter("topic-b-opt-1.ts", "topicBOpt1Adapter", "topic-b-opt-1", "Topic B Opt 1", "#4c1d95", "#a78bfa");
+writeModularAdapter("topic-b-opt-2.ts", "topicBOpt2Adapter", "topic-b-opt-2", "Topic B Opt 2", "#713f12", "#eab308");
+
+console.log("  ✔ Created " + pluginName + "-adapters/ with types.ts, index.ts, and 4 adapter files");
+
+// ── controls.tsx ──────────────────────────────────────────
+const controlsContent = `import React from "react";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "../../store/store";
+import { resetSimulation } from "../../store/slices/simulationSlice";
+import {
+  setVariant,
+  setTopic,
+  type ${pascalName}State,
+  type VariantKey,
+} from "./${camelName}Slice";
+import { TOPICS, getAdapter, type TopicKey } from "./${pluginName}-adapters";
+
+const ${pascalName}Controls: React.FC = () => {
+  const dispatch = useDispatch();
+  const st = useSelector((state: RootState) => state.${camelName}) as ${pascalName}State;
+
+  const sync = (cb: () => void) => {
+    cb();
+    dispatch(resetSimulation());
+  };
+
+  const activeTopic = TOPICS.find((t) => t.id === st.topic)!;
+
+  return (
+    <div className="${pluginName}-controls">
+      {/* ── Topic dropdown ── */}
+      <div className="${pluginName}-controls__group">
+        <select
+          className="${pluginName}-controls__select"
+          value={st.topic}
+          onChange={(e) =>
+            sync(() => dispatch(setTopic(e.target.value as TopicKey)))
+          }
+        >
+          {TOPICS.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <span className="${pluginName}-controls__sep" />
+
+      {/* ── Variant buttons for active topic ── */}
+      <div className="${pluginName}-controls__group">
+        {activeTopic.variants.map((vk: VariantKey) => {
+          const adapter = getAdapter(vk);
+          return (
+            <button
+              key={vk}
+              className={\`${pluginName}-controls__btn\${st.variant === vk ? " ${pluginName}-controls__btn--active" : ""}\`}
+              style={
+                st.variant === vk
+                  ? {
+                      color: adapter.colors.stroke,
+                      borderColor: adapter.colors.stroke,
+                    }
+                  : {}
+              }
+              onClick={() => sync(() => dispatch(setVariant(vk)))}
+            >
+              {adapter.profile.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default ${pascalName}Controls;
+`;
+
+fs.writeFileSync(path.join(targetDir, "controls.tsx"), controlsContent);
+} // end modular-only files
+
+/* ================================================================
    9. Update registry.ts — add import + wire into category
    ================================================================ */
 const registryPath = path.join(__dirname, "../src/registry.ts");
@@ -3352,7 +4186,7 @@ if (fs.existsSync(registryPath)) {
   );
 }
 
-const modeLabel = isSandbox ? 'sandbox ' : isTimeline ? 'timeline ' : isComparison ? 'comparison-lab ' : '';
+const modeLabel = isSandbox ? 'sandbox ' : isTimeline ? 'timeline ' : isComparison ? 'comparison-lab ' : isModular ? 'modular ' : '';
 console.log("");
 console.log(
   '✔ Created ' + modeLabel + 'plugin "' + pluginName + '" in src/plugins/' + pluginName,
@@ -3382,6 +4216,17 @@ if (isComparison) {
   console.log("        variant-a.ts      — Variant A adapter");
   console.log("        variant-b.ts      — Variant B adapter");
 }
+if (isModular) {
+  console.log("    • flow-engine.ts      — Lab-engine step & flow config (topic-scoped)");
+  console.log("    • controls.tsx        — Topic dropdown + variant buttons");
+  console.log("    • " + pluginName + "-adapters/");
+  console.log("        types.ts          — Adapter interface contract");
+  console.log("        index.ts          — Topics + getAdapter() registry");
+  console.log("        topic-a-opt-1.ts  — Topic A variant 1 adapter");
+  console.log("        topic-a-opt-2.ts  — Topic A variant 2 adapter");
+  console.log("        topic-b-opt-1.ts  — Topic B variant 1 adapter");
+  console.log("        topic-b-opt-2.ts  — Topic B variant 2 adapter");
+}
 console.log("");
 console.log("  Next steps:");
 if (isSandbox) {
@@ -3404,6 +4249,16 @@ if (isSandbox) {
   console.log("    5. Define steps & flow beats in STEPS (flow-engine.ts)");
   console.log("    6. Add concept pills & definitions in concepts.tsx");
   console.log("    7. Uses shared lib/lab-engine — animation hook is ~30 lines");
+} else if (isModular) {
+  console.log("    1. Rename TopicKey + VariantKey values to match your domain");
+  console.log("    2. Rename adapter files (topic-a-opt-1.ts → your-concept.ts)");
+  console.log("    3. Define TOPICS array in adapters/index.ts");
+  console.log("    4. Add per-topic state fields in the slice");
+  console.log("    5. Add per-topic \`when\` guards to STEPS (flow-engine.ts)");
+  console.log("    6. Build adapter topology + metrics for each variant");
+  console.log("    7. Add topic questions in main.tsx TOPIC_QUESTIONS");
+  console.log("    8. Add concept pills & definitions in concepts.tsx");
+  console.log("    9. Uses shared lib/lab-engine — animation hook is ~30 lines");
 } else {
   console.log("    1. Define your VizCraft nodes/edges in main.tsx");
   console.log("    2. Add step animations in use" + pascalName + "Animation.ts");
