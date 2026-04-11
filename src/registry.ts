@@ -34,6 +34,7 @@ import SolidPlugin from "./plugins/solid";
 import GraphqlPlugin from "./plugins/graphql";
 import PostgresqlPlugin from "./plugins/postgresql";
 import StructuresPlugin from "./plugins/structures";
+import MicrofrontendsPlugin from "./plugins/microfrontends";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -144,6 +145,14 @@ export const categories: PluginCategory[] = [
       "Deep dives into database internals, indexing, query planning, storage patterns, and performance trade-offs.",
     accent: "#10b981",
     plugins: [PostgresqlPlugin, StructuresPlugin],
+  },
+  {
+    id: "frontends",
+    name: "Frontends",
+    description:
+      "Micro-frontends, build-time composition, runtime integration strategies, and frontend architecture at scale.",
+    accent: "#6366f1",
+    plugins: [MicrofrontendsPlugin],
   },
 ];
 

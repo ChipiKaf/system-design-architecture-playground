@@ -521,11 +521,11 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         accent: "#a78bfa",
         content: (
           <p>
-            Every internal GiST entry stores an MBR — a rectangle defined by
-            its lower-left and upper-right corners. When a new point is
-            inserted, the MBR of the target subtree may need to enlarge to
-            contain it. The "penalty" function measures this enlargement, and
-            GiST picks the subtree with the least enlargement.
+            Every internal GiST entry stores an MBR — a rectangle defined by its
+            lower-left and upper-right corners. When a new point is inserted,
+            the MBR of the target subtree may need to enlarge to contain it. The
+            "penalty" function measures this enlargement, and GiST picks the
+            subtree with the least enlargement.
           </p>
         ),
       },
@@ -589,8 +589,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             The <code>&lt;-&gt;</code> operator computes distance between
             geometries. GiST walks the tree using a priority queue ordered by
             distance from the query point to each MBR. Closer MBRs are visited
-            first. Subtrees whose MBR distance exceeds the current k-th best
-            are pruned entirely.
+            first. Subtrees whose MBR distance exceeds the current k-th best are
+            pruned entirely.
           </p>
         ),
       },
@@ -599,11 +599,10 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         accent: "#5eead4",
         content: (
           <p>
-            B-tree indexes sorted scalar keys — there's no concept of
-            "distance" in a sorted list. GIN indexes inverted posting lists —
-            distance doesn't apply. Only GiST's bounding-box model provides the
-            geometry needed to compute and compare distances during tree
-            traversal.
+            B-tree indexes sorted scalar keys — there's no concept of "distance"
+            in a sorted list. GIN indexes inverted posting lists — distance
+            doesn't apply. Only GiST's bounding-box model provides the geometry
+            needed to compute and compare distances during tree traversal.
           </p>
         ),
       },
@@ -611,8 +610,7 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
   },
   "gist-vs-btree-gin": {
     title: "GiST vs B-tree vs GIN",
-    subtitle:
-      "Three index models for three different query patterns.",
+    subtitle: "Three index models for three different query patterns.",
     accentColor: "#ef4444",
     sections: [
       {
@@ -645,9 +643,9 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
           <p>
             GiST's main trade-off: because bounding boxes can overlap, queries
             may need to visit multiple subtrees. B-tree never has this problem
-            (sorted keys create non-overlapping ranges). GIN avoids it too
-            (flat posting lists). For spatial data, this cost is acceptable
-            because the alternative is a full table scan.
+            (sorted keys create non-overlapping ranges). GIN avoids it too (flat
+            posting lists). For spatial data, this cost is acceptable because
+            the alternative is a full table scan.
           </p>
         ),
       },

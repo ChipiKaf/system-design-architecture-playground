@@ -95,11 +95,7 @@ function drawBox(
 /* Main topology builder                                   */
 /* ──────────────────────────────────────────────────────── */
 
-function buildGistTopology(
-  builder: any,
-  state: StructuresState,
-  helpers: any,
-) {
+function buildGistTopology(builder: any, state: StructuresState, helpers: any) {
   const hot = (z: string) => helpers.hot(z);
 
   /* ── Step markers ───────────────────────────────── */
@@ -940,9 +936,24 @@ function buildGistTopology(
         ["Model", "sorted keys", "inverted lists", "bounding boxes"],
         ["Entry", "key + TID", "value + posting list", "MBR + child ptr"],
         ["Overlap?", "never", "N/A (flat lists)", "yes — boxes can overlap"],
-        ["Query path", "always 1 path", "1 entry → list scan", "may scan MULTIPLE subtrees"],
-        ["KNN?", "no native support", "no native support", "yes — ORDER BY <->"],
-        ["Best for", "scalar =, <, >, range", "multi-value contains", "spatial, range, FTS"],
+        [
+          "Query path",
+          "always 1 path",
+          "1 entry → list scan",
+          "may scan MULTIPLE subtrees",
+        ],
+        [
+          "KNN?",
+          "no native support",
+          "no native support",
+          "yes — ORDER BY <->",
+        ],
+        [
+          "Best for",
+          "scalar =, <, >, range",
+          "multi-value contains",
+          "spatial, range, FTS",
+        ],
       ];
 
       rows.forEach((row, ri) => {
@@ -953,12 +964,7 @@ function buildGistTopology(
               x: CX - 360 + ci * 240,
               y: tableY + ri * 22,
               text: cell,
-              fill:
-                ri === 0
-                  ? "#f0abfc"
-                  : ci === 0
-                    ? "#94a3b8"
-                    : "#e2e8f0",
+              fill: ri === 0 ? "#f0abfc" : ci === 0 ? "#94a3b8" : "#e2e8f0",
               fontSize: ri === 0 ? 10 : 9,
               fontWeight: ri === 0 || ci === 0 ? "700" : "500",
               textAnchor: ci === 0 ? "end" : "middle",
