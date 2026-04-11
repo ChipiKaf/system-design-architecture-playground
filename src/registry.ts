@@ -35,6 +35,14 @@ import GraphqlPlugin from "./plugins/graphql";
 import PostgresqlPlugin from "./plugins/postgresql";
 import StructuresPlugin from "./plugins/structures";
 import MicrofrontendsPlugin from "./plugins/microfrontends";
+import AiEvolutionPlugin from "./plugins/ai-evolution";
+import LgplArchitecturePlugin from "./plugins/lgpl-architecture";
+import OauthPlugin from "./plugins/oauth";
+import AwsCognitoPlugin from "./plugins/aws-cognito";
+import OidcPlugin from "./plugins/oidc";
+import ReactBestPracticesPlugin from "./plugins/react-best-practices";
+import ReactPerformancePlugin from "./plugins/react-performance";
+import VirtualScrollingPlugin from "./plugins/virtual-scrolling";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -152,7 +160,31 @@ export const categories: PluginCategory[] = [
     description:
       "Micro-frontends, build-time composition, runtime integration strategies, and frontend architecture at scale.",
     accent: "#6366f1",
-    plugins: [MicrofrontendsPlugin],
+    plugins: [MicrofrontendsPlugin, ReactBestPracticesPlugin, ReactPerformancePlugin, VirtualScrollingPlugin],
+  },
+  {
+    id: "artificial-intelligence",
+    name: "Artificial Intelligence",
+    description:
+      "From traditional ML pipelines to Generative AI — foundation models, prompt engineering, fine-tuning, and deployment.",
+    accent: "#a855f7",
+    plugins: [AiEvolutionPlugin],
+  },
+  {
+    id: "architecture-patterns",
+    name: "Architecture Patterns",
+    description:
+      "Architectural building blocks — layers, gates, pipes, loops, and more.",
+    accent: "#6366f1",
+    plugins: [LgplArchitecturePlugin],
+  },
+  {
+    id: "authentication",
+    name: "Authentication",
+    description:
+      "OAuth, tokens, identity providers, and secure access control.",
+    accent: "#7c3aed",
+    plugins: [OauthPlugin, AwsCognitoPlugin, OidcPlugin],
   },
 ];
 

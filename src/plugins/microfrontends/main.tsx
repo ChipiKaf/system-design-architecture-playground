@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useEffect } from "react";
+import React, { useMemo, useLayoutEffect, useRef, useEffect } from "react";
 import {
   viz,
   type PanZoomController,
@@ -69,13 +69,16 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
     showEntries,
     showShared,
     showIframe,
+    showDuplicateDeps,
+    showHooksCrash,
+    showVersionMismatch,
     failedRemote,
     showFallback,
   } = runtime;
   const hot = (zone: string) => hotZones.includes(zone);
 
   /* ── Build VizCraft scene ─────────────────────────────── */
-  const scene = (() => {
+  const scene = useMemo(() => {
     const b = viz().view(W, H);
 
     /* ── Shell background overlay ─────────────────────── */
@@ -337,7 +340,7 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
     }
 
     // Router → MF Runtime (internal hand-off)
-    if (currentStep >= 5) {
+    if (currentStep >= 6) {
       b.edge("router", "mf-runtime", "e-handoff")
         .stroke(hot("router") || hot("mf-runtime") ? C.blue : C.dimEdge, 1.5)
         .arrow(true);
@@ -358,7 +361,7 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
     }
 
     // MF Runtime → Entries (discovery / resolve)
-    if (showEntries && currentStep >= 4) {
+    if (showEntries && currentStep >= 5) {
       for (const t of ["entry-a", "entry-b", "entry-c"]) {
         b.edge("mf-runtime", t, `e-disc-${t.slice(-1)}`)
           .stroke(hot("mf-runtime") || hot(t) ? C.violet : C.dimEdge, 1.5)
@@ -368,7 +371,7 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
     }
 
     // Entry → Slot (mount)
-    if (showEntries && currentStep >= 5) {
+    if (showEntries && currentStep >= 6) {
       const mounts: [string, string, string][] = [
         ["entry-a", "slot-a", C.green],
         ["entry-b", "slot-b", C.amber],
@@ -452,6 +455,180 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
         );
       }
 
+      // Duplicate dependency warning overlays (Step 3: The Glue Problem)
+      if (showDuplicateDeps) {
+        const dupes = [
+          { x: 260, label: "React 18 📦 (copy 1)" },
+          { x: 600, label: "React 18 📦 (copy 2)" },
+          { x: 940, label: "React 18 📦 (copy 3)" },
+        ];
+        for (const d of dupes) {
+          o.add(
+            "rect",
+            {
+              x: d.x - 72,
+              y: 395,
+              w: 144,
+              h: 24,
+              rx: 6,
+              ry: 6,
+              fill: "rgba(239, 68, 68, 0.12)",
+              stroke: "rgba(239, 68, 68, 0.4)",
+              strokeWidth: 1.5,
+              opacity: 1,
+            },
+            { key: `dup-bg-${d.x}` },
+          );
+          o.add(
+            "text",
+            {
+              x: d.x,
+              y: 411,
+              text: d.label,
+              fill: "#fca5a5",
+              fontSize: 11,
+              fontWeight: "bold",
+            },
+            { key: `dup-lbl-${d.x}` },
+          );
+        }
+        o.add(
+          "text",
+          {
+            x: 600,
+            y: 440,
+            text: showHooksCrash
+              ? "⚠ Two React instances → hooks break!"
+              : "⚠ 3× React downloaded — wasteful!",
+            fill: "#f87171",
+            fontSize: 13,
+            fontWeight: "bold",
+          },
+          { key: "dup-warning" },
+        );
+      }
+
+      // Hooks crash overlay (Step 4)
+      if (showHooksCrash) {
+        // Error box inside Dashboard slot
+        o.add(
+          "rect",
+          {
+            x: 260 - 88,
+            y: 305,
+            w: 176,
+            h: 72,
+            rx: 8,
+            ry: 8,
+            fill: "rgba(239, 68, 68, 0.15)",
+            stroke: "#ef4444",
+            strokeWidth: 2,
+            opacity: 1,
+          },
+          { key: "crash-box" },
+        );
+        o.add(
+          "text",
+          {
+            x: 260,
+            y: 325,
+            text: "❌ Invalid hook call",
+            fill: "#fca5a5",
+            fontSize: 12,
+            fontWeight: "bold",
+          },
+          { key: "crash-title" },
+        );
+        o.add(
+          "text",
+          {
+            x: 260,
+            y: 345,
+            text: "useState() grabbed React B's",
+            fill: "#94a3b8",
+            fontSize: 10,
+          },
+          { key: "crash-line1" },
+        );
+        o.add(
+          "text",
+          {
+            x: 260,
+            y: 360,
+            text: "walkie-talkie — but it's silent",
+            fill: "#94a3b8",
+            fontSize: 10,
+          },
+          { key: "crash-line2" },
+        );
+      }
+
+      // Version mismatch overlay (Step 9)
+      if (showVersionMismatch) {
+        // Settings slot shows version conflict
+        o.add(
+          "rect",
+          {
+            x: 940 - 92,
+            y: 305,
+            w: 184,
+            h: 82,
+            rx: 8,
+            ry: 8,
+            fill: "rgba(251, 191, 36, 0.1)",
+            stroke: "#f59e0b",
+            strokeWidth: 2,
+            opacity: 1,
+          },
+          { key: "ver-box" },
+        );
+        o.add(
+          "text",
+          {
+            x: 940,
+            y: 322,
+            text: "⚠ Version conflict",
+            fill: "#fbbf24",
+            fontSize: 12,
+            fontWeight: "bold",
+          },
+          { key: "ver-title" },
+        );
+        o.add(
+          "text",
+          {
+            x: 940,
+            y: 342,
+            text: "Host: React 18.2",
+            fill: "#67e8f9",
+            fontSize: 10,
+          },
+          { key: "ver-host" },
+        );
+        o.add(
+          "text",
+          {
+            x: 940,
+            y: 357,
+            text: "Settings wants: React 19.0",
+            fill: "#fca5a5",
+            fontSize: 10,
+          },
+          { key: "ver-remote" },
+        );
+        o.add(
+          "text",
+          {
+            x: 940,
+            y: 377,
+            text: "strictVersion? → refuse to load",
+            fill: "#94a3b8",
+            fontSize: 9,
+          },
+          { key: "ver-strict" },
+        );
+      }
+
       // Signals
       signals.forEach((sig) => {
         const { id, ...params } = sig;
@@ -460,7 +637,19 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
     });
 
     return b;
-  })();
+  }, [
+    currentStep,
+    hotZones,
+    showEntries,
+    showShared,
+    showIframe,
+    showDuplicateDeps,
+    showHooksCrash,
+    showVersionMismatch,
+    failedRemote,
+    showFallback,
+    signals,
+  ]);
 
   /* ── Mount / destroy VizCraft scene ─────────────────── */
   useLayoutEffect(() => {
@@ -498,6 +687,24 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
       label: "Micro-frontends",
       color: "#c4b5fd",
       borderColor: "#8b5cf6",
+    },
+    {
+      key: "the-problem",
+      label: "Why Module Fed?",
+      color: "#fca5a5",
+      borderColor: "#ef4444",
+    },
+    {
+      key: "hooks-crash",
+      label: "Hooks Crash",
+      color: "#fca5a5",
+      borderColor: "#dc2626",
+    },
+    {
+      key: "version-mismatch",
+      label: "Version Mismatch",
+      color: "#fde68a",
+      borderColor: "#f59e0b",
     },
     {
       key: "module-federation",
@@ -539,16 +746,19 @@ const MicrofrontendsVisualization: React.FC<Props> = ({
 
   /* ── Phase subtitle ─────────────────────────────────── */
   const subtitles: Record<string, string> = {
-    overview: "Independently deployable frontend modules",
-    "host-shell": "The container that mounts remote modules",
-    remotes: "Each MFE has its own repo, CI, and release cycle",
-    expose: "Build outputs → remoteEntry.js manifests",
-    discovery: "Host fetches manifests to learn available modules",
-    "lazy-load": "Dynamic import() on navigation",
-    "shared-deps": "Singleton negotiation prevents duplication",
-    iframe: "Full isolation via <iframe> + postMessage",
-    failure: "Error boundaries handle partial failures",
-    summary: "Choose your integration strategy",
+    overview: "One giant app, all teams tangled together",
+    "host-shell": "The building — hallways, security, and empty rooms",
+    remotes: "Three teams, three separate apps, ship anytime",
+    "glue-problem": "Without sharing, every app bundles its own React",
+    "hooks-crash": "Two React copies → hooks break → app crashes",
+    expose: "Each team publishes a tiny 'menu' — remoteEntry.js",
+    discovery: "The Host reads the menus to learn what's available",
+    "lazy-load": "Download only the code you actually need",
+    "shared-deps": "One copy of React for everyone — the whole point",
+    "version-mismatch": "What if one team ships a different React version?",
+    iframe: "Glass wall isolation — safe but limited",
+    failure: "One app breaks, the rest keep working",
+    summary: "Choose the right strategy for your team",
   };
 
   /* ── Render ─────────────────────────────────────────── */

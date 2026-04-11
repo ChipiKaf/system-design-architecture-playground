@@ -50,6 +50,12 @@
 .microfrontends-phase--expose .vc-stat-badge__value {
   color: #c084fc;
 }
+.microfrontends-phase--glue-problem .vc-stat-badge__value {
+  color: #f87171;
+}
+.microfrontends-phase--hooks-crash .vc-stat-badge__value {
+  color: #dc2626;
+}
 .microfrontends-phase--discovery .vc-stat-badge__value {
   color: #a78bfa;
 }
@@ -58,6 +64,9 @@
 }
 .microfrontends-phase--shared-deps .vc-stat-badge__value {
   color: #22d3ee;
+}
+.microfrontends-phase--version-mismatch .vc-stat-badge__value {
+  color: #fbbf24;
 }
 .microfrontends-phase--iframe .vc-stat-badge__value {
   color: #fbbf24;
