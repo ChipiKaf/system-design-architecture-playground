@@ -1,0 +1,76 @@
+.react-router-root {
+  --react-router-bg: #020617;
+  --react-router-panel: rgba(7, 17, 34, 0.88);
+  --react-router-border: rgba(148, 163, 184, 0.18);
+  --react-router-text: #e2e8f0;
+  --react-router-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--react-router-text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(59, 130, 246, 0.14),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(20, 184, 166, 0.12),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.react-router-stage {
+  background: var(--react-router-panel);
+  border: 1px solid var(--react-router-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.react-router-phase--overview .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.react-router-phase--full-reload .vc-stat-badge__value {
+  color: #f87171;
+}
+.react-router-phase--spa-concept .vc-stat-badge__value {
+  color: #34d399;
+}
+.react-router-phase--browser-router .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.react-router-phase--routes-config .vc-stat-badge__value {
+  color: #06b6d4;
+}
+.react-router-phase--link-component .vc-stat-badge__value {
+  color: #34d399;
+}
+.react-router-phase--dynamic-segments .vc-stat-badge__value {
+  color: #a78bfa;
+}
+.react-router-phase--nested-routes .vc-stat-badge__value {
+  color: #f472b6;
+}
+.react-router-phase--use-navigate .vc-stat-badge__value {
+  color: #fb923c;
+}
+.react-router-phase--search-params .vc-stat-badge__value {
+  color: #22d3ee;
+}
+.react-router-phase--catch-all .vc-stat-badge__value {
+  color: #f87171;
+}
+.react-router-phase--summary .vc-stat-badge__value {
+  color: #86efac;
+}

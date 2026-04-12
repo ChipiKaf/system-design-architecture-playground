@@ -1,0 +1,142 @@
+.step-functions-root {
+  --step-functions-bg: #020617;
+  --step-functions-panel: rgba(7, 17, 34, 0.88);
+  --step-functions-border: rgba(148, 163, 184, 0.18);
+  --step-functions-text: #e2e8f0;
+  --step-functions-muted: #94a3b8;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--step-functions-text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(249, 115, 22, 0.14),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at bottom right,
+      rgba(99, 102, 241, 0.12),
+      transparent 30%
+    ),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Stage ──────────────────────────────────────────── */
+.step-functions-stage {
+  background: var(--step-functions-panel);
+  border: 1px solid var(--step-functions-border);
+  box-shadow: 0 20px 42px -28px rgba(0, 0, 0, 0.7);
+  border-radius: 24px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Phase colours ──────────────────────────────────── */
+.step-functions-phase--overview .vc-stat-badge__value {
+  color: #fbbf24;
+}
+.step-functions-phase--triggering .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.step-functions-phase--validating .vc-stat-badge__value {
+  color: #818cf8;
+}
+.step-functions-phase--choosing .vc-stat-badge__value {
+  color: #f59e0b;
+}
+.step-functions-phase--assessing .vc-stat-badge__value {
+  color: #818cf8;
+}
+.step-functions-phase--uploading .vc-stat-badge__value {
+  color: #60a5fa;
+}
+.step-functions-phase--notifying .vc-stat-badge__value {
+  color: #f43f5e;
+}
+.step-functions-phase--complete .vc-stat-badge__value {
+  color: #22c55e;
+}
+.step-functions-phase--rejecting .vc-stat-badge__value {
+  color: #ef4444;
+}
+.step-functions-phase--failed .vc-stat-badge__value {
+  color: #ef4444;
+}
+.step-functions-phase--summary .vc-stat-badge__value {
+  color: #fbbf24;
+}
+
+/* ── Workflow State List ────────────────────────────── */
+.sfn-state-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.sfn-state-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  font-size: 0.78rem;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+
+  &--active {
+    background: rgba(15, 23, 42, 0.9);
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+}
+
+.sfn-state-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.sfn-state-chip__name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.sfn-state-chip__type {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Key Idea card ──────────────────────────────────── */
+.sfn-key-idea {
+  font-size: 0.84rem;
+  font-style: italic;
+  color: #cbd5e1;
+  line-height: 1.55;
+  margin: 0.3rem 0 0;
+}
+
+/* ── Signal styling ─────────────────────────────────── */
+.step-functions-root {
+  .viz-signal {
+    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
+  }
+
+  .viz-node[data-clickable="true"] {
+    cursor: pointer;
+  }
+}

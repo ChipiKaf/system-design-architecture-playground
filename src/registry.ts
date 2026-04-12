@@ -43,6 +43,9 @@ import OidcPlugin from "./plugins/oidc";
 import ReactBestPracticesPlugin from "./plugins/react-best-practices";
 import ReactPerformancePlugin from "./plugins/react-performance";
 import VirtualScrollingPlugin from "./plugins/virtual-scrolling";
+import ReactRouterPlugin from "./plugins/react-router";
+import InsuranceDesignPlugin from "./plugins/insurance-design";
+import StepFunctionsPlugin from "./plugins/step-functions";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -91,6 +94,7 @@ export const categories: PluginCategory[] = [
       CiCdBuildPlugin,
       EcommerceCapPlugin,
       GraphqlPlugin,
+      InsuranceDesignPlugin,
     ],
   },
   {
@@ -160,7 +164,13 @@ export const categories: PluginCategory[] = [
     description:
       "Micro-frontends, build-time composition, runtime integration strategies, and frontend architecture at scale.",
     accent: "#6366f1",
-    plugins: [MicrofrontendsPlugin, ReactBestPracticesPlugin, ReactPerformancePlugin, VirtualScrollingPlugin],
+    plugins: [
+      MicrofrontendsPlugin,
+      ReactBestPracticesPlugin,
+      ReactPerformancePlugin,
+      VirtualScrollingPlugin,
+      ReactRouterPlugin,
+    ],
   },
   {
     id: "artificial-intelligence",
@@ -185,6 +195,14 @@ export const categories: PluginCategory[] = [
       "OAuth, tokens, identity providers, and secure access control.",
     accent: "#7c3aed",
     plugins: [OauthPlugin, AwsCognitoPlugin, OidcPlugin],
+  },
+  {
+    id: "aws-services",
+    name: "AWS Services",
+    description:
+      "Deep dives into AWS managed services — Step Functions, Lambda, DynamoDB, and how they work together.",
+    accent: "#f97316",
+    plugins: [StepFunctionsPlugin],
   },
 ];
 
