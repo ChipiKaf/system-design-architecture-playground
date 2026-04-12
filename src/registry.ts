@@ -46,6 +46,7 @@ import VirtualScrollingPlugin from "./plugins/virtual-scrolling";
 import ReactRouterPlugin from "./plugins/react-router";
 import InsuranceDesignPlugin from "./plugins/insurance-design";
 import StepFunctionsPlugin from "./plugins/step-functions";
+import NextjsPlugin from "./plugins/nextjs";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -119,7 +120,7 @@ export const categories: PluginCategory[] = [
     description:
       "How code actually runs — event loops, call stacks, queues, rendering, and other runtime mechanics.",
     accent: "#14b8a6",
-    plugins: [EventLoopPlugin, AngularPlugin, SolidPlugin],
+    plugins: [EventLoopPlugin, AngularPlugin, SolidPlugin, NextjsPlugin],
   },
   {
     id: "iot",
