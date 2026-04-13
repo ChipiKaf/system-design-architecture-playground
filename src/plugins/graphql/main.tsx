@@ -46,6 +46,12 @@ const TOPIC_PILLS: Record<TopicKey, { key: ConceptKey; label: string }[]> = {
     { key: "subscription-op", label: "Subscription" },
     { key: "schema", label: "Schema (SDL)" },
   ],
+  "resolvers-data-fetching": [
+    { key: "resolver-execution", label: "Resolver Model" },
+    { key: "n-plus-1", label: "N+1 Problem" },
+    { key: "dataloader", label: "DataLoader" },
+    { key: "resolver", label: "Lambda Resolvers" },
+  ],
 };
 
 /* ── Interview questions per topic ───────────────────── */
@@ -54,6 +60,8 @@ const TOPIC_QUESTIONS: Record<TopicKey, string> = {
     "What are the main differences between GraphQL and REST, and why might you choose GraphQL?",
   "queries-vs-mutations-vs-subscriptions":
     "Distinguish between GraphQL queries, mutations and subscriptions.",
+  "resolvers-data-fetching":
+    "How does GraphQL fetch data from the database? Walk me through what happens under the hood when a nested query runs.",
 };
 
 /* ── Code examples per variant ───────────────────────── */
@@ -283,6 +291,146 @@ type Post {
 }
 // → AppSync manages WebSocket
 // → Auto fan-out to subscribers`,
+    },
+  },
+  "sql-join-resolver": {
+    client: {
+      label: "Client — Nested Query",
+      code: `const { data } = await client.graphql({
+  query: \`
+    query GetClaims {
+      claims {
+        id
+        amount
+        status
+        policyholder {
+          name
+          email
+        }
+      }
+    }
+  \`,
+});
+// → One request, nested fields
+// → How does the server get
+//   policyholder data?`,
+    },
+    server: {
+      label: "Resolver — SQL JOIN",
+      code: `// claims resolver — single query
+const resolvers = {
+  Query: {
+    claims: async () => {
+      const { rows } = await pg.query(\`
+        SELECT c.id, c.amount, c.status,
+               p.name, p.email
+        FROM claims c
+        JOIN persons p
+          ON c.policyholder_id = p.id
+      \`);
+      return rows;
+    }
+  }
+};
+// → 1 query (JOIN) gets everything
+// → Only works for single-DB setups`,
+    },
+  },
+  "naive-resolvers": {
+    client: {
+      label: "Client — Same Query",
+      code: `const { data } = await client.graphql({
+  query: \`
+    query GetClaims {
+      claims {
+        id
+        amount
+        policyholder {
+          name
+        }
+      }
+    }
+  \`,
+});
+// → Same query as before
+// → But the server handles it
+//   very differently…`,
+    },
+    server: {
+      label: "Resolvers — Naive (N+1)",
+      code: `const resolvers = {
+  Query: {
+    // Query 1: get all claims
+    claims: async () => {
+      const { rows } = await pg.query(
+        'SELECT * FROM claims'
+      );
+      return rows; // 100 claims
+    }
+  },
+  Claim: {
+    // Runs ONCE PER CLAIM (100×)
+    policyholder: async (claim) => {
+      const { rows } = await pg.query(
+        'SELECT * FROM persons WHERE id = $1',
+        [claim.policyholder_id]
+      );
+      return rows[0];
+    }
+  }
+};
+// → 1 + 100 = 101 queries!
+// → This is the N+1 problem`,
+    },
+  },
+  "dataloader-batching": {
+    client: {
+      label: "Client — Same Query",
+      code: `const { data } = await client.graphql({
+  query: \`
+    query GetClaims {
+      claims {
+        id
+        amount
+        policyholder {
+          name
+        }
+      }
+    }
+  \`,
+});
+// → Exact same query
+// → Client doesn't know about
+//   DataLoader — it's server-side`,
+    },
+    server: {
+      label: "Resolvers — With DataLoader",
+      code: `import DataLoader from 'dataloader';
+
+// Created per-request
+const personLoader = new DataLoader(
+  async (ids) => {
+    // ONE query for ALL ids
+    const { rows } = await pg.query(
+      'SELECT * FROM persons WHERE id = ANY($1)',
+      [ids]
+    );
+    // Return in same order as ids
+    return ids.map(id =>
+      rows.find(r => r.id === id)
+    );
+  }
+);
+
+const resolvers = {
+  Claim: {
+    policyholder: (claim) =>
+      personLoader.load(claim.policyholder_id)
+      // DataLoader batches 100 load()
+      // calls into 1 SQL query
+  }
+};
+// → 1 + 1 = 2 queries total!`,
     },
   },
 };

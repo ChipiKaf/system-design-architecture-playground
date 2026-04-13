@@ -47,6 +47,9 @@ import ReactRouterPlugin from "./plugins/react-router";
 import InsuranceDesignPlugin from "./plugins/insurance-design";
 import StepFunctionsPlugin from "./plugins/step-functions";
 import NextjsPlugin from "./plugins/nextjs";
+import AuroraPostgresPlugin from "./plugins/aurora-postgres";
+import ClimbingStairsPlugin from "./plugins/climbing-stairs";
+import PerfectSquaresPlugin from "./plugins/perfect-squares";
 
 /* ──────────────────────────────────────────────────────────
  *  Plugin Category Registry
@@ -95,8 +98,7 @@ export const categories: PluginCategory[] = [
       CiCdBuildPlugin,
       EcommerceCapPlugin,
       GraphqlPlugin,
-      InsuranceDesignPlugin,
-    ],
+      InsuranceDesignPlugin, AuroraPostgresPlugin],
   },
   {
     id: "architecture",
@@ -112,7 +114,7 @@ export const categories: PluginCategory[] = [
     description:
       "Core algorithm ideas explained visually — time complexity, search strategies, growth curves, and more.",
     accent: "#f97316",
-    plugins: [BigOPlugin, PalindromePlugin, CoinChangePlugin, LcsPlugin],
+    plugins: [BigOPlugin, PalindromePlugin, CoinChangePlugin, LcsPlugin, ClimbingStairsPlugin, PerfectSquaresPlugin],
   },
   {
     id: "language-runtime",

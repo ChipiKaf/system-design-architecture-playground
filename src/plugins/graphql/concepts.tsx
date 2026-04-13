@@ -10,7 +10,10 @@ export type ConceptKey =
   | "resolver"
   | "query-op"
   | "mutation-op"
-  | "subscription-op";
+  | "subscription-op"
+  | "n-plus-1"
+  | "dataloader"
+  | "resolver-execution";
 
 interface ConceptDefinition {
   title: string;
@@ -403,6 +406,187 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             <li>
               <strong>AppSync</strong> manages WebSocket connections, scaling,
               and fan-out automatically
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+  "n-plus-1": {
+    title: "The N+1 Problem",
+    subtitle: "The #1 performance trap in GraphQL — and how to spot it",
+    accentColor: "#ef4444",
+    sections: [
+      {
+        title: "What is the N+1 problem?",
+        accent: "#ef4444",
+        content: (
+          <p>
+            Imagine you ask for 100 insurance claims, and for each claim you
+            also want the policyholder's name. With naive resolvers, GraphQL
+            fires <strong>1 query</strong> to get the 100 claims, then fires{" "}
+            <strong>100 more queries</strong> — one per claim — to get each
+            policyholder. That's <strong>101 queries</strong> instead of 1 or 2.
+            The "N" is the number of items (100 claims), the "+1" is the initial
+            query. Hence: N+1.
+          </p>
+        ),
+      },
+      {
+        title: "Why does GraphQL cause this?",
+        accent: "#f97316",
+        content: (
+          <p>
+            GraphQL resolves fields <strong>independently</strong>. Each field
+            has its own resolver function. When the <code>policyholder</code>{" "}
+            field resolver runs, it doesn't know that 99 other claims also need
+            a policyholder. It only sees its own parent claim's{" "}
+            <code>policyholder_id</code> and fires a query for that one ID.
+            Multiply that by N items and you get N+1.
+          </p>
+        ),
+      },
+      {
+        title: "A concrete example",
+        accent: "#ef4444",
+        content: (
+          <ul>
+            <li>
+              <strong>Query 1:</strong> SELECT * FROM claims → 100 rows
+            </li>
+            <li>
+              <strong>Query 2:</strong> SELECT * FROM persons WHERE id = 'p1'
+            </li>
+            <li>
+              <strong>Query 3:</strong> SELECT * FROM persons WHERE id = 'p2'
+            </li>
+            <li>
+              <strong>…</strong> (98 more identical queries)
+            </li>
+            <li>
+              <strong>Query 101:</strong> SELECT * FROM persons WHERE id =
+              'p100'
+            </li>
+            <li>
+              <strong>Total:</strong> 101 database round trips for data that
+              could be fetched in 2
+            </li>
+          </ul>
+        ),
+      },
+    ],
+  },
+  dataloader: {
+    title: "DataLoader — Batching & Caching",
+    subtitle: "The industry-standard fix for the N+1 problem in GraphQL",
+    accentColor: "#3b82f6",
+    sections: [
+      {
+        title: "What is DataLoader?",
+        accent: "#3b82f6",
+        content: (
+          <p>
+            DataLoader is a utility (originally from Facebook) that sits between
+            your resolvers and your data sources. Instead of each resolver
+            firing its own query immediately, DataLoader{" "}
+            <strong>collects all the IDs</strong> requested during the current
+            event loop tick, then fires <strong>one batched query</strong> for
+            all of them.
+          </p>
+        ),
+      },
+      {
+        title: "How batching works",
+        accent: "#22c55e",
+        content: (
+          <ul>
+            <li>
+              100 resolver calls → <code>loader.load(id1)</code>,{" "}
+              <code>loader.load(id2)</code>, …, <code>loader.load(id100)</code>
+            </li>
+            <li>DataLoader waits for the current tick to finish</li>
+            <li>
+              Fires <strong>one query</strong>:{" "}
+              <code>
+                SELECT * FROM persons WHERE id IN ('id1', 'id2', …, 'id100')
+              </code>
+            </li>
+            <li>Returns each result to the correct resolver</li>
+            <li>
+              <strong>Result:</strong> 2 queries instead of 101
+            </li>
+          </ul>
+        ),
+      },
+      {
+        title: "Why DataLoader, not just SQL JOINs?",
+        accent: "#a78bfa",
+        content: (
+          <p>
+            SQL JOINs only work when all data lives in one database. DataLoader
+            works with <strong>any data source</strong> — other databases, REST
+            APIs, microservices, even third-party services. It also provides{" "}
+            <strong>per-request caching</strong>: if two claims share the same
+            policyholder, the second call returns the cached result without
+            hitting the database again.
+          </p>
+        ),
+      },
+    ],
+  },
+  "resolver-execution": {
+    title: "GraphQL Resolver Execution Model",
+    subtitle: "How GraphQL actually fetches data — it's NOT a database",
+    accentColor: "#e535ab",
+    sections: [
+      {
+        title: "GraphQL is an orchestration layer",
+        accent: "#e535ab",
+        content: (
+          <p>
+            GraphQL does <strong>not</strong> talk to your database directly. It
+            doesn't know SQL. It doesn't store data. GraphQL is a{" "}
+            <strong>query language for your API</strong> — an orchestration
+            layer that sits between clients and your data sources. When a query
+            arrives, GraphQL walks the query tree field by field, calling a{" "}
+            <strong>resolver function</strong> for each field. Each resolver
+            decides where to get its data: a database, another API, a cache, or
+            even a calculation.
+          </p>
+        ),
+      },
+      {
+        title: "Per-field resolution",
+        accent: "#22c55e",
+        content: (
+          <p>
+            Every field in a GraphQL schema can have its own resolver. When you
+            query{" "}
+            <code>{"{ claims { id, amount, policyholder { name } } }"}</code>,
+            the engine first calls the <code>claims</code> resolver (which might
+            query PostgreSQL), then for each claim it calls the{" "}
+            <code>policyholder</code> resolver (which might call a different
+            service). This per-field model is powerful but creates the N+1
+            problem if you're not careful.
+          </p>
+        ),
+      },
+      {
+        title: "Three data-fetching strategies",
+        accent: "#3b82f6",
+        content: (
+          <ul>
+            <li>
+              <strong>SQL JOIN:</strong> Do the JOIN in the resolver — 1 query,
+              but only works for single-database setups
+            </li>
+            <li>
+              <strong>Naive resolvers:</strong> Each field fetches independently
+              — leads to N+1 problem (101 queries for 100 items)
+            </li>
+            <li>
+              <strong>DataLoader batching:</strong> Collect IDs, batch into one
+              WHERE IN query — 2 queries total, works across any data source
             </li>
           </ul>
         ),

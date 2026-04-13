@@ -48,13 +48,22 @@ export type StepKey =
   | "qvmvs-appsync-process"
   | "qvmvs-resolve"
   | "qvmvs-response"
-  | "qvmvs-summary";
+  | "qvmvs-summary"
+  /* Q3 — Resolvers & Data Fetching */
+  | "q3-overview"
+  | "q3-client-request"
+  | "q3-parse-validate"
+  | "q3-resolve-claims"
+  | "q3-resolve-nested"
+  | "q3-response"
+  | "q3-summary";
 
 /* ── Guards ──────────────────────────────────────────── */
 
 const isQ1 = (s: GraphqlState) => s.topic === "graphql-vs-rest";
 const isQ2 = (s: GraphqlState) =>
   s.topic === "queries-vs-mutations-vs-subscriptions";
+const isQ3 = (s: GraphqlState) => s.topic === "resolvers-data-fetching";
 
 /* ── Step Configuration ──────────────────────────────── */
 
@@ -351,6 +360,186 @@ export const STEPS: StepDef[] = [
         : s.variant === "mutation-op"
           ? "Mutations are write operations (create/update/delete). Only top-level mutation fields may have side effects. After the write, AppSync returns the result AND pushes it to any active subscriptions watching that mutation type."
           : "Subscriptions provide real-time updates via WebSocket. Client subscribes to a mutation type with optional filters → when a matching mutation fires, the data is pushed automatically. Used for live chat, notifications, collaborative editing.",
+  },
+  // ── Q3 — Resolvers & Data Fetching ────────────────
+  {
+    key: "q3-overview",
+    label: "How Does GraphQL Fetch Data?",
+    when: isQ3,
+    nextButton: "Begin →",
+    action: "resetRun",
+    explain: (s) => {
+      const adapter = getAdapter(s.variant);
+      return `${adapter.profile.label}: ${adapter.profile.description}`;
+    },
+  },
+  {
+    key: "q3-client-request",
+    label: "Client Sends Query",
+    when: isQ3,
+    phase: "request",
+    processingText: "Sending query…",
+    nextButtonColor: "#e535ab",
+    flow: (s) => [
+      { from: "client", to: "graphql", duration: 500, color: "#e535ab" },
+    ],
+    finalHotZones: ["client", "graphql"],
+    recalcMetrics: true,
+    explain: () =>
+      "The client sends a GraphQL query asking for claims AND the policyholder name for each claim. This is a nested query — the policyholder field lives on a different table than claims. How the server fetches this data depends entirely on how the resolvers are written.",
+  },
+  {
+    key: "q3-parse-validate",
+    label: "Parse & Validate Against Schema",
+    when: isQ3,
+    phase: "validate",
+    processingText: "Validating…",
+    flow: () => [
+      { from: "graphql", to: "graphql", duration: 400, color: "#a78bfa" },
+    ],
+    finalHotZones: ["graphql"],
+    recalcMetrics: true,
+    explain: () =>
+      "The GraphQL engine parses the query into a tree (AST) and checks every field against the schema. It confirms that 'claims' is a valid query field, and that 'policyholder' is a valid field on the Claim type. If anything doesn't match the schema, the query is rejected before any resolver runs.",
+  },
+  {
+    key: "q3-resolve-claims",
+    label: "Resolve Top-Level: claims",
+    when: isQ3,
+    phase: "resolve",
+    processingText: "Fetching claims…",
+    nextButtonColor: "#22c55e",
+    flow: (s) =>
+      s.variant === "sql-join-resolver"
+        ? [
+            {
+              from: "graphql",
+              to: "resolver",
+              duration: 400,
+              color: "#22c55e",
+            },
+            { from: "resolver", to: "db", duration: 500, color: "#eab308" },
+          ]
+        : [
+            {
+              from: "graphql",
+              to: "claimsRes",
+              duration: 400,
+              color: "#22c55e",
+            },
+            { from: "claimsRes", to: "db", duration: 500, color: "#eab308" },
+          ],
+    finalHotZones: (s) =>
+      s.variant === "sql-join-resolver"
+        ? ["resolver", "db"]
+        : ["claimsRes", "db"],
+    recalcMetrics: true,
+    explain: (s) =>
+      s.variant === "sql-join-resolver"
+        ? "The claims resolver fires a single SQL query with a JOIN: SELECT c.*, p.name FROM claims c JOIN persons p ON c.policyholder_id = p.id. One query gets everything — claims AND their policyholders. This works great when all your data is in one database."
+        : s.variant === "naive-resolvers"
+          ? "The claims() resolver fires: SELECT * FROM claims. This returns 100 claim rows. Each row has a policyholder_id, but NOT the policyholder's name yet. The GraphQL engine sees that the query also asks for 'policyholder', so it needs to resolve that field next — for every single claim."
+          : "The claims() resolver fires: SELECT * FROM claims. This returns 100 claim rows. Each row has a policyholder_id but not the policyholder name. The GraphQL engine sees the nested 'policyholder' field and will call the policyholder resolver for each claim — but DataLoader will intercept those calls.",
+  },
+  {
+    key: "q3-resolve-nested",
+    label: (s) =>
+      s.variant === "sql-join-resolver"
+        ? "All Data Already Fetched"
+        : s.variant === "naive-resolvers"
+          ? "N+1 Problem: 100 More Queries!"
+          : "DataLoader Batches into 1 Query",
+    when: isQ3,
+    phase: (s) =>
+      s.variant === "sql-join-resolver"
+        ? "resolve"
+        : s.variant === "naive-resolvers"
+          ? "n-plus-1"
+          : "batch",
+    processingText: (s) =>
+      s.variant === "naive-resolvers"
+        ? "Firing 100 queries…"
+        : s.variant === "dataloader-batching"
+          ? "Batching IDs…"
+          : "Already resolved",
+    nextButtonColor: (s) =>
+      s.variant === "naive-resolvers" ? "#ef4444" : "#3b82f6",
+    flow: (s) =>
+      s.variant === "sql-join-resolver"
+        ? []
+        : s.variant === "naive-resolvers"
+          ? [
+              {
+                from: "graphql",
+                to: "holderRes",
+                duration: 300,
+                color: "#ef4444",
+              },
+              { from: "holderRes", to: "db", duration: 400, color: "#ef4444" },
+            ]
+          : [
+              {
+                from: "graphql",
+                to: "holderRes",
+                duration: 300,
+                color: "#3b82f6",
+              },
+              {
+                from: "holderRes",
+                to: "dataloader",
+                duration: 400,
+                color: "#3b82f6",
+              },
+              { from: "dataloader", to: "db", duration: 400, color: "#eab308" },
+            ],
+    finalHotZones: (s) =>
+      s.variant === "sql-join-resolver"
+        ? ["resolver", "db"]
+        : s.variant === "naive-resolvers"
+          ? ["holderRes", "db", "counter"]
+          : ["dataloader", "db", "counter"],
+    recalcMetrics: true,
+    explain: (s) =>
+      s.variant === "sql-join-resolver"
+        ? "Because the JOIN already fetched policyholder data alongside claims, there's nothing more to do. The resolver returned all the data in a single query. This is the simplest approach — but it only works when all your data lives in one database."
+        : s.variant === "naive-resolvers"
+          ? "Here's the N+1 problem: GraphQL calls the policyholder() resolver once for EACH of the 100 claims. Each call fires its own query: SELECT * FROM persons WHERE id = 'xyz'. That's 100 separate database queries — plus the 1 original claims query = 101 total. The database is hammered with nearly identical queries that could have been combined."
+          : "All 100 policyholder() resolver calls go through DataLoader. Instead of firing immediately, DataLoader collects all 100 person IDs during the current event loop tick. Then it fires ONE query: SELECT * FROM persons WHERE id IN ('id1', 'id2', …, 'id100'). That's just 2 total queries (1 for claims + 1 batched for policyholders) instead of 101.",
+  },
+  {
+    key: "q3-response",
+    label: "Response to Client",
+    when: isQ3,
+    phase: "response",
+    processingText: "Returning data…",
+    flow: (s) =>
+      s.variant === "sql-join-resolver"
+        ? [
+            { from: "db", to: "resolver", duration: 400 },
+            { from: "resolver", to: "graphql", duration: 400 },
+            { from: "graphql", to: "client", duration: 400 },
+          ]
+        : [{ from: "db", to: "result", duration: 400 }],
+    finalHotZones: ["client", "result"],
+    recalcMetrics: true,
+    explain: (s) =>
+      s.variant === "sql-join-resolver"
+        ? "The response goes back to the client with all claims and their policyholder names. Total: 1 database query. Simple and efficient — the JOIN did all the heavy lifting."
+        : s.variant === "naive-resolvers"
+          ? "The client finally gets the response with all 100 claims and policyholder names. But it took 101 database queries to get there. With 1,000 claims that would be 1,001 queries. With 10,000 claims — you can see the problem. The response is correct, but painfully slow."
+          : "The client gets the same response — all 100 claims with policyholder names. But it only took 2 database queries total: 1 for claims, 1 batched query for all policyholders. DataLoader solved the N+1 problem without changing the resolver structure.",
+  },
+  {
+    key: "q3-summary",
+    label: "Summary & Comparison",
+    when: isQ3,
+    phase: "summary",
+    explain: (s) =>
+      s.variant === "sql-join-resolver"
+        ? "SQL JOIN approach: 1 query total. The resolver does a JOIN to fetch claims + policyholders together. Pros: simplest, fastest for single-database setups. Cons: only works when all data is in the same database. If policyholders lived in a separate microservice or API, you couldn't JOIN."
+        : s.variant === "naive-resolvers"
+          ? "Naive resolver approach: 101 queries for 100 claims (N+1 problem). GraphQL's per-field resolver model means each nested field triggers its own database call. This is the DEFAULT behavior if you don't add batching. The N+1 problem is the #1 performance trap in GraphQL — and DataLoader is the standard fix."
+          : "DataLoader approach: 2 queries total. DataLoader sits between resolvers and the database, collecting IDs and batching them into a single WHERE IN query. This is the industry-standard solution for the N+1 problem. Works across databases, APIs, and microservices — not just SQL.",
   },
 ];
 

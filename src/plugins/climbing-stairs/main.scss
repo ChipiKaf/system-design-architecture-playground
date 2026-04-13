@@ -1,0 +1,415 @@
+/* ── Climbing Stairs Plugin ──────────────────────────── */
+
+.cs-root {
+  --cs-bg: #020617;
+  --cs-panel: rgba(7, 17, 34, 0.88);
+  --cs-border: rgba(148, 163, 184, 0.18);
+  --cs-text: #e2e8f0;
+  --cs-muted: #94a3b8;
+  --cs-card-bg: #0f172a;
+  --cs-card-border: #1e293b;
+
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--cs-text);
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.12), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.10), transparent 30%),
+    linear-gradient(180deg, #020617 0%, #071325 100%);
+}
+
+/* ── Concept pills bar ──────────────────────────────── */
+.cs-pills {
+  padding: 10px 16px 6px;
+  flex-shrink: 0;
+}
+
+/* ── Body: stage + sidebar ──────────────────────────── */
+.cs-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+/* ── Stage (canvas area) ────────────────────────────── */
+.cs-stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--cs-panel);
+  border: 1px solid var(--cs-border);
+  border-radius: 16px;
+  overflow: hidden;
+
+  &__head {
+    padding: 10px 14px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  &__stats {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  &__canvas-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  &__canvas {
+    position: absolute;
+    inset: 0;
+  }
+}
+
+/* ── Input row & presets ────────────────────────────── */
+.cs-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cs-input-label {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.cs-input {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 13px;
+  font-family: "JetBrains Mono", monospace;
+  padding: 3px 8px;
+  width: 56px;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: #f59e0b;
+  }
+}
+
+.cs-apply-btn {
+  background: #b45309;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  &:hover { background: #d97706; }
+}
+
+.cs-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cs-preset-btn {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: "JetBrains Mono", monospace;
+  &:hover {
+    background: #334155;
+    color: #fbbf24;
+    border-color: #f59e0b;
+  }
+}
+
+/* ── Phase chip ─────────────────────────────────────── */
+.cs-phase {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &__label {
+    font-size: 10px;
+    color: #475569;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  &__value {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+    border-radius: 4px;
+    padding: 1px 6px;
+    background: #1e293b;
+    color: #94a3b8;
+  }
+
+  &--intro .cs-phase__value { color: #fbbf24; }
+  &--understand .cs-phase__value { color: #818cf8; }
+  &--subproblem .cs-phase__value { color: #a78bfa; }
+  &--recurrence .cs-phase__value { color: #c084fc; }
+  &--init-array .cs-phase__value { color: #64748b; }
+  &--base-0 .cs-phase__value { color: #34d399; }
+  &--base-1 .cs-phase__value { color: #34d399; }
+  &--filling .cs-phase__value { color: #fbbf24; }
+  &--result .cs-phase__value { color: #86efac; }
+}
+
+/* ── Stat chip ──────────────────────────────────────── */
+.cs-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &__label {
+    font-size: 10px;
+    color: #475569;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  &__value {
+    font-size: 11px;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+    color: #e2e8f0;
+  }
+}
+
+/* ── Sidebar ────────────────────────────────────────── */
+.cs-sidebar {
+  width: 320px;
+  min-width: 280px;
+  max-width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 4px 2px 4px 0;
+
+  /* thin scrollbar */
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+}
+
+/* ── Cards ──────────────────────────────────────────── */
+.cs-card {
+  background: var(--cs-card-bg);
+  border: 1px solid var(--cs-card-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  animation: cs-card-in 0.25s ease-out;
+
+  &__label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+    color: #64748b;
+  }
+
+  &__text {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    margin: 0;
+
+    p { margin: 0 0 6px; }
+    p:last-child { margin-bottom: 0; }
+    strong { color: #e2e8f0; }
+    ul, ol {
+      margin: 4px 0;
+      padding-left: 16px;
+    }
+    li { margin-bottom: 2px; }
+  }
+}
+
+@keyframes cs-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Card variants ──────────────────────────────────── */
+.cs-card--problem {
+  border-color: #f59e0b44;
+  background: linear-gradient(135deg, #1c120766, #0f172a);
+
+  .cs-card__label { color: #fbbf24; }
+}
+
+.cs-card--explanation {
+  border-color: #3b82f644;
+  background: linear-gradient(135deg, #0b254566, #0f172a);
+
+  .cs-card__label { color: #60a5fa; }
+}
+
+.cs-card--reasoning {
+  border-color: #a78bfa44;
+  background: linear-gradient(135deg, #1e103d66, #0f172a);
+
+  .cs-card__label { color: #a78bfa; }
+}
+
+.cs-card--dp-meaning {
+  border-color: #818cf844;
+  background: linear-gradient(135deg, #1e1b4b44, #0f172a);
+
+  .cs-card__label { color: #818cf8; }
+}
+
+.cs-card--base-case {
+  border-color: #22c55e44;
+  background: linear-gradient(135deg, #052e1666, #0f172a);
+
+  .cs-card__label { color: #34d399; }
+}
+
+.cs-card--loop {
+  border-color: #f59e0b44;
+  background: linear-gradient(135deg, #1c120766, #0f172a);
+
+  .cs-card__label { color: #fbbf24; }
+}
+
+.cs-card--code {
+  border-color: #1e293b;
+}
+
+/* ── Inline code ────────────────────────────────────── */
+.cs-code {
+  background: #1e293b;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: #93c5fd;
+}
+
+/* ── Code block ─────────────────────────────────────── */
+.cs-code-block {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #94a3b8;
+  margin: 0;
+  padding: 0;
+
+  &__line {
+    padding: 1px 6px;
+    border-radius: 3px;
+    transition: background-color 0.3s, color 0.3s;
+    white-space: pre;
+
+    &--active {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      font-weight: 600;
+    }
+  }
+}
+
+/* ── Formula highlight ──────────────────────────────── */
+.cs-formula {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: #c084fc;
+  background: #1e103d55;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #a78bfa44;
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+/* ── Examples ───────────────────────────────────────── */
+.cs-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.cs-example {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  padding: 3px 8px;
+  background: #1e293b66;
+  border-radius: 4px;
+  color: #cbd5e1;
+
+  strong { color: #fbbf24; }
+}
+
+/* ── Insight box ────────────────────────────────────── */
+.cs-insight {
+  background: #1e103d44;
+  border: 1px solid #a78bfa33;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 6px 0;
+
+  p { margin: 0 0 4px; }
+  ul { margin: 4px 0; padding-left: 16px; }
+  li { color: #c4b5fd; }
+  em { color: #a78bfa; font-style: normal; font-weight: 600; }
+}
+
+/* ── Fill detail row ────────────────────────────────── */
+.cs-fill-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: "JetBrains Mono", monospace;
+  margin-top: 4px;
+}
+
+/* ── Current index highlight ────────────────────────── */
+.cs-ij-current {
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: #1c191744;
+  border: 1px solid #f59e0b44;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fde68a;
+}
+
+/* ── Base-case learn-more link ──────────────────────── */
+.cs-base-case-link {
+  background: none;
+  border: none;
+  color: #34d399;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:hover { color: #86efac; }
+}

@@ -1,68 +1,71 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { LabState } from "../../lib/lab-engine";
-import { getAdapter, TOPICS, type TopicKey } from "./graphql-adapters";
+import { getAdapter, TOPICS, type TopicKey } from "./aurora-postgres-adapters";
 
 /* ── Variant identifiers ─────────────────────────────── */
 export type VariantKey =
-  | "graphql-approach"
-  | "rest-approach"
-  | "query-op"
-  | "mutation-op"
-  | "subscription-op"
-  | "sql-join-resolver"
-  | "naive-resolvers"
-  | "dataloader-batching";
+  | "acid-guarantees"
+  | "complex-queries"
+  | "jsonb-flexibility"
+  | "extensions-ecosystem"
+  | "storage-architecture"
+  | "read-replicas"
+  | "claims-pipeline"
+  | "policy-lifecycle";
 
 export { type TopicKey };
 
 /* ── State shape ─────────────────────────────────────── */
-export interface GraphqlState extends LabState {
+export interface AuroraPostgresState extends LabState {
   topic: TopicKey;
   variant: VariantKey;
 
-  /* Q1 — GraphQL vs REST */
-  endpoints: "none" | "single" | "multiple";
-  fetchStrategy: "none" | "exact" | "over" | "under";
-  schemaVisible: boolean;
-  responseFields: number;
-  roundTrips: number;
+  /* Q1 — Why Relational */
+  transactionGuarantee: "none" | "acid" | "eventual";
+  queryComplexity: "none" | "simple" | "complex";
 
-  /* Q3 — Resolvers & Data Fetching */
-  queryCount: number;
-  batchEnabled: boolean;
-  resolverStrategy: "none" | "join" | "naive" | "batched";
+  /* Q2 — Why PostgreSQL */
+  schemaMode: "none" | "relational" | "jsonb" | "hybrid";
+  extensionsActive: boolean;
+
+  /* Q3 — Why Aurora */
+  storageReplication: "none" | "active" | "quorum";
+  replicaCount: number;
+
+  /* Q4 — Insurance Schema */
+  pipelineStage: string;
+  auditTrail: boolean;
 }
 
 /* ── Metrics model (delegates to adapter) ────────────── */
-export function computeMetrics(state: GraphqlState) {
+export function computeMetrics(state: AuroraPostgresState) {
   const adapter = getAdapter(state.variant);
   adapter.computeMetrics(state);
 }
 
-function resetFlags(state: GraphqlState) {
-  state.endpoints = "none";
-  state.fetchStrategy = "none";
-  state.schemaVisible = false;
-  state.responseFields = 0;
-  state.roundTrips = 0;
-  state.queryCount = 0;
-  state.batchEnabled = false;
-  state.resolverStrategy = "none";
+function resetFlags(state: AuroraPostgresState) {
+  state.transactionGuarantee = "none";
+  state.queryComplexity = "none";
+  state.schemaMode = "none";
+  state.extensionsActive = false;
+  state.storageReplication = "none";
+  state.replicaCount = 0;
+  state.pipelineStage = "none";
+  state.auditTrail = false;
 }
 
-export const initialState: GraphqlState = {
+export const initialState: AuroraPostgresState = {
   topic: TOPICS[0].id,
   variant: TOPICS[0].defaultVariant as VariantKey,
 
-  endpoints: "none",
-  fetchStrategy: "none",
-  schemaVisible: false,
-  responseFields: 0,
-  roundTrips: 0,
-
-  queryCount: 0,
-  batchEnabled: false,
-  resolverStrategy: "none",
+  transactionGuarantee: "none",
+  queryComplexity: "none",
+  schemaMode: "none",
+  extensionsActive: false,
+  storageReplication: "none",
+  replicaCount: 0,
+  pipelineStage: "none",
+  auditTrail: false,
 
   hotZones: [],
   explanation:
@@ -73,8 +76,8 @@ export const initialState: GraphqlState = {
 computeMetrics(initialState);
 
 /* ── Slice ───────────────────────────────────────────── */
-const graphqlSlice = createSlice({
-  name: "graphql",
+const auroraPostgresSlice = createSlice({
+  name: "auroraPostgres",
   initialState,
   reducers: {
     reset: () => {
@@ -90,7 +93,7 @@ const graphqlSlice = createSlice({
       state.phase = "overview";
       computeMetrics(state);
     },
-    patchState(state, action: PayloadAction<Partial<GraphqlState>>) {
+    patchState(state, action: PayloadAction<Partial<AuroraPostgresState>>) {
       Object.assign(state, action.payload);
     },
     recalcMetrics(state) {
@@ -125,5 +128,6 @@ export const {
   recalcMetrics,
   setVariant,
   setTopic,
-} = graphqlSlice.actions;
-export default graphqlSlice.reducer;
+} = auroraPostgresSlice.actions;
+
+export default auroraPostgresSlice.reducer;
