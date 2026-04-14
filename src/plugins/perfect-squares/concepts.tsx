@@ -44,8 +44,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <p>
             A greedy approach (always pick the largest square) doesn't always
-            work. For n = 12, greedy gives 9 + 1 + 1 + 1 = 4 squares, but
-            the optimal is 4 + 4 + 4 = 3 squares. DP tries all options
+            work. For n = 12, greedy gives 9 + 1 + 1 + 1 = 4 squares, but the
+            optimal is 4 + 4 + 4 = 3 squares. DP tries all options
             systematically.
           </p>
         ),
@@ -67,9 +67,7 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
               <code style={{ color: "#fbbf24" }}>dp[i]</code> = the minimum
               number of perfect squares that sum to <strong>i</strong>.
             </p>
-            <ul
-              style={{ color: "#e2e8f0", paddingLeft: 20, lineHeight: 1.8 }}
-            >
+            <ul style={{ color: "#e2e8f0", paddingLeft: 20, lineHeight: 1.8 }}>
               <li>dp[0] = 0 — zero squares needed for sum 0</li>
               <li>dp[1] = 1 — just 1²</li>
               <li>dp[4] = 1 — just 2²</li>
@@ -104,8 +102,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             </pre>
             <p style={{ marginTop: 12 }}>
               For each target sum <strong>i</strong>, we try subtracting every
-              perfect square j² and pick whichever leaves the smallest
-              remaining count.
+              perfect square j² and pick whichever leaves the smallest remaining
+              count.
             </p>
           </div>
         ),
@@ -125,12 +123,12 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
           <div>
             <p>
               To make the sum <strong>0</strong>, you need zero squares. This
-              sounds trivial, but it's essential — without it, dp[1] would
-              stay at ∞.
+              sounds trivial, but it's essential — without it, dp[1] would stay
+              at ∞.
             </p>
             <p>
-              Everything above 0 starts at ∞ and gets replaced as we find
-              better decompositions.
+              Everything above 0 starts at ∞ and gets replaced as we find better
+              decompositions.
             </p>
           </div>
         ),
@@ -151,9 +149,7 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             <p>
               For <strong>n = 12</strong>, the largest square ≤ 12 is 9. But:
             </p>
-            <ul
-              style={{ color: "#e2e8f0", paddingLeft: 20, lineHeight: 1.8 }}
-            >
+            <ul style={{ color: "#e2e8f0", paddingLeft: 20, lineHeight: 1.8 }}>
               <li>
                 Greedy: 9 + 1 + 1 + 1 = <strong>4 squares</strong>
               </li>

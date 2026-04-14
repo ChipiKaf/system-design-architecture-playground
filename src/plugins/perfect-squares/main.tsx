@@ -75,10 +75,7 @@ const CODE_LINES = [
 
 function isArrayPhase(p: string) {
   return (
-    p === "init-array" ||
-    p === "base-case" ||
-    p === "filling" ||
-    p === "result"
+    p === "init-array" || p === "base-case" || p === "filling" || p === "result"
   );
 }
 
@@ -389,8 +386,7 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
         const cy = GRID_Y + row * STRIDE + CELL_H / 2;
 
         const isCurrent =
-          i === currentIndex &&
-          (phase === "filling" || phase === "base-case");
+          i === currentIndex && (phase === "filling" || phase === "base-case");
         const isSource =
           phase === "filling" &&
           currentIndex >= 1 &&
@@ -481,11 +477,7 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
       });
 
       // ── Arrow from source cell to current during filling ──
-      if (
-        phase === "filling" &&
-        currentIndex >= 1 &&
-        bestJ > 0
-      ) {
+      if (phase === "filling" && currentIndex >= 1 && bestJ > 0) {
         const srcIdx = currentIndex - bestJ * bestJ;
         const srcCol = srcIdx % cols;
         const srcRow = Math.floor(srcIdx / cols);
@@ -758,8 +750,8 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
                     square doesn't always give the best answer!
                   </div>
                   <div className="ps-example">
-                    For n = 12: greedy gives 9+1+1+1 = 4 squares, but 4+4+4 =
-                    3 is better.
+                    For n = 12: greedy gives 9+1+1+1 = 4 squares, but 4+4+4 = 3
+                    is better.
                   </div>
                 </div>
                 <p style={{ marginTop: 8, color: "#818cf8" }}>
@@ -781,12 +773,12 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
                 <div className="ps-insight">
                   <p>
                     If we subtract any square{" "}
-                    <code className="ps-code">j²</code> from i, we get a
-                    smaller problem: i − j².
+                    <code className="ps-code">j²</code> from i, we get a smaller
+                    problem: i − j².
                   </p>
                   <p>
-                    If we already know dp[i − j²], then using j² costs just
-                    1 more square.
+                    If we already know dp[i − j²], then using j² costs just 1
+                    more square.
                   </p>
                   <p>
                     So: <em>dp[i]</em> = min over all j of{" "}
@@ -806,8 +798,8 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
                   {`for j = 1 to √i:\n  dp[i] = min(dp[i], dp[i-j²] + 1)`}
                 </pre>
                 <p>
-                  Unlike Climbing Stairs (which only looks at i−1 and i−2),
-                  here we have an <strong>inner loop</strong> that tries every
+                  Unlike Climbing Stairs (which only looks at i−1 and i−2), here
+                  we have an <strong>inner loop</strong> that tries every
                   square.
                 </p>
                 <ol>
@@ -848,9 +840,9 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
                   <strong>zero</strong> squares.
                 </p>
                 <p style={{ color: "#94a3b8", marginTop: 6 }}>
-                  Everything else starts at ∞ — meaning "we haven't found a
-                  way yet". As we fill left to right, ∞ values get replaced
-                  with real answers.
+                  Everything else starts at ∞ — meaning "we haven't found a way
+                  yet". As we fill left to right, ∞ values get replaced with
+                  real answers.
                 </p>
                 <button
                   className="ps-base-case-link"
@@ -865,11 +857,11 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
           {/* Loop explainer — visible during filling */}
           {phase === "filling" && currentIndex >= 1 && (
             <div className="ps-card ps-card--loop">
-              <div className="ps-card__label">🔄 Inner loop for dp[{currentIndex}]</div>
+              <div className="ps-card__label">
+                🔄 Inner loop for dp[{currentIndex}]
+              </div>
               <div className="ps-card__text">
-                <p>
-                  Try each square j² ≤ {currentIndex}:
-                </p>
+                <p>Try each square j² ≤ {currentIndex}:</p>
                 {squaresUpTo(currentIndex).map((sq) => {
                   const j = Math.sqrt(sq);
                   const rem = currentIndex - sq;
@@ -891,8 +883,8 @@ const PerfectSquaresVisualization: React.FC<Props> = ({
                   );
                 })}
                 <p style={{ marginTop: 6, color: "#fde68a" }}>
-                  Best: dp[{currentIndex}] = {dp[currentIndex]} (via {bestJ}²
-                  = {bestJ * bestJ})
+                  Best: dp[{currentIndex}] = {dp[currentIndex]} (via {bestJ}² ={" "}
+                  {bestJ * bestJ})
                 </p>
               </div>
             </div>

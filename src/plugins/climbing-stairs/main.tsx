@@ -187,7 +187,10 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
           fill = "#1c1917";
           stroke = "#f59e0b";
           strokeW = 2.2;
-        } else if (i === currentIndex && (phase === "base-0" || phase === "base-1")) {
+        } else if (
+          i === currentIndex &&
+          (phase === "base-0" || phase === "base-1")
+        ) {
           fill = "#0b2545";
           stroke = "#3b82f6";
           strokeW = 2;
@@ -195,7 +198,11 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
           fill = "#0b1e3a";
           stroke = "#2563eb55";
           strokeW = 1.2;
-        } else if (phase === "understand" || phase === "subproblem" || phase === "recurrence") {
+        } else if (
+          phase === "understand" ||
+          phase === "subproblem" ||
+          phase === "recurrence"
+        ) {
           fill = "#0f172a";
           stroke = "#334155";
           strokeW = 1;
@@ -284,8 +291,19 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
         const examples: string[] = [];
         if (n === 2) examples.push("(1+1)", "(2)");
         else if (n === 3) examples.push("(1+1+1)", "(1+2)", "(2+1)");
-        else if (n === 4) examples.push("(1+1+1+1)", "(1+1+2)", "(1+2+1)", "(2+1+1)", "(2+2)");
-        else if (n === 5) examples.push("(11111)", "(1+1+1+2)", "(1+1+2+1)", "(1+2+1+1)", "(2+1+1+1)", "(1+2+2)", "(2+1+2)", "(2+2+1)");
+        else if (n === 4)
+          examples.push("(1+1+1+1)", "(1+1+2)", "(1+2+1)", "(2+1+1)", "(2+2)");
+        else if (n === 5)
+          examples.push(
+            "(11111)",
+            "(1+1+1+2)",
+            "(1+1+2+1)",
+            "(1+2+1+1)",
+            "(2+1+1+1)",
+            "(1+2+2)",
+            "(2+1+2)",
+            "(2+2+1)",
+          );
 
         o.add(
           "text",
@@ -894,10 +912,10 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
           <div className="cs-card cs-card--problem">
             <div className="cs-card__label">Problem</div>
             <p className="cs-card__text">
-              You are climbing a staircase with <strong>{n} steps</strong>.
-              Each time you can take <strong>1 step</strong> or{" "}
-              <strong>2 steps</strong>. How many distinct ways can you reach
-              the top?
+              You are climbing a staircase with <strong>{n} steps</strong>. Each
+              time you can take <strong>1 step</strong> or{" "}
+              <strong>2 steps</strong>. How many distinct ways can you reach the
+              top?
             </p>
           </div>
 
@@ -947,8 +965,7 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
                   <p>You can only get there from:</p>
                   <ul>
                     <li>
-                      Step <code className="cs-code">i−1</code> (taking +1
-                      step)
+                      Step <code className="cs-code">i−1</code> (taking +1 step)
                     </li>
                     <li>
                       Step <code className="cs-code">i−2</code> (taking +2
@@ -961,9 +978,8 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
                   </p>
                 </div>
                 <p style={{ marginTop: 8 }}>
-                  Let's define:{" "}
-                  <code className="cs-code">dp[i]</code> = number of distinct
-                  ways to reach step <strong>i</strong>.
+                  Let's define: <code className="cs-code">dp[i]</code> = number
+                  of distinct ways to reach step <strong>i</strong>.
                 </p>
               </div>
             </div>
@@ -974,9 +990,7 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
             <div className="cs-card cs-card--reasoning">
               <div className="cs-card__label">💡 The recurrence</div>
               <div className="cs-card__text">
-                <pre className="cs-formula">
-                  dp[i] = dp[i-1] + dp[i-2]
-                </pre>
+                <pre className="cs-formula">dp[i] = dp[i-1] + dp[i-2]</pre>
                 <p>
                   This is the same formula as the{" "}
                   <strong style={{ color: "#f9a8d4" }}>
@@ -984,9 +998,7 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
                   </strong>
                   !
                 </p>
-                <p style={{ marginTop: 8 }}>
-                  Now we just need:
-                </p>
+                <p style={{ marginTop: 8 }}>Now we just need:</p>
                 <ol>
                   <li>An array to store the results</li>
                   <li>Base cases (what we know for sure)</li>
@@ -1008,8 +1020,9 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
                 </p>
                 {phase === "filling" && currentIndex >= 2 && (
                   <div className="cs-ij-current">
-                    Right now: <code className="cs-code">dp[{currentIndex}]</code>{" "}
-                    = ways to reach step {currentIndex} = {dp[currentIndex]}
+                    Right now:{" "}
+                    <code className="cs-code">dp[{currentIndex}]</code> = ways
+                    to reach step {currentIndex} = {dp[currentIndex]}
                   </div>
                 )}
               </div>
@@ -1024,23 +1037,21 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
                 {phase === "base-0" && (
                   <>
                     <p>
-                      <code className="cs-code">dp[0] = 1</code> —{" "}
-                      there is <strong>one way</strong> to be at the ground:
-                      do nothing.
+                      <code className="cs-code">dp[0] = 1</code> — there is{" "}
+                      <strong>one way</strong> to be at the ground: do nothing.
                     </p>
                     <p style={{ color: "#94a3b8", marginTop: 6 }}>
-                      This feels weird, but it's needed! Without it, dp[2]
-                      would be wrong. Try: dp[2] = dp[1] + dp[0] = 1 + 1 = 2.
-                      ✓
+                      This feels weird, but it's needed! Without it, dp[2] would
+                      be wrong. Try: dp[2] = dp[1] + dp[0] = 1 + 1 = 2. ✓
                     </p>
                   </>
                 )}
                 {phase === "base-1" && (
                   <>
                     <p>
-                      <code className="cs-code">dp[1] = 1</code> —{" "}
-                      there is <strong>one way</strong> to reach step 1:
-                      take a single step from the ground.
+                      <code className="cs-code">dp[1] = 1</code> — there is{" "}
+                      <strong>one way</strong> to reach step 1: take a single
+                      step from the ground.
                     </p>
                     <p style={{ color: "#94a3b8", marginTop: 6 }}>
                       Now we have two known values. The loop can begin!
@@ -1063,9 +1074,7 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
               <div className="cs-card__label">🔄 The loop</div>
               <div className="cs-card__text">
                 <p>
-                  <code className="cs-code">
-                    for (i = 2; i &lt;= {n}; i++)
-                  </code>
+                  <code className="cs-code">for (i = 2; i &lt;= {n}; i++)</code>
                 </p>
                 <p>
                   We go left → right, computing each cell using the two before
@@ -1074,13 +1083,13 @@ const ClimbingStairsVisualization: React.FC<Props> = ({
                 </p>
                 <div className="cs-fill-detail">
                   <span style={{ color: "#a78bfa" }}>■</span>
-                  <code className="cs-code">dp[{currentIndex - 1}]</code>{" "}
-                  = {dp[currentIndex - 1]} (came from +1 step)
+                  <code className="cs-code">dp[{currentIndex - 1}]</code> ={" "}
+                  {dp[currentIndex - 1]} (came from +1 step)
                 </div>
                 <div className="cs-fill-detail">
                   <span style={{ color: "#60a5fa" }}>■</span>
-                  <code className="cs-code">dp[{currentIndex - 2}]</code>{" "}
-                  = {dp[currentIndex - 2]} (came from +2 steps)
+                  <code className="cs-code">dp[{currentIndex - 2}]</code> ={" "}
+                  {dp[currentIndex - 2]} (came from +2 steps)
                 </div>
               </div>
             </div>

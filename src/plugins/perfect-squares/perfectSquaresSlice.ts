@@ -128,7 +128,9 @@ const perfectSquaresSlice = createSlice({
         const remaining = index - sq;
         const candidate = state.dp[remaining] + 1;
         const marker = j === bestJVal ? " ✓ best" : "";
-        tried.push(`${j}² = ${sq} → dp[${remaining}] + 1 = ${candidate}${marker}`);
+        tried.push(
+          `${j}² = ${sq} → dp[${remaining}] + 1 = ${candidate}${marker}`,
+        );
       }
 
       state.explanation =

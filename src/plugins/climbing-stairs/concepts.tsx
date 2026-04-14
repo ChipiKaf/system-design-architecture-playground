@@ -30,8 +30,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             <p>
               You are climbing a staircase with <strong>n</strong> steps. Each
               time you can take either <strong>1 step</strong> or{" "}
-              <strong>2 steps</strong>. How many distinct ways can you reach
-              the top?
+              <strong>2 steps</strong>. How many distinct ways can you reach the
+              top?
             </p>
             <p>
               For example, with n = 3 there are 3 ways: (1+1+1), (1+2), and
@@ -46,8 +46,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <p>
             A brute-force recursive approach has exponential time complexity
-            because it recomputes the same sub-problems. DP stores each
-            result once, giving us <strong>O(n)</strong> time and space.
+            because it recomputes the same sub-problems. DP stores each result
+            once, giving us <strong>O(n)</strong> time and space.
           </p>
         ),
       },
@@ -104,9 +104,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
             </pre>
             <p style={{ marginTop: 12 }}>
               To reach step <strong>i</strong>, you either came from step{" "}
-              <strong>i−1</strong> (took 1 step) or step{" "}
-              <strong>i−2</strong> (took 2 steps). The total ways is the sum
-              of both.
+              <strong>i−1</strong> (took 1 step) or step <strong>i−2</strong>{" "}
+              (took 2 steps). The total ways is the sum of both.
             </p>
           </div>
         ),
@@ -125,8 +124,8 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         content: (
           <p>
             There is exactly <strong>one way</strong> to stay at the ground —
-            take zero steps. This might feel counter-intuitive, but it's
-            needed so dp[2] = dp[1] + dp[0] = 1 + 1 = 2, which is correct.
+            take zero steps. This might feel counter-intuitive, but it's needed
+            so dp[2] = dp[1] + dp[0] = 1 + 1 = 2, which is correct.
           </p>
         ),
       },
@@ -153,21 +152,17 @@ export const concepts: Record<ConceptKey, ConceptDefinition> = {
         accent: "#ec4899",
         content: (
           <div>
-            <p>
-              The Fibonacci sequence: 1, 1, 2, 3, 5, 8, 13, …
-            </p>
+            <p>The Fibonacci sequence: 1, 1, 2, 3, 5, 8, 13, …</p>
             <p>
               The climbing stairs DP array produces exactly the same numbers.
-              Both satisfy <code style={{ color: "#f9a8d4" }}>
-                f(n) = f(n-1) + f(n-2)
-              </code>{" "}
+              Both satisfy{" "}
+              <code style={{ color: "#f9a8d4" }}>f(n) = f(n-1) + f(n-2)</code>{" "}
               with f(0) = 1, f(1) = 1.
             </p>
             <p style={{ color: "#94a3b8", marginTop: 8 }}>
-              This means climbing stairs can also be solved in O(1) space
-              with two rolling variables, or even O(log n) with matrix
-              exponentiation — but the DP table approach is clearest for
-              learning.
+              This means climbing stairs can also be solved in O(1) space with
+              two rolling variables, or even O(log n) with matrix exponentiation
+              — but the DP table approach is clearest for learning.
             </p>
           </div>
         ),

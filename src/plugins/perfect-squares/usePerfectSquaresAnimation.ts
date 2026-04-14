@@ -13,7 +13,9 @@ import {
   type PerfectSquaresState,
 } from "./perfectSquaresSlice";
 
-export const usePerfectSquaresAnimation = (onAnimationComplete?: () => void) => {
+export const usePerfectSquaresAnimation = (
+  onAnimationComplete?: () => void,
+) => {
   const dispatch = useDispatch();
   const { currentStep } = useSelector((s: RootState) => s.simulation);
   const runtime = useSelector(
@@ -46,8 +48,7 @@ export const usePerfectSquaresAnimation = (onAnimationComplete?: () => void) => 
           currentIndex: -1,
           filledUpTo: -1,
           bestJ: -1,
-          explanation:
-            `Pick a value for n. We'll find the minimum number of perfect squares that sum to n.`,
+          explanation: `Pick a value for n. We'll find the minimum number of perfect squares that sum to n.`,
         }),
       );
       finish();
@@ -55,19 +56,39 @@ export const usePerfectSquaresAnimation = (onAnimationComplete?: () => void) => 
     }
 
     /* Step 1: Understand the problem */
-    if (currentStep === 1) { dispatch(setUnderstand()); finish(); return; }
+    if (currentStep === 1) {
+      dispatch(setUnderstand());
+      finish();
+      return;
+    }
 
     /* Step 2: Identify the sub-problem */
-    if (currentStep === 2) { dispatch(setSubproblem()); finish(); return; }
+    if (currentStep === 2) {
+      dispatch(setSubproblem());
+      finish();
+      return;
+    }
 
     /* Step 3: Discover the recurrence */
-    if (currentStep === 3) { dispatch(setRecurrence()); finish(); return; }
+    if (currentStep === 3) {
+      dispatch(setRecurrence());
+      finish();
+      return;
+    }
 
     /* Step 4: Create dp array */
-    if (currentStep === 4) { dispatch(initArray()); finish(); return; }
+    if (currentStep === 4) {
+      dispatch(initArray());
+      finish();
+      return;
+    }
 
     /* Step 5: Base case dp[0] = 0 */
-    if (currentStep === 5) { dispatch(setBase()); finish(); return; }
+    if (currentStep === 5) {
+      dispatch(setBase());
+      finish();
+      return;
+    }
 
     /* Steps 6+: Fill dp[1] through dp[n] */
     const fillIndex = currentStep - 5; // step 6 → index 1, step 7 → index 2, …

@@ -14,7 +14,9 @@ import {
   type ClimbingStairsState,
 } from "./climbingStairsSlice";
 
-export const useClimbingStairsAnimation = (onAnimationComplete?: () => void) => {
+export const useClimbingStairsAnimation = (
+  onAnimationComplete?: () => void,
+) => {
   const dispatch = useDispatch();
   const { currentStep } = useSelector((s: RootState) => s.simulation);
   const runtime = useSelector(
@@ -46,8 +48,7 @@ export const useClimbingStairsAnimation = (onAnimationComplete?: () => void) => 
           phase: "intro",
           currentIndex: -1,
           filledUpTo: -1,
-          explanation:
-            `Pick a value for n (the number of stairs). We'll walk through solving this step by step.`,
+          explanation: `Pick a value for n (the number of stairs). We'll walk through solving this step by step.`,
         }),
       );
       finish();
